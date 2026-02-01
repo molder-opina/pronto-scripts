@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Supabase/Postgres (opcional)
+# SUPABASE_DB_POOLER_URL=postgresql://postgres.<project_ref>:[YOUR-PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres
+# SUPABASE_DB_URL=postgresql+psycopg2://user:pass@host:5432/db?sslmode=require
+
+# SUPABASE_DB_HOST=
+# SUPABASE_DB_PORT=5432
+# SUPABASE_DB_USER=
+# SUPABASE_DB_PASSWORD=
+# SUPABASE_DB_NAME=
+# SUPABASE_DB_SSLMODE=require
+
+# SUPABASE_DB_POOLER_HOST=
+# SUPABASE_DB_POOLER_PORT=6543
+# SUPABASE_DB_POOLER_USER=
+# SUPABASE_DB_POOLER_PASSWORD=
+# SUPABASE_DB_POOLER_NAME=
+# SUPABASE_DB_POOLER_SSLMODE=require
+
+export SUPABASE_DB_POOLER_PASSWORD=${SUPABASE_DB_PASSWORD}

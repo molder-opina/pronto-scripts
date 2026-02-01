@@ -1,0 +1,11 @@
+
+ALTER TABLE pronto_orders
+ADD COLUMN accepted_at TIMESTAMP NULL,
+ADD COLUMN waiter_accepted_at TIMESTAMP NULL,
+ADD COLUMN chef_accepted_at TIMESTAMP NULL,
+ADD COLUMN ready_at TIMESTAMP NULL,
+ADD COLUMN delivered_at TIMESTAMP NULL,
+ADD COLUMN check_requested_at TIMESTAMP NULL,
+ADD COLUMN feedback_requested_at TIMESTAMP NULL,
+ADD COLUMN feedback_completed_at TIMESTAMP NULL,
+ADD COLUMN paid_at TIMESTAMP NULL;

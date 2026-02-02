@@ -6,8 +6,8 @@ project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "build"))
 
-from shared.db import get_session
-from shared.models import Employee
+from pronto_shared.db import get_session
+from pronto_shared.models import Employee
 
 
 def list_employees():

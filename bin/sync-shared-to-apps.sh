@@ -1,7 +1,17 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════════════
 # Script: sync-shared-to-apps.sh
-# Propósito: Sincronizar contenido de shared static a las aplicaciones
+# PROPÓSITO: Este script ya NO es necesario con la nueva estructura.
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# ANTIGUA (monorepo): src/shared/static/js/ → se sincronizaba a apps
+# NUEVA (multi-repo): pronto_shared es un package pip instalado
+#
+# Los assets estáticos ahora viven en:
+# - pronto-static/src/vue/shared/ → para Vue components
+# - pronto-static/src/static_content/ → para assets (CSS, imágenes)
+#
+# Los módulos JS/TS se compilan independientemente en cada repo.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -27,51 +37,14 @@ log() {
     echo -e "${color}[${level}]${NC} ${message}"
 }
 
-log INFO "Sincronizando shared static → pronto_employees..."
+log INFO "Script deprecado: sync-shared-to-apps.sh"
+log INFO "La sincronización ya no es necesaria con la estructura actual."
+log INFO ""
+log INFO "Estructura actual:"
+log INFO "  - pronto_shared (Python): package en pronto-libs, instalado via pip"
+log INFO "  - Vue components: en pronto-static/src/vue/shared/"
+log INFO "  - Static assets: en pronto-static/src/static_content/"
+log INFO ""
+log INFO "Cada aplicación gestiona sus propios assets."
 
-# JS compilados
-log INFO "Copiando JS compilados..."
-cp -f "${ROOT_DIR}/src/shared/static/js/dist/employees/"*.js \
-    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/" 2>/dev/null || true
-
-# Chunks
-cp -rf "${ROOT_DIR}/src/shared/static/js/dist/employees/chunks/"* \
-    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/chunks/" 2>/dev/null || true
-
-# Assets
-cp -rf "${ROOT_DIR}/src/shared/static/js/dist/employees/assets/"* \
-    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/assets/" 2>/dev/null || true
-
-# CSS modules (vanilla JS)
-log INFO "Copiando módulos JS..."
-for file in keyboard-shortcuts.js pagination.js realtime.js loading.js \
-    notifications.js feedback_dashboard.js business_config.js roles_management.js \
-    shortcuts_admin.js employees_manager_vanilla.js roles_manager_vanilla.js; do
-    if [ -f "${ROOT_DIR}/src/shared/static/js/${file}" ]; then
-        cp -f "${ROOT_DIR}/src/shared/static/js/${file}" \
-            "${ROOT_DIR}/src/pronto_employees/static/js/${file}" 2>/dev/null || true
-    fi
-done
-
-# CSS
-log INFO "Copiando CSS..."
-for file in dashboard.css reports.css styles.css tokens.css waiter-pos-modern.css waiter.css; do
-    if [ -f "${ROOT_DIR}/src/shared/static/css/${file}" ]; then
-        cp -f "${ROOT_DIR}/src/shared/static/css/${file}" \
-            "${ROOT_DIR}/src/pronto_employees/static/css/${file}" 2>/dev/null || true
-    fi
-done
-
-# Components CSS
-log INFO "Copiando CSS de componentes..."
-cp -rf "${ROOT_DIR}/src/shared/static/css/components/"* \
-    "${ROOT_DIR}/src/pronto_employees/static/css/components/" 2>/dev/null || true
-
-# notifications.css
-if [ -f "${ROOT_DIR}/src/static_content/assets/css/notifications.css" ]; then
-    cp -f "${ROOT_DIR}/src/static_content/assets/css/notifications.css" \
-        "${ROOT_DIR}/src/pronto_employees/static/css/notifications.css" 2>/dev/null || true
-fi
-
-log INFO "Sincronización completada"
-log INFO "Archivos en employees/dist/employees: $(ls "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/"*.js 2>/dev/null | wc -l)"
+exit 0

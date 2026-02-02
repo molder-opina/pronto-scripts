@@ -22,9 +22,9 @@ sys.path.insert(0, str(project_root / "build"))
 
 from sqlalchemy import select  # noqa: E402
 
-from shared.db import get_session  # noqa: E402
-from shared.models import Order  # noqa: E402
-from shared.services.price_service import (  # noqa: E402
+from pronto_shared.db import get_session  # noqa: E402
+from pronto_shared.models import Order  # noqa: E402
+from pronto_shared.services.price_service import (  # noqa: E402
     calculate_price_breakdown,
     get_price_display_mode,
 )

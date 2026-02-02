@@ -44,7 +44,7 @@ def _build_target_url() -> str:
 def _load_config():
     """Load the shared config loader after adjusting sys.path."""
     sys.path.insert(0, str(Path(__file__).parent / ".." / "build"))
-    from shared.config import load_config
+    from pronto_shared.config import load_config
 
     return load_config
 

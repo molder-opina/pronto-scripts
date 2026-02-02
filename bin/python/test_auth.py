@@ -15,11 +15,16 @@ from pathlib import Path
 def _load_dependencies():
     """Load app dependencies after adjusting sys.path."""
     # Agregar el directorio build al path para importaciones locales
-    sys.path.insert(0, str(Path(__file__).parent.parent / "build"))
+    # Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
-    from shared.db import get_session
-    from shared.models import Employee
-    from shared.security import (
+    from pronto_shared.db import get_session
+    from pronto_shared.models import Employee
+    from pronto_shared.security import (
         decrypt_string,
         encrypt_string,
         hash_credentials,

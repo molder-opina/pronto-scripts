@@ -10,7 +10,7 @@ from pathlib import Path
 # Agregar el directorio build al path
 sys.path.insert(0, str(Path(__file__).parent / "build"))
 
-from shared.services.business_config_service import set_config_value  # noqa: E402
+from pronto_shared.services.business_config_service import set_config_value  # noqa: E402
 
 
 def main():

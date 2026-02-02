@@ -4,8 +4,8 @@ import sys
 # Add build directory to path
 sys.path.append(os.path.join(os.getcwd(), "build"))
 
-from shared.database import SessionLocal
-from shared.models import Employee
+from pronto_shared.database import SessionLocal
+from pronto_shared.models import Employee
 
 
 def check_employees():

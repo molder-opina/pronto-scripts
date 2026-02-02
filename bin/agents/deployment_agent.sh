@@ -49,9 +49,11 @@ if echo "$CHANGED_FILES" | grep -q "docker-compose.yml"; then
 fi
 
 # 4. Detectar nuevos modelos de base de datos
-if echo "$CHANGED_FILES" | grep -q "src/shared/models.py"; then
+# Nota: Con la nueva estructura, los modelos están en pronto-libs/src/pronto_shared/models.py
+if echo "$CHANGED_FILES" | grep -q "pronto_shared/models.py\|src/pronto_shared/models.py"; then
     # Verificar si se agregaron nuevas clases (tablas)
-    if git diff --cached src/shared/models.py | grep -q "^+class.*Base"; then
+    if git diff --cached src/pronto_shared/models.py 2>/dev/null | grep -q "^+class.*Base" || \
+       echo "$CHANGED_FILES" | grep -q "pronto_shared/models.py.*\+class"; then
         echo "   🗄️ Detectados posibles nuevos modelos de base de datos"
         
         # Verificar que seed data o init scripts los mencionen
@@ -63,10 +65,11 @@ if echo "$CHANGED_FILES" | grep -q "src/shared/models.py"; then
 fi
 
 # 5. Detectar nuevos servicios de negocio críticos
+# Los servicios críticos ahora están en pronto_shared (pronto-libs)
 CRITICAL_SERVICES=(
-    "src/shared/services/business_config_service.py"
-    "src/shared/services/secret_service.py"
-    "src/shared/services/settings_service.py"
+    "pronto_shared/services/business_config_service.py"
+    "pronto_shared/services/secret_service.py"
+    "pronto_shared/services/settings_service.py"
 )
 
 for service in "${CRITICAL_SERVICES[@]}"; do

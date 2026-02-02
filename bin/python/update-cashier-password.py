@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Update cashier password using proper hashing from shared.security."""
+"""Update cashier password using proper hashing from pronto_shared.security."""
 
 import os
 import sys
 
 # Add project to path for shared imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(project_root, "build"))
+# Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
 
 # Load environment variables
@@ -25,7 +30,7 @@ load_env_file(os.path.join(project_root, "config", "secrets.env"))
 
 import psycopg2
 
-from shared.security import hash_credentials, hash_identifier
+from pronto_shared.security import hash_credentials, hash_identifier
 
 postgres_host = os.getenv("POSTGRES_HOST", "localhost")
 postgres_port = os.getenv("POSTGRES_PORT", "5432")

@@ -1,8 +1,8 @@
 from sqlalchemy import select
 
-from shared.config import load_config
-from shared.db import get_session, init_engine
-from shared.models import Table
+from pronto_shared.config import load_config
+from pronto_shared.db import get_session, init_engine
+from pronto_shared.models import Table
 
 # Init DB
 config = load_config("pronto-employees")

@@ -57,9 +57,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "build"))
 
 from sqlalchemy import select  # noqa: E402
 
-from shared.config import load_config  # noqa: E402
-from shared.db import get_session, init_db, init_engine  # noqa: E402
-from shared.models import Base, MenuCategory, MenuItem  # noqa: E402
+from pronto_shared.config import load_config  # noqa: E402
+from pronto_shared.db import get_session, init_db, init_engine  # noqa: E402
+from pronto_shared.models import Base, MenuCategory, MenuItem  # noqa: E402
 
 # Mapeo de categorías a estilos de imagen
 CATEGORY_STYLES = {

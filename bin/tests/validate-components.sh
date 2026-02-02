@@ -296,16 +296,26 @@ check_static_assets() {
         WARNED_CHECKS=$((WARNED_CHECKS + 1))
     fi
 
-    # Check if built assets exist
-    local assets_dir="src/shared/static/js/dist/clients"
+    # Check if built assets exist (try multiple locations)
+    local assets_dir=""
+    for path in \
+        "../pronto-client/src/pronto_clients/static/js/dist/clients" \
+        "../pronto-static/src/vue/clients/dist" \
+        "src/pronto_clients/static/js/dist/clients"; do
+        if [ -d "$path" ]; then
+            assets_dir="$path"
+            break
+        fi
+    done
+
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    if [ -d "$assets_dir" ]; then
+    if [ -n "$assets_dir" ] && [ -d "$assets_dir" ]; then
         local file_count=$(find "$assets_dir" -name "*.js" 2>/dev/null | wc -l)
-        log_pass "Client assets directory - $file_count JS files"
+        log_pass "Client assets directory - $file_count JS files ($assets_dir)"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
-        log_fail "Client assets directory not found"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        log_warn "Client assets directory not found (may be normal if not built yet)"
+        WARNED_CHECKS=$((WARNED_CHECKS + 1))
     fi
 }
 

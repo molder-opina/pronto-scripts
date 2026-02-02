@@ -45,9 +45,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "build"))
 
 from sqlalchemy import func, select, text  # noqa: E402
 
-from shared.config import load_config  # noqa: E402
-from shared.db import get_session, init_db, init_engine  # noqa: E402
-from shared.models import (  # noqa: E402
+from pronto_shared.config import load_config  # noqa: E402
+from pronto_shared.db import get_session, init_db, init_engine  # noqa: E402
+from pronto_shared.models import (  # noqa: E402
     Base,
     Customer,
     DiningSession,
@@ -60,7 +60,7 @@ from shared.models import (  # noqa: E402
     OrderItem,
     OrderItemModifier,
 )
-from shared.services.seed import load_seed_data  # noqa: E402
+from pronto_shared.services.seed import load_seed_data  # noqa: E402
 
 
 def reset_database():

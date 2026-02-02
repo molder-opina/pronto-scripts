@@ -20,7 +20,12 @@ import sys
 
 # Add project to path for shared imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(project_root, "build"))
+# Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
 try:
     import psycopg2
@@ -30,7 +35,7 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from shared.security import hash_credentials, hash_identifier
+    from pronto_shared.security import hash_credentials, hash_identifier
 except ImportError:
     print("❌ Error: No se puede importar shared.security")
     print("   Asegúrate de que el directorio src/shared existe")

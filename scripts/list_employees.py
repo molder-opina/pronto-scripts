@@ -5,8 +5,8 @@ import sys
 sys.path.append("/opt/pronto")
 
 from pronto_employees.app import create_app
-from shared.db import get_session
-from shared.models import Employee
+from pronto_shared.db import get_session
+from pronto_shared.models import Employee
 
 
 def list_employees():

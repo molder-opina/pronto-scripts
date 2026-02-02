@@ -84,6 +84,6 @@ else
     echo "  pytest tests/integration/test_jwt_*.py -vv"
     echo ""
     echo "Para ver cobertura:"
-    echo "  pytest tests/integration/test_jwt_*.py --cov=src/shared/jwt_service --cov=src/shared/jwt_middleware --cov-report=html"
+    echo "  pytest tests/integration/test_jwt_*.py --cov=pronto_shared.jwt_service --cov=pronto_shared.jwt_middleware --cov-report=html"
     exit 1
 fi

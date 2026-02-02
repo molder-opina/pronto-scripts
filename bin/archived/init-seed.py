@@ -89,8 +89,8 @@ def init_seed_data():
         sys.exit(1)
 
     # Import and run seed functions
-    from shared.models import Area, SystemSetting, Table
-    from shared.services.seed import ensure_seed_data
+    from pronto_shared.models import Area, SystemSetting, Table
+    from pronto_shared.services.seed import ensure_seed_data
 
     with Session() as session:
         print("")

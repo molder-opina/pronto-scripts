@@ -7,8 +7,8 @@ sys.path.insert(0, "build")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from shared.models import Employee
-from shared.security import hash_credentials
+from pronto_shared.models import Employee
+from pronto_shared.security import hash_credentials
 
 # DB Connection
 # Try Postgres first, fallback to SQLite if needed?

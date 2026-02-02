@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "build"))
 
-from shared.services.ai_image_service import AIImageService  # noqa: E402
+from pronto_shared.services.ai_image_service import AIImageService  # noqa: E402
 
 
 def main() -> None:

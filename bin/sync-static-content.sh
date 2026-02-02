@@ -120,9 +120,21 @@ copy_assets_to_static() {
     fi
 
     # Copiar branding
-    if [ -d "${ROOT_DIR}/src/shared/assets/branding" ]; then
-        log INFO "Copiando branding..."
-        cp -r "${ROOT_DIR}/src/shared/assets/branding/"* "${STATIC_ASSETS_DIR}/branding/" 2>/dev/null || true
+    BRANDING_FOUND=false
+    for branding_path in \
+        "${ROOT_DIR}/../pronto-static/src/static_content/assets/branding" \
+        "${ROOT_DIR}/src/pronto_static/static_content/assets/branding" \
+        "${STATIC_CONTENT_DIR}/branding"; do
+        if [ -d "$branding_path" ]; then
+            log INFO "Copiando branding desde: $branding_path"
+            cp -r "$branding_path/"* "${STATIC_ASSETS_DIR}/branding/" 2>/dev/null || true
+            BRANDING_FOUND=true
+            break
+        fi
+    done
+
+    if [ "$BRANDING_FOUND" = false ]; then
+        log WARN "Directorio de branding no encontrado"
     fi
 
     # Copiar JS vanilla de empleados (no compilados)

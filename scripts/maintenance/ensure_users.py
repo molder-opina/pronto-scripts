@@ -8,8 +8,8 @@ sys.path.insert(0, "build")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from shared.models import Employee
-from shared.security import encrypt_string, hash_credentials, hash_identifier
+from pronto_shared.models import Employee
+from pronto_shared.security import encrypt_string, hash_credentials, hash_identifier
 
 DB_URL = "postgresql://pronto:pronto123@localhost:5432/pronto"
 

@@ -6,6 +6,18 @@ PROJECT_ROOT="${SCRIPT_DIR}/../.."
 
 echo "🔧 Inicializando sistema de Áreas..."
 
+# Try to find migration files
+MIGRATION_PATH=""
+for path in \
+    "${PROJECT_ROOT}/../pronto-libs/src/pronto_shared/migrations" \
+    "${PROJECT_ROOT}/../pronto-libs/build/lib/pronto_shared/migrations" \
+    "/opt/pronto/lib/pronto_shared/migrations"; do
+    if [ -f "${path}/010_create_area_management_functions.sql" ]; then
+        MIGRATION_PATH="${path}"
+        break
+    fi
+done
+
 # Verificar migración de funciones de área
 echo ""
 echo "📋 Paso 1: Verificando migración de funciones de área..."
@@ -15,9 +27,16 @@ CREATE_AREA_EXISTS=$(docker exec pronto-postgres psql -U pronto -d pronto -tAc "
 
 if [ "$CREATE_AREA_EXISTS" = "false" ]; then
     echo "⚠️  Migración de funciones de área no encontrada."
-    echo "   Aplicando: src/shared/migrations/010_create_area_management_functions.sql"
-    docker exec pronto-postgres psql -U pronto -d pronto -f "${PROJECT_ROOT}/src/shared/migrations/010_create_area_management_functions.sql"
-    echo "   ✅ Funciones aplicadas."
+    
+    if [ -n "$MIGRATION_PATH" ]; then
+        echo "   Aplicando: ${MIGRATION_PATH}/010_create_area_management_functions.sql"
+        docker exec pronto-postgres psql -U pronto -d pronto -f "${MIGRATION_PATH}/010_create_area_management_functions.sql"
+        echo "   ✅ Funciones aplicadas."
+    else
+        echo "   ⚠️  No se encontró el archivo de migración."
+        echo "   Asegúrate de que pronto_shared esté instalado:"
+        echo "   cd ../pronto-libs && pip install -e ."
+    fi
 else
     echo "   ✅ Funciones de área ya aplicadas."
 fi
@@ -97,7 +116,7 @@ ORDER BY a.prefix;
 " 2>&1
 
 echo ""
-echo "📊 Paso 6: Estadísticas finales"
+echo "📋 Paso 6: Estadísticas finales"
 
 echo "   Resumen del sistema:"
 docker exec pronto-postgres psql -U pronto -d pronto -c "
@@ -105,13 +124,13 @@ SELECT
     'Áreas Activas' AS metrica, COUNT(*) AS valor 
 FROM pronto_areas WHERE is_active = TRUE
 UNION ALL
-SELECT 'Mesas Activas' AS metrica, COUNT(*) FILTER (is_active = TRUE) AS valor 
+SELECT 'Mesas Activas' AS metrica, COUNT(*) FILTER(is_active = TRUE) AS valor 
 FROM pronto_tables
 UNION ALL
-SELECT 'Mesas con Área' AS metrica, COUNT(*) FILTER (area_id IS NOT NULL AND is_active = TRUE) AS valor 
+SELECT 'Mesas con Área' AS metrica, COUNT(*) FILTER(area_id IS NOT NULL AND is_active = TRUE) AS valor 
 FROM pronto_tables
 UNION ALL
-SELECT 'Mesas sin Área' AS metrica, COUNT(*) FILTER (area_id IS NULL AND is_active = TRUE) AS valor 
+SELECT 'Mesas sin Área' AS metrica, COUNT(*) FILTER(area_id IS NULL AND is_active = TRUE) AS valor 
 FROM pronto_tables;
 " 2>&1
 
@@ -123,3 +142,4 @@ echo "   - docker exec pronto-postgres psql -U pronto -d pronto -c \"SELECT * FR
 echo "   - docker exec pronto-postgres psql -U pronto -d pronto -c \"SELECT get_tables_by_area(area_id);\""
 echo "   - docker exec pronto-postgres psql -U pronto -d pronto -c \"SELECT get_area_statistics();\""
 echo ""
+

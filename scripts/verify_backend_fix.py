@@ -9,9 +9,9 @@ sys.path.append("/opt/pronto")
 from flask import Flask
 
 from pronto_employees.app import create_app
-from shared.db import get_session, init_engine
-from shared.models import Customer, DiningSession, MenuItem, Order, OrderItem, OrderStatus
-from shared.services.order_service import list_orders
+from pronto_shared.db import get_session, init_engine
+from pronto_shared.models import Customer, DiningSession, MenuItem, Order, OrderItem, OrderStatus
+from pronto_shared.services.order_service import list_orders
 
 
 def verify_backend():

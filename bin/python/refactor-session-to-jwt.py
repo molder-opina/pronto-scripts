@@ -19,7 +19,12 @@ from pathlib import Path
 
 # Add project to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "build"))
+# Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
 
 def find_files_with_session_refs(base_dir):
@@ -63,12 +68,12 @@ def refactor_file(filepath, dry_run=False):
         changes.append("Removed 'session' from Flask imports")
 
     # 2. Agregar imports de JWT si no existen
-    if "from shared.jwt_middleware import" not in content:
+    if "from pronto_shared.jwt_middleware import" not in content:
         # Buscar la línea de imports de pronto_employees.decorators
         if "from pronto_employees.decorators import" in content:
             content = re.sub(
                 r"(from pronto_employees\.decorators import [^\\n]+)",
-                r"\1\nfrom shared.jwt_middleware import get_current_user, get_employee_id",
+                r"\1\nfrom pronto_shared.jwt_middleware import get_current_user, get_employee_id",
                 content,
             )
             changes.append("Added JWT middleware imports")
@@ -76,7 +81,7 @@ def refactor_file(filepath, dry_run=False):
             # Agregar después del primer import de shared
             content = re.sub(
                 r"(from shared\.[^\\n]+ import [^\\n]+)",
-                r"\1\nfrom shared.jwt_middleware import get_current_user, get_employee_id",
+                r"\1\nfrom pronto_shared.jwt_middleware import get_current_user, get_employee_id",
                 content,
                 count=1,
             )

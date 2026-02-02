@@ -9,12 +9,17 @@ import os
 import sys
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "build"))
+# Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
 from sqlalchemy import func
 
-from shared.db import get_session
-from shared.models import (
+from pronto_shared.db import get_session
+from pronto_shared.models import (
     Area,
     BusinessConfig,
     DayPeriod,
@@ -24,7 +29,7 @@ from shared.models import (
     MenuItemDayPeriod,
     Table,
 )
-from shared.security import hash_credentials, hash_identifier
+from pronto_shared.security import hash_credentials, hash_identifier
 
 
 class DatabaseValidator:
@@ -613,8 +618,8 @@ class DatabaseValidator:
 
         try:
             # Initialize database engine
-            from shared.config import load_config
-            from shared.db import init_engine
+            from pronto_shared.config import load_config
+            from pronto_shared.db import init_engine
 
             config = load_config("validate_seed")
             init_engine(config)

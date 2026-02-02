@@ -14,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent / "build"))
 
 from sqlalchemy import text  # noqa: E402
 
-from shared.config import load_config  # noqa: E402
-from shared.db import get_session, init_engine  # noqa: E402
-from shared.logging_config import get_logger  # noqa: E402
+from pronto_shared.config import load_config  # noqa: E402
+from pronto_shared.db import get_session, init_engine  # noqa: E402
+from pronto_shared.logging_config import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
 

@@ -47,7 +47,7 @@ def _prompt_text(prompt: str, default: str) -> str:
 
 
 def _resolve_password() -> str:
-    from shared.validation import validate_password
+    from pronto_shared.validation import validate_password
 
     default_password = os.getenv("SEED_EMPLOYEE_PASSWORD", "ChangeMe!123")
     use_default = _prompt_bool("Usar contrasena default de seed?", default=True)
@@ -85,7 +85,7 @@ def _choose_role() -> str:
 
 
 def _seed_employees(session) -> None:
-    from shared.services.seed import _get_or_create_employee
+    from pronto_shared.services.seed import _get_or_create_employee
 
     if not _prompt_bool("Crear/actualizar empleados?", default=True):
         return
@@ -118,8 +118,8 @@ def _seed_employees(session) -> None:
 
 
 def _seed_customers(session) -> None:
-    from shared.models import Customer
-    from shared.security import hash_identifier
+    from pronto_shared.models import Customer
+    from pronto_shared.security import hash_identifier
 
     if not _prompt_bool("Crear/actualizar clientes?", default=True):
         return
@@ -173,9 +173,9 @@ def main() -> None:
     os.environ.setdefault("POSTGRES_DB", "pronto")
     os.environ.setdefault("POSTGRES_SSLMODE", "disable")
 
-    from shared.config import load_config
-    from shared.db import get_session, init_engine
-    from shared.services.seed import _assign_missing_employee_identity
+    from pronto_shared.config import load_config
+    from pronto_shared.db import get_session, init_engine
+    from pronto_shared.services.seed import _assign_missing_employee_identity
 
     config = load_config("seed-interactive")
     init_engine(config)

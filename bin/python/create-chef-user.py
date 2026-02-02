@@ -9,9 +9,14 @@ import sys
 
 # Add project to path - must include src/ for shared imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(project_root, "build"))
+# Ensure pronto_shared is importable
+try:
+    import pronto_shared
+except ImportError:
+    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
+    cd ../pronto-libs && pip install -e .")
 
-from shared.security import hash_credentials
+from pronto_shared.security import hash_credentials
 
 
 def create_chef_user():

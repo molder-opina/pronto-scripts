@@ -7,10 +7,10 @@ Useful for debugging login issues.
 import os
 import sys
 
-from shared.config import load_config
-from shared.db import get_session, init_engine
-from shared.models import Employee
-from shared.security import hash_credentials
+from pronto_shared.config import load_config
+from pronto_shared.db import get_session, init_engine
+from pronto_shared.models import Employee
+from pronto_shared.security import hash_credentials
 
 DEFAULT_PASSWORD = os.getenv("SEED_EMPLOYEE_PASSWORD", "ChangeMe!123")
 

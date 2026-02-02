@@ -187,19 +187,18 @@ NGINX_STATIC_ROOT="/var/www/pronto-static"
 if [[ -d "${NGINX_STATIC_ROOT}" ]]; then
   echo ">> Sincronizando assets al nginx local en ${NGINX_STATIC_ROOT} ..."
   # JS compilado clientes
-  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/static/js/dist/clients/" "${NGINX_STATIC_ROOT}/static/js/dist/clients/" || true
+  sudo install -d "${NGINX_STATIC_ROOT}/assets/js/clients" || true
+  sudo rsync -a "${PROJECT_ROOT}/pronto-static/src/static_content/assets/js/clients/" "${NGINX_STATIC_ROOT}/assets/js/clients/" || true
   # JS compilado empleados
-  sudo rsync -a "${PROJECT_ROOT}/src/pronto_employees/static/js/dist/employees/" "${NGINX_STATIC_ROOT}/static/js/dist/employees/" || true
+  sudo install -d "${NGINX_STATIC_ROOT}/assets/js/employees" || true
+  sudo rsync -a "${PROJECT_ROOT}/pronto-static/src/static_content/assets/js/employees/" "${NGINX_STATIC_ROOT}/assets/js/employees/" || true
   # CSS
-  sudo install -d "${NGINX_STATIC_ROOT}/static/css" || true
-  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/static/css/menu.css" "${NGINX_STATIC_ROOT}/static/css/" || true
-  # Plantilla base
-  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/templates/base.html" "${NGINX_STATIC_ROOT}/base.html" || true
-  # JS global (keyboard shortcuts y otros assets compartidos)
-  sudo install -d "${NGINX_STATIC_ROOT}/assets/js" || true
-  sudo rsync -a "${PROJECT_ROOT}/src/static_content/assets/js/" "${NGINX_STATIC_ROOT}/assets/js/" || true
+  sudo install -d "${NGINX_STATIC_ROOT}/assets/css" || true
+  sudo rsync -a "${PROJECT_ROOT}/pronto-static/src/static_content/assets/css/" "${NGINX_STATIC_ROOT}/assets/css/" || true
+  # Plantilla base (si existe)
+  sudo rsync -a "${PROJECT_ROOT}/pronto-client/src/pronto_clients/templates/base.html" "${NGINX_STATIC_ROOT}/base.html" || true
   # Assets (imágenes, íconos, libs locales)
-  sudo rsync -a "${PROJECT_ROOT}/src/static_content/assets/" "${NGINX_STATIC_ROOT}/assets/" || true
+  sudo rsync -a "${PROJECT_ROOT}/pronto-static/src/static_content/assets/" "${NGINX_STATIC_ROOT}/assets/" || true
   # Evitar 403 en /assets por permisos restrictivos heredados del repo (nginx necesita +x en dirs y +r en archivos)
   sudo chmod -R a+rX "${NGINX_STATIC_ROOT}/assets" 2>/dev/null || true
   echo ">> Sincronización de estáticos a nginx completada."

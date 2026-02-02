@@ -61,7 +61,18 @@ if [ -f "/etc/nginx/sites-enabled/pronto.conf" ]; then
 fi
 
 # Copiar configuración temporal
-cp /apps/pronto/pronto-app/nginx-reverse-proxy-temp.conf /etc/nginx/sites-available/pronto-temp.conf
+NGINX_TEMP_SOURCE=""
+if [ -n "${NGINX_REVERSE_PROXY_TEMP_CONF:-}" ] && [ -f "${NGINX_REVERSE_PROXY_TEMP_CONF}" ]; then
+    NGINX_TEMP_SOURCE="${NGINX_REVERSE_PROXY_TEMP_CONF}"
+fi
+
+if [ -z "${NGINX_TEMP_SOURCE}" ]; then
+    echo -e "${RED}Error: No se encontró nginx-reverse-proxy-temp.conf${NC}"
+    echo "   Define NGINX_REVERSE_PROXY_TEMP_CONF con la ruta del archivo."
+    exit 1
+fi
+
+cp "${NGINX_TEMP_SOURCE}" /etc/nginx/sites-available/pronto-temp.conf
 ln -sf /etc/nginx/sites-available/pronto-temp.conf /etc/nginx/sites-enabled/pronto-temp.conf
 
 # Verificar sintaxis de nginx
@@ -130,7 +141,18 @@ echo -e "${YELLOW}Paso 3: Aplicando configuración final con SSL...${NC}"
 rm -f /etc/nginx/sites-enabled/pronto-temp.conf
 
 # Copiar configuración final con SSL
-cp /apps/pronto/pronto-app/nginx-reverse-proxy.conf /etc/nginx/sites-available/pronto.conf
+NGINX_SOURCE=""
+if [ -n "${NGINX_REVERSE_PROXY_CONF:-}" ] && [ -f "${NGINX_REVERSE_PROXY_CONF}" ]; then
+    NGINX_SOURCE="${NGINX_REVERSE_PROXY_CONF}"
+fi
+
+if [ -z "${NGINX_SOURCE}" ]; then
+    echo -e "${RED}Error: No se encontró nginx-reverse-proxy.conf${NC}"
+    echo "   Define NGINX_REVERSE_PROXY_CONF con la ruta del archivo."
+    exit 1
+fi
+
+cp "${NGINX_SOURCE}" /etc/nginx/sites-available/pronto.conf
 ln -sf /etc/nginx/sites-available/pronto.conf /etc/nginx/sites-enabled/pronto.conf
 
 # Verificar sintaxis de nginx

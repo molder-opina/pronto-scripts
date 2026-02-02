@@ -12,9 +12,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
+REPO_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
 # Cargar variables de entorno
-source "${ROOT_DIR}/.env" 2>/dev/null || true
+if [ -f "${ROOT_DIR}/.env" ]; then
+    source "${ROOT_DIR}/.env"
+fi
 
 # Colores
 RED='\033[0;31m'
@@ -42,10 +45,11 @@ log() {
 }
 
 # Directorios
-STATIC_CONTENT_DIR="${ROOT_DIR}/src/static_content"
+PRONTO_STATIC_DIR="${REPO_ROOT}/pronto-static"
+STATIC_CONTENT_DIR="${PRONTO_STATIC_DIR}/src/static_content"
 STATIC_ASSETS_DIR="${STATIC_CONTENT_DIR}/assets"
-CLIENT_JS_DIST="${ROOT_DIR}/src/pronto_clients/static/js/dist/clients"
-EMPLOYEE_JS_DIST="${ROOT_DIR}/src/pronto_employees/static/js/dist/employees"
+CLIENT_JS_DIST="${STATIC_ASSETS_DIR}/js/clients"
+EMPLOYEE_JS_DIST="${STATIC_ASSETS_DIR}/js/employees"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FUNCIÓN: Compilar bundles JavaScript
@@ -57,21 +61,25 @@ compile_js_bundles() {
     local os
     os="$(uname -s)"
 
-    # Cambiar al directorio del proyecto
-    cd "${ROOT_DIR}"
+    # Cambiar al directorio de pronto-static
+    cd "${PRONTO_STATIC_DIR}"
 
     if [ ! -d "node_modules" ]; then
         log WARN "node_modules no encontrado, instalando..."
-        npm install
+        if command -v pnpm &> /dev/null; then
+            pnpm install
+        else
+            npm install
+        fi
     fi
 
-    # Compilar bundle de clientes
-    log INFO "Compilando bundle de clientes..."
-    PRONTO_TARGET=clients npx vite build
-
-    # Compilar bundle de empleados
-    log INFO "Compilando bundle de empleados..."
-    PRONTO_TARGET=employees npx vite build
+    # Compilar bundle de clientes/empleados
+    log INFO "Compilando bundles..."
+    if command -v pnpm &> /dev/null; then
+        pnpm build
+    else
+        npm run build
+    fi
 
     log OK "Bundles JavaScript compilados exitosamente"
 }
@@ -87,78 +95,20 @@ copy_assets_to_static() {
     mkdir -p "${STATIC_ASSETS_DIR}/js/clients"
     mkdir -p "${STATIC_ASSETS_DIR}/css/employees"
     mkdir -p "${STATIC_ASSETS_DIR}/css/clients"
-    mkdir -p "${STATIC_ASSETS_DIR}/branding"
+    mkdir -p "${STATIC_ASSETS_DIR}/pronto/branding"
+    mkdir -p "${STATIC_ASSETS_DIR}/pronto/menu"
 
-    # Copiar bundles JS de clientes
     if [ -d "${CLIENT_JS_DIST}" ]; then
-        log INFO "Copiando bundle de clientes..."
-        cp -r "${CLIENT_JS_DIST}/"* "${STATIC_ASSETS_DIR}/js/clients/" 2>/dev/null || true
-        log OK "Bundle de clientes copiado a js/clients/"
+        log OK "Bundle de clientes disponible en ${CLIENT_JS_DIST}"
     else
         log WARN "Directorio de bundle de clientes no encontrado: ${CLIENT_JS_DIST}"
     fi
 
-    # Copiar bundles JS de empleados
     if [ -d "${EMPLOYEE_JS_DIST}" ]; then
-        log INFO "Copiando bundle de empleados..."
-        cp -r "${EMPLOYEE_JS_DIST}/"* "${STATIC_ASSETS_DIR}/js/employees/" 2>/dev/null || true
-        log OK "Bundle de empleados copiado a js/employees/"
+        log OK "Bundle de empleados disponible en ${EMPLOYEE_JS_DIST}"
     else
         log WARN "Directorio de bundle de empleados no encontrado: ${EMPLOYEE_JS_DIST}"
     fi
-
-    # Copiar CSS de clientes
-    if [ -d "${ROOT_DIR}/src/pronto_clients/static/css" ]; then
-        log INFO "Copiando CSS de clientes..."
-        cp -r "${ROOT_DIR}/src/pronto_clients/static/css/"* "${STATIC_ASSETS_DIR}/css/clients/" 2>/dev/null || true
-    fi
-
-    # Copiar CSS de empleados
-    if [ -d "${ROOT_DIR}/src/pronto_employees/static/css" ]; then
-        log INFO "Copiando CSS de empleados..."
-        cp -r "${ROOT_DIR}/src/pronto_employees/static/css/"* "${STATIC_ASSETS_DIR}/css/employees/" 2>/dev/null || true
-    fi
-
-    # Copiar branding
-    BRANDING_FOUND=false
-    for branding_path in \
-        "${ROOT_DIR}/../pronto-static/src/static_content/assets/branding" \
-        "${ROOT_DIR}/src/pronto_static/static_content/assets/branding" \
-        "${STATIC_CONTENT_DIR}/branding"; do
-        if [ -d "$branding_path" ]; then
-            log INFO "Copiando branding desde: $branding_path"
-            cp -r "$branding_path/"* "${STATIC_ASSETS_DIR}/branding/" 2>/dev/null || true
-            BRANDING_FOUND=true
-            break
-        fi
-    done
-
-    if [ "$BRANDING_FOUND" = false ]; then
-        log WARN "Directorio de branding no encontrado"
-    fi
-
-    # Copiar JS vanilla de empleados (no compilados)
-    log INFO "Copiando JS vanilla de empleados..."
-    mkdir -p "${STATIC_ASSETS_DIR}/js/employees"
-    for file in keyboard-shortcuts.js pagination.js realtime.js loading.js \
-        notifications.js feedback_dashboard.js business_config.js roles_management.js \
-        shortcuts_admin.js employees_manager_vanilla.js roles_manager_vanilla.js \
-        reports.js; do
-        if [ -f "${ROOT_DIR}/src/pronto_employees/static/js/${file}" ]; then
-            cp -f "${ROOT_DIR}/src/pronto_employees/static/js/${file}" \
-                "${STATIC_ASSETS_DIR}/js/employees/" 2>/dev/null || true
-        fi
-    done
-
-    # Copiar JS vanilla de clientes (no compilados)
-    log INFO "Copiando JS vanilla de clientes..."
-    mkdir -p "${STATIC_ASSETS_DIR}/js/clients"
-    for file in keyboard-shortcuts.js notifications.js; do
-        if [ -f "${ROOT_DIR}/src/pronto_clients/static/js/${file}" ]; then
-            cp -f "${ROOT_DIR}/src/pronto_clients/static/js/${file}" \
-                "${STATIC_ASSETS_DIR}/js/clients/" 2>/dev/null || true
-        fi
-    done
 
     log OK "Assets copiados a static_content/"
 }
@@ -207,7 +157,7 @@ upload_to_static_server() {
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/js/clients
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/css/employees
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/css/clients
-    docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/branding
+    docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/pronto/branding
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/pronto/menu
 
     # Copiar JS de empleados
@@ -228,7 +178,7 @@ upload_to_static_server() {
 
     # Copiar branding
     log INFO "Copiando branding..."
-    docker cp "${STATIC_ASSETS_DIR}/branding/." "$container_name:/usr/share/nginx/html/assets/branding/" 2>/dev/null || true
+    docker cp "${STATIC_ASSETS_DIR}/pronto/branding/." "$container_name:/usr/share/nginx/html/assets/pronto/branding/" 2>/dev/null || true
 
     # Copiar imágenes de productos (pronto/menu)
     if [ -d "${STATIC_ASSETS_DIR}/pronto/menu" ]; then
@@ -267,9 +217,15 @@ show_status() {
 
     echo "  JS Bundles:"
     if [ -d "${STATIC_ASSETS_DIR}/js" ]; then
-        ls -lh "${STATIC_ASSETS_DIR}/js/"*.js 2>/dev/null | head -5 | while read -r line; do
-            echo "    ${line}"
-        done
+        local js_list
+        js_list=$(find "${STATIC_ASSETS_DIR}/js" -maxdepth 2 -type f -name "*.js" 2>/dev/null | head -5)
+        if [ -n "${js_list}" ]; then
+            while read -r file; do
+                [ -n "${file}" ] && ls -lh "${file}" | sed 's/^/    /'
+            done <<< "${js_list}"
+        else
+            echo "    (no JS bundles encontrados)"
+        fi
     fi
     echo ""
 

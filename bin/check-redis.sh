@@ -56,7 +56,7 @@ import sys
 
 from redis import Redis
 
-from shared import socketio_manager as sm
+from pronto_shared import socketio_manager as sm
 
 prefix = os.environ.get("DIAG_PREFIX", "redisdiag")
 order_id = 900001

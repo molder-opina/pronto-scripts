@@ -4,7 +4,7 @@
 # PROPÓSITO: Este script ya NO es necesario con la nueva estructura.
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# ANTIGUA (monorepo): src/shared/static/js/ → se sincronizaba a apps
+# ANTIGUA (monorepo): shared/static/js/ → se sincronizaba a apps
 # NUEVA (multi-repo): pronto_shared es un package pip instalado
 #
 # Los assets estáticos ahora viven en:

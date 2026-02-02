@@ -77,7 +77,7 @@ ${content}
 **Specific concerns for this project:**
 - Distinguish between Flask session and SQLAlchemy session
 - Verify JWT usage (get_employee_id, get_current_user)
-- Check for proper use of shared.security for hashing
+- Check for proper use of pronto_shared.security for hashing
 - Ensure no hardcoded credentials or secrets
 - Verify proper error handling and logging
 

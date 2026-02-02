@@ -7,7 +7,8 @@ SOCKET_IO_VERSION="${SOCKET_IO_VERSION:-4.5.4}"
 CHART_JS_VERSION="${CHART_JS_VERSION:-4.4.0}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ASSETS_DIR="${ROOT_DIR}/build/static_content/assets/lib"
+REPO_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
+ASSETS_DIR="${REPO_ROOT}/pronto-static/src/static_content/assets/lib"
 
 mkdir -p "${ASSETS_DIR}"
 

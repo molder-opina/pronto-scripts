@@ -1,9 +1,11 @@
 import json
 import os
 import sys
+from pathlib import Path
 
-# Add build to path
-sys.path.insert(0, "build")
+# Add pronto-libs to path
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "pronto-libs/src"))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

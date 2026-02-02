@@ -15,13 +15,13 @@ docker exec pronto-employee python3 -c "
 import sys
 sys.path.insert(0, '/opt/pronto')
 
-from shared.db import init_engine, get_session
-from shared.config import load_config
-from shared.models import (
+from pronto_shared.db import init_engine, get_session
+from pronto_shared.config import load_config
+from pronto_shared.models import (
     Employee, MenuCategory, MenuItem, Area, Table,
     BusinessConfig, DayPeriod
 )
-from shared.security import hash_credentials, hash_identifier
+from pronto_shared.security import hash_credentials, hash_identifier
 
 # Initialize database
 config = load_config('validate_seed')

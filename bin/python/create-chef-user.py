@@ -13,8 +13,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try:
     import pronto_shared
 except ImportError:
-    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
-    cd ../pronto-libs && pip install -e .")
+    raise ImportError(
+        "pronto_shared package not found. Install it from pronto-libs repo:\n"
+        "cd ../pronto-libs && pip install -e ."
+    )
 
 from pronto_shared.security import hash_credentials
 

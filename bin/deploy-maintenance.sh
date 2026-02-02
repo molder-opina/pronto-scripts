@@ -4,6 +4,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -41,7 +45,7 @@ deploy_maintenance_page() {
     mkdir -p "$MAINTENANCE_DIR/maintenance-assets"
 
     # Copy maintenance page
-    local maintenance_source="${MAINTENANCE_SOURCE:-build/static_content/maintenance.html}"
+    local maintenance_source="${MAINTENANCE_SOURCE:-${REPO_ROOT}/pronto-static/src/static_content/maintenance.html}"
     if [ -f "$maintenance_source" ]; then
         cp "$maintenance_source" "$MAINTENANCE_DIR/maintenance.html"
         print_info "Copied maintenance.html from $maintenance_source"

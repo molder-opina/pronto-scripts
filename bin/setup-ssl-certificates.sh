@@ -53,7 +53,19 @@ fi
 NGINX_CONF="/etc/nginx/sites-available/pronto.conf"
 if [ ! -f "$NGINX_CONF" ]; then
     echo -e "${YELLOW}Copiando configuración de nginx...${NC}"
-    cp /apps/pronto/pronto-app/nginx-reverse-proxy.conf "$NGINX_CONF"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+    NGINX_SOURCE=""
+    if [ -n "${NGINX_REVERSE_PROXY_CONF:-}" ] && [ -f "${NGINX_REVERSE_PROXY_CONF}" ]; then
+        NGINX_SOURCE="${NGINX_REVERSE_PROXY_CONF}"
+    fi
+
+    if [ -z "${NGINX_SOURCE}" ]; then
+        echo -e "${RED}Error: No se encontró nginx-reverse-proxy.conf${NC}"
+        echo "   Define NGINX_REVERSE_PROXY_CONF con la ruta del archivo."
+        exit 1
+    fi
+    cp "${NGINX_SOURCE}" "$NGINX_CONF"
 
     # Crear enlace simbólico
     if [ ! -L "/etc/nginx/sites-enabled/pronto.conf" ]; then

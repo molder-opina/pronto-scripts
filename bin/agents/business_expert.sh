@@ -11,9 +11,9 @@ echo "   - Verificando terminología de negocio..."
 REQUIRED_TERMS=("propina" "mesa" "orden" "comanda" "caja" "corte")
 MISSING_TERMS=0
 
-# We search in the whole build directory but exclude binary files and dist
+SEARCH_DIRS=("pronto-api" "pronto-employees" "pronto-client" "pronto-static" "pronto-libs")
 for term in "${REQUIRED_TERMS[@]}"; do
-    if ! grep -rI "$term" src/ --exclude-dir="dist" --exclude-dir="__pycache__" > /dev/null; then
+    if ! grep -rI "$term" "${SEARCH_DIRS[@]}" --exclude-dir="dist" --exclude-dir="__pycache__" > /dev/null; then
         echo "   ⚠️  Advertencia: No se encontró el término crítico de negocio '$term'. ¿Está completa la lógica de negocio?"
         MISSING_TERMS=$((MISSING_TERMS + 1))
     fi
@@ -26,7 +26,7 @@ fi
 # 2. Check for Currency Formatting usage
 echo "   - Verificando uso de formateo de moneda..."
 # Look for 'formatCurrency' usage in frontend code
-if ! grep -r "formatCurrency" src/pronto_clients/static/js/src > /dev/null && ! grep -r "formatCurrency" src/pronto_employees/static/js/src > /dev/null; then
+if ! grep -r "formatCurrency" pronto-static/src/vue/clients > /dev/null && ! grep -r "formatCurrency" pronto-static/src/vue/employees > /dev/null; then
     echo "   ⚠️  Advertencia: No se detectó uso de 'formatCurrency' en el frontend. Verifica que los precios se muestren correctamente."
 else
     echo "   ✅ Función de formateo de moneda en uso."
@@ -34,7 +34,7 @@ fi
 
 # 3. Verify Business Config seed presence
 echo "   - Verificando configuración inicial de negocio..."
-if [ ! -f "src/shared/services/business_config_service.py" ]; then
+if [ ! -f "pronto-libs/src/pronto_shared/services/business_config_service.py" ]; then
     echo "   ❌ Error: Falta el servicio de configuración de negocio (business_config_service.py)."
     EXIT_CODE=1
 else

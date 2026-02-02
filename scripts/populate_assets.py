@@ -1,16 +1,24 @@
+import os
 import shutil
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+STATIC_ASSETS_DIR = REPO_ROOT / "pronto-static/src/static_content/assets"
+
 # Source Directory (Artifacts)
-ARTIFACTS_DIR = Path("/Users/molder/.gemini/antigravity/brain/a04e6b23-bc24-411d-bf33-0724cf2fa329")
+ARTIFACTS_DIR = Path(
+    os.environ.get(
+        "PRONTO_ARTIFACTS_DIR",
+        str(Path.home() / ".gemini/antigravity/brain"),
+    )
+)
 
 # Destination Directory
-DEST_DIR = Path(
-    "/Users/molder/projects/github - molder/pronto-app/src/static_content/assets/cafeteria-test/menu"
-)
-BRANDING_DIR = Path(
-    "/Users/molder/projects/github - molder/pronto-app/src/static_content/assets/cafeteria-test/branding"
-)
+DEST_DIR = STATIC_ASSETS_DIR / "pronto/menu"
+BRANDING_DIR = STATIC_ASSETS_DIR / "pronto/branding"
+
+if not ARTIFACTS_DIR.exists():
+    raise SystemExit(f"❌ Artifacts dir no existe: {ARTIFACTS_DIR}")
 
 # Create dirs if not exist
 DEST_DIR.mkdir(parents=True, exist_ok=True)

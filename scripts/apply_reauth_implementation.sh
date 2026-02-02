@@ -32,7 +32,7 @@ echo ""
 echo "2. Instalando dependencias..."
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    cd src/pronto_employees
+    cd pronto-employees
     pip install -q -r requirements.txt
     if [ $? -eq 0 ]; then
         echo "✅ Dependencias instaladas"
@@ -40,10 +40,10 @@ if [ -f ".venv/bin/activate" ]; then
         echo "❌ Error instalando dependencias"
         exit 1
     fi
-    cd ../..
+    cd ..
 elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
-    cd src/pronto_employees
+    cd pronto-employees
     pip install -q -r requirements.txt
     if [ $? -eq 0 ]; then
         echo "✅ Dependencias instaladas"
@@ -51,12 +51,12 @@ elif [ -f "venv/bin/activate" ]; then
         echo "❌ Error instalando dependencias"
         exit 1
     fi
-    cd ../..
+    cd ..
 else
     echo "⚠️  No se encontró virtualenv, intentando pip global..."
-    cd src/pronto_employees
+    cd pronto-employees
     python3 -m pip install -q -r requirements.txt 2>/dev/null || echo "⚠️  Instalación saltada (requiere virtualenv)"
-    cd ../..
+    cd ..
 fi
 echo ""
 
@@ -92,11 +92,11 @@ echo ""
 
 # 5. Test de imports
 echo "5. Verificando imports..."
-python3 << 'PYEOF'
+PYTHONPATH="pronto-libs/src:pronto-employees/src:${PYTHONPATH:-}" python3 << 'PYEOF'
 try:
-    from build.pronto_employees.extensions import csrf
-    from shared.datetime_utils import utcnow
-    from shared.models import SuperAdminHandoffToken, AuditLog
+    from pronto_employees.extensions import csrf
+    from pronto_shared.datetime_utils import utcnow
+    from pronto_shared.models import SuperAdminHandoffToken, AuditLog
     print("✅ Todos los imports funcionan correctamente")
 except ImportError as e:
     print(f"❌ Error en imports: {e}")
@@ -110,7 +110,7 @@ echo ""
 
 # 6. Verificar migración de base de datos
 echo "6. Verificando migración de base de datos..."
-if [ -f "src/shared/migrations/010_add_super_admin_handoff_and_audit.sql" ]; then
+if [ -f "pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql" ]; then
     echo "✅ Archivo de migración existe"
 
     # Check if tables exist in database
@@ -128,7 +128,7 @@ if [ -f "src/shared/migrations/010_add_super_admin_handoff_and_audit.sql" ]; the
             echo "⚠️  Migración NO aplicada aún"
             echo ""
             echo "Para aplicar la migración ejecuta:"
-            echo "  bash bin/apply_migration.sh src/shared/migrations/010_add_super_admin_handoff_and_audit.sql"
+            echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql"
         fi
     else
         echo "   (psql no disponible o DB no configurada, saltando verificación)"
@@ -153,15 +153,15 @@ echo "========================================"
 echo ""
 echo "IMPORTANTE: Archivos que necesitan creación manual:"
 echo ""
-echo "1. src/pronto_employees/routes/system/auth.py (CRÍTICO)"
+echo "1. pronto-employees/src/pronto_employees/routes/system/auth.py (CRÍTICO)"
 echo "   - Consola /system exclusiva super_admin"
 echo "   - Endpoints /system/reauth para handoff"
 echo ""
 echo "2. Actualizar cada scope auth.py (CRÍTICO):"
-echo "   - src/pronto_employees/routes/waiter/auth.py"
-echo "   - src/pronto_employees/routes/chef/auth.py"
-echo "   - src/pronto_employees/routes/cashier/auth.py"
-echo "   - src/pronto_employees/routes/admin/auth.py"
+echo "   - pronto-employees/src/pronto_employees/routes/waiter/auth.py"
+echo "   - pronto-employees/src/pronto_employees/routes/chef/auth.py"
+echo "   - pronto-employees/src/pronto_employees/routes/cashier/auth.py"
+echo "   - pronto-employees/src/pronto_employees/routes/admin/auth.py"
 echo "   Agregar endpoint @csrf.exempt super_admin_login"
 echo ""
 echo "3. Templates de login y reauth:"
@@ -169,7 +169,7 @@ echo "   - login_system.html"
 echo "   - system_reauth_confirm.html"
 echo "   - system_reauth_redirect.html"
 echo ""
-echo "4. Actualizar src/pronto_employees/app.py:"
+echo "4. Actualizar pronto-employees/src/pronto_employees/app.py:"
 echo "   - Import csrf desde extensions"
 echo "   - CORS con orígenes explícitos"
 echo "   - ProxyFix si hay reverse proxy"
@@ -178,5 +178,5 @@ echo ""
 echo "Ver IMPLEMENTACION_REAUTH.md para detalles completos."
 echo ""
 echo "Si la migración no está aplicada, siguiente paso:"
-echo "  bash bin/apply_migration.sh src/shared/migrations/010_add_super_admin_handoff_and_audit.sql"
+echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql"
 echo ""

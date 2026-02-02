@@ -7,7 +7,7 @@ EXIT_CODE=0
 
 # 1. Check migration file naming convention
 echo "   - Verificando nombres de migraciones..."
-INVALID_MIGRATIONS=$(find src/shared/migrations -name "*.sql" ! -name "*_*.sql" ! -name "README.md")
+INVALID_MIGRATIONS=$(find pronto-libs/src/pronto_shared/migrations -name "*.sql" ! -name "*_*.sql" ! -name "README.md")
 if [ -n "$INVALID_MIGRATIONS" ]; then
     echo "   ❌ Error: Migraciones sin formato correcto (deben ser snake_case y numeradas/fechadas)."
     echo "$INVALID_MIGRATIONS"
@@ -18,17 +18,17 @@ fi
 
 # 2. Check for dangerous operations in migrations
 echo "   - Buscando operaciones destructivas..."
-if grep -rE "DROP TABLE|DROP COLUMN" src/shared/migrations --include="*.sql" > /dev/null; then
+if grep -rE "DROP TABLE|DROP COLUMN" pronto-libs/src/pronto_shared/migrations --include="*.sql" > /dev/null; then
     echo "   ⚠️  Advertencia: Se detectaron operaciones DROP en migraciones. Verificar que no haya pérdida de datos accidental."
-    grep -rE "DROP TABLE|DROP COLUMN" src/shared/migrations --include="*.sql" | head -n 3
+    grep -rE "DROP TABLE|DROP COLUMN" pronto-libs/src/pronto_shared/migrations --include="*.sql" | head -n 3
     # Warn only, sometimes necessary
 else
     echo "   ✅ No se detectaron operaciones DROP obvias."
 fi
 
 # 3. Check models.py existence
-if [ ! -f "src/shared/models.py" ]; then
-    echo "   ❌ Error: No se encuentra src/shared/models.py"
+if [ ! -f "pronto-libs/src/pronto_shared/models.py" ]; then
+    echo "   ❌ Error: No se encuentra pronto-libs/src/pronto_shared/models.py"
     EXIT_CODE=1
 fi
 

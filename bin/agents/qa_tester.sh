@@ -7,7 +7,7 @@ EXIT_CODE=0
 
 # 1. Check for focused tests (which skip others)
 echo "   - Buscando pruebas enfocadas (.only, fit)..."
-if grep -rE "\.only\(|fit\(|fdescribe\(" tests/ e2e-tests/ src/pronto_clients/static/js/src/__tests__ src/pronto_employees/static/js/src/__tests__ --include="*.ts" --include="*.js" --include="*.py" --exclude-dir=node_modules > /dev/null 2>&1; then
+if grep -rE "\.only\(|fit\(|fdescribe\(" tests/ e2e-tests/ pronto-static/src/ pronto-client/src/ pronto-employees/src/ --include="*.ts" --include="*.js" --include="*.py" --exclude-dir=node_modules > /dev/null 2>&1; then
     echo "   ❌ Error: Se encontraron pruebas enfocadas (.only, fit, fdescribe). Esto evita que corran todas las pruebas."
     grep -rE "\.only\(|fit\(|fdescribe\(" tests/ e2e-tests/ --include="*.ts" --include="*.js" --include="*.py" --exclude-dir=node_modules | head -n 3
     EXIT_CODE=1

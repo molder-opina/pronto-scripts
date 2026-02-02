@@ -299,9 +299,8 @@ check_static_assets() {
     # Check if built assets exist (try multiple locations)
     local assets_dir=""
     for path in \
-        "../pronto-client/src/pronto_clients/static/js/dist/clients" \
-        "../pronto-static/src/vue/clients/dist" \
-        "src/pronto_clients/static/js/dist/clients"; do
+        "../pronto-static/src/static_content/assets/js/clients" \
+        "../pronto-static/src/static_content/assets/js/employees"; do
         if [ -d "$path" ]; then
             assets_dir="$path"
             break

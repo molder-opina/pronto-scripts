@@ -6,6 +6,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
+PRONTO_STATIC_DIR="${REPO_ROOT}/pronto-static/src/static_content"
 
 # Cargar variables de entorno
 ENV_FILE="${PROJECT_ROOT}/.env"
@@ -17,8 +19,10 @@ if [[ -f "${ENV_FILE}" ]]; then
 fi
 
 RESTAURANT_NAME="${RESTAURANT_NAME:-cafeteria-test}"
-SOURCE_DIR="${PROJECT_ROOT}/build/static_content/assets/${RESTAURANT_NAME}/products"
-DEST_NGINX="/var/www/pronto-static/assets/${RESTAURANT_NAME}/products"
+RESTAURANT_SLUG="${RESTAURANT_SLUG:-${RESTAURANT_NAME}}"
+SOURCE_DIR="${PRONTO_STATIC_DIR}/assets/${RESTAURANT_SLUG}/products"
+FALLBACK_SOURCE_DIR="${PRONTO_STATIC_DIR}/assets/pronto/products"
+DEST_NGINX="/var/www/pronto-static/assets/${RESTAURANT_SLUG}/products"
 
 echo "=========================================="
 echo "  Sincronización de Imágenes de Productos"
@@ -31,11 +35,16 @@ echo ""
 
 # Verificar que exista el directorio de origen
 if [[ ! -d "${SOURCE_DIR}" ]]; then
-  echo "❌ Error: No existe el directorio de origen: ${SOURCE_DIR}"
-  echo ""
-  echo "Primero genera las imágenes con:"
-  echo "  python scripts/generate_product_images.py"
-  exit 1
+  if [[ -d "${FALLBACK_SOURCE_DIR}" ]]; then
+    SOURCE_DIR="${FALLBACK_SOURCE_DIR}"
+    echo "ℹ️  Usando fallback: ${SOURCE_DIR}"
+  else
+    echo "❌ Error: No existe el directorio de origen: ${SOURCE_DIR}"
+    echo ""
+    echo "Primero genera las imágenes con:"
+    echo "  python scripts/generate_product_images.py --output-dir \"${SOURCE_DIR}\""
+    exit 1
+  fi
 fi
 
 # Contar imágenes en origen

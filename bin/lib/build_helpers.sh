@@ -14,17 +14,26 @@ run_frontend_builds() {
   if [[ $need_employees -eq 0 && $need_clients -eq 0 ]]; then
     return
   fi
-  if ! command -v npm > /dev/null 2>&1; then
-    echo "⚠️ npm no está disponible; omitiendo build de bundles TypeScript."
+  if ! command -v npm > /dev/null 2>&1 && ! command -v pnpm > /dev/null 2>&1; then
+    echo "⚠️ npm/pnpm no está disponible; omitiendo build de bundles TypeScript."
     return
   fi
+  local static_dir="${PROJECT_ROOT}/pronto-static"
   if [[ $need_employees -eq 1 ]]; then
     echo ">> Generando bundle frontend para empleados (npm run build:employees)..."
-    (cd "${PROJECT_ROOT}" && npm run build:employees)
+    if command -v pnpm > /dev/null 2>&1; then
+      (cd "${static_dir}" && pnpm build:employees)
+    else
+      (cd "${static_dir}" && npm run build:employees)
+    fi
   fi
   if [[ $need_clients -eq 1 ]]; then
     echo ">> Generando bundle frontend para clientes (npm run build:clients)..."
-    (cd "${PROJECT_ROOT}" && npm run build:clients)
+    if command -v pnpm > /dev/null 2>&1; then
+      (cd "${static_dir}" && pnpm build:clients)
+    else
+      (cd "${static_dir}" && npm run build:clients)
+    fi
   fi
 }
 
@@ -74,6 +83,11 @@ prepare_dependencies() {
   fi
 
   # Usamos flags para asegurar compatibilidad con python:3.11-slim (Debian)
+  REQ_ARGS=()
+  if [ -f "${PROJECT_ROOT}/pronto-api/requirements.txt" ]; then
+    REQ_ARGS+=("-r" "${PROJECT_ROOT}/pronto-api/requirements.txt")
+  fi
+
   "$PIP_CMD" download \
     --dest "${PROJECT_ROOT}/build/wheels" \
     --platform "$PLATFORM" \
@@ -81,15 +95,13 @@ prepare_dependencies() {
     --implementation cp \
     --abi cp311 \
     --only-binary=:all: \
-    -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
-    -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
+    "${REQ_ARGS[@]}" \
     gunicorn flask-cors flask-session requests==2.32.3 greenlet \
     --no-cache-dir || {
       echo "⚠️  Hubo un error descargando wheels binarias. Intentando descarga mixta (source + binary)..."
       "$PIP_CMD" download \
         --dest "${PROJECT_ROOT}/build/wheels" \
-        -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
-        -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
+        "${REQ_ARGS[@]}" \
         gunicorn flask-cors flask-session requests==2.32.3 greenlet \
         --no-cache-dir
     }

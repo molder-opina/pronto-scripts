@@ -1,7 +1,11 @@
 #!/bin/bash
 # limpieza-pronto-app.sh - Script de limpieza automatizado
 
-echo "🧹 Script de Limpieza para Pronto-App"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PRONTO_STATIC_DIR="${REPO_ROOT}/pronto-static/src/static_content"
+
+echo "🧹 Script de Limpieza para Pronto"
 echo "====================================="
 
 # 1. Limpiar cache de Python
@@ -36,7 +40,7 @@ UNUSED_IMAGES=(
 )
 
 for img in "${UNUSED_IMAGES[@]}"; do
-    rm -f "src/static_content/assets/cafeteria-test/menu/$img"
+    rm -f "${PRONTO_STATIC_DIR}/assets/pronto/menu/$img"
 done
 echo "✅ Imágenes no utilizadas eliminadas ($(echo ${#UNUSED_IMAGES[@]}))"
 
@@ -58,8 +62,8 @@ echo "✅ Scripts de desarrollo archivados"
 
 # 6. Limpiar archivos de test en build
 echo "🧪 Eliminando archivos de test..."
-rm -rf src/pronto_clients/static/js/src/__tests__
-rm -rf src/pronto_employees/static/js/src/__tests__
+rm -rf "${REPO_ROOT}/pronto-static/src/vue/clients/__tests__"
+rm -rf "${REPO_ROOT}/pronto-static/src/vue/employees/__tests__"
 rm -f test-setup.ts
 echo "✅ Archivos de test eliminados"
 

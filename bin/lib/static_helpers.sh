@@ -2,6 +2,10 @@
 # bin/lib/static_helpers.sh
 # Helper functions for static content synchronization
 
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
+PRONTO_STATIC_DIR="${PRONTO_STATIC_DIR:-${PROJECT_ROOT}/pronto-static/src/static_content}"
+PRONTO_STATIC_ASSETS_DIR="${PRONTO_STATIC_DIR}/assets"
+
 slugify() {
   local input="${1:-}"
   input="$(echo "${input}" | tr '[:upper:]' '[:lower:]')"
@@ -183,25 +187,25 @@ sync_static_content() {
             # Crear directorios en el contenedor
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/js 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/css 2>/dev/null || true
-            docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/branding 2>/dev/null || true
+            docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/branding 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/menu 2>/dev/null || true
 
             # Copiar JS bundles
             echo "   - Copiando JS bundles..."
-            docker cp "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
-            docker cp "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
+            docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/clients/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
+            docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/employees/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
 
             # Copiar CSS
             echo "   - Copiando CSS..."
-            docker cp "${PROJECT_ROOT}/build/static_content/assets/css/"* "$static_container:/usr/share/nginx/html/assets/css/" 2>/dev/null || true
+            docker cp "${PRONTO_STATIC_ASSETS_DIR}/css/"* "$static_container:/usr/share/nginx/html/assets/css/" 2>/dev/null || true
 
             # Copiar branding
             echo "   - Copiando branding..."
-            docker cp "${PROJECT_ROOT}/build/static_content/assets/pronto/branding/"* "$static_container:/usr/share/nginx/html/assets/branding/" 2>/dev/null || true
+            docker cp "${PRONTO_STATIC_ASSETS_DIR}/pronto/branding/"* "$static_container:/usr/share/nginx/html/assets/pronto/branding/" 2>/dev/null || true
 
             # Copiar imágenes de menú
             echo "   - Copiando imágenes de menú..."
-            docker cp "${PROJECT_ROOT}/build/static_content/assets/pronto/menu/"* "$static_container:/usr/share/nginx/html/assets/pronto/menu/" 2>/dev/null || true
+            docker cp "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu/"* "$static_container:/usr/share/nginx/html/assets/pronto/menu/" 2>/dev/null || true
 
             # Recargar nginx
             docker exec "$static_container" nginx -s reload 2>/dev/null || true
@@ -227,37 +231,37 @@ sync_static_content() {
             sudo install -d "${static_content_root}/assets/js/employees" || true
             sudo install -d "${static_content_root}/assets/css/clients" || true
             sudo install -d "${static_content_root}/assets/css/employees" || true
-            sudo install -d "${static_content_root}/assets/branding" || true
+            sudo install -d "${static_content_root}/assets/pronto/branding" || true
             sudo install -d "${static_content_root}/assets/pronto/menu" || true
 
             # JS compilado clientes
-            if [[ -d "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients/" "${static_content_root}/assets/js/clients/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js/clients" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/js/clients/" "${static_content_root}/assets/js/clients/"
             fi
 
             # JS compilado empleados
-            if [[ -d "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees/" "${static_content_root}/assets/js/employees/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js/employees" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/js/employees/" "${static_content_root}/assets/js/employees/"
             fi
 
             # CSS compartido
-            if [[ -d "${PROJECT_ROOT}/build/static_content/assets/css" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/static_content/assets/css/" "${static_content_root}/assets/css/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/css" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/css/" "${static_content_root}/assets/css/"
             fi
 
             # Branding
-            if [[ -d "${PROJECT_ROOT}/build/static_content/assets/pronto/branding" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/static_content/assets/pronto/branding/" "${static_content_root}/assets/branding/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/pronto/branding" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/pronto/branding/" "${static_content_root}/assets/pronto/branding/"
             fi
 
             # Imágenes de menú
-            if [[ -d "${PROJECT_ROOT}/build/static_content/assets/pronto/menu" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/static_content/assets/pronto/menu/" "${static_content_root}/assets/pronto/menu/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu/" "${static_content_root}/assets/pronto/menu/"
             fi
 
             # JS vanilla compartido
-            if [[ -d "${PROJECT_ROOT}/build/static_content/assets/js" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/static_content/assets/js/" "${static_content_root}/assets/js/"
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/js/" "${static_content_root}/assets/js/"
             fi
 
             # Corregir permisos

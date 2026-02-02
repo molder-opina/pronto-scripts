@@ -6,18 +6,18 @@ echo "🤵 [AGENTE MESERO] Validando consola de meseros (/waiter)..."
 EXIT_CODE=0
 
 # 1. Check for Waiter Section template
-if [ ! -f "src/pronto_employees/templates/includes/_waiter_section.html" ]; then
+if [ ! -f "pronto-employees/src/pronto_employees/templates/includes/_waiter_section.html" ]; then
     echo "   ❌ Error: No se encuentra el template _waiter_section.html"
     EXIT_CODE=1
 fi
 
 # 2. Check for Waiter JS module
-if [ ! -f "src/shared/static/js/src/modules/waiter-board.ts" ]; then
+if [ ! -f "pronto-static/src/vue/employees/modules/waiter-board.ts" ]; then
     echo "   ⚠️  Advertencia: No se encuentra el módulo principal de meseros (waiter-board.ts)"
 fi
 
 # 3. Check for waiter assignment logic
-if ! grep -r "table-assignment" src/pronto_employees/static/js/src > /dev/null; then
+if ! grep -r "table-assignment" pronto-static/src/vue/employees > /dev/null; then
     echo "   ⚠️  Advertencia: No se detectó lógica de asignación de mesas."
 fi
 

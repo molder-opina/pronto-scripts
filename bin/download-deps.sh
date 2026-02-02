@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
 
 echo ">> Descargando dependencias Python a local (build/wheels)..."
 mkdir -p "${PROJECT_ROOT}/build/wheels"
@@ -36,6 +37,14 @@ fi
 # Usamos flags para asegurar compatibilidad con python:3.11-slim (Debian)
 # Esto descarga wheels binarias si existen, o fuentes si no.
 # Nota: Si falla en paquetes con extensiones C, se requerirá compilación en el contenedor.
+REQ_ARGS=()
+for req in \
+  "${REPO_ROOT}/pronto-api/requirements.txt"; do
+  if [ -f "${req}" ]; then
+    REQ_ARGS+=("-r" "${req}")
+  fi
+done
+
 "$PIP_CMD" download \
   --dest "${PROJECT_ROOT}/build/wheels" \
   --platform "$PLATFORM" \
@@ -43,15 +52,13 @@ fi
   --implementation cp \
   --abi cp311 \
   --only-binary=:all: \
-  -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
-  -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
+  "${REQ_ARGS[@]}" \
   gunicorn flask-cors flask-session requests==2.32.3 greenlet \
   --no-cache-dir || {
     echo "⚠️  Hubo un error descargando wheels binarias. Intentando descarga mixta (source + binary)..."
     "$PIP_CMD" download \
       --dest "${PROJECT_ROOT}/build/wheels" \
-      -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
-      -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
+      "${REQ_ARGS[@]}" \
       gunicorn flask-cors flask-session requests==2.32.3 greenlet \
       --no-cache-dir
   }

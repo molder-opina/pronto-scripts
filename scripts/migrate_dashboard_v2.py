@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 
-path = Path(
-    "/Users/molder/projects/github - molder/pronto-app/src/pronto_employees/templates/dashboard.html"
-)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_PATH = REPO_ROOT / "pronto-employees/src/pronto_employees/templates/dashboard.html"
+path = Path(os.environ.get("PRONTO_DASHBOARD_PATH", str(DEFAULT_PATH)))
 
 
 def extract_block(lines, id_search):

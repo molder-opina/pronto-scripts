@@ -7,7 +7,7 @@ EXIT_CODE=0
 
 # 1. Check for large images (>1MB)
 echo "   - Verificando tamaño de imágenes..."
-LARGE_IMAGES=$(find src/static_content/assets -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) -size +1M)
+LARGE_IMAGES=$(find pronto-static/src/static_content/assets -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) -size +1M)
 if [ -n "$LARGE_IMAGES" ]; then
     echo "   ⚠️  Advertencia: Imágenes mayores a 1MB detectadas:"
     echo "$LARGE_IMAGES" | head -n 3
@@ -18,7 +18,7 @@ fi
 
 # 2. Check for CSS !important overuse
 echo "   - Verificando uso de !important en CSS..."
-IMPORTANT_COUNT=$(grep -r "!important" src/ --include="*.css" | wc -l)
+IMPORTANT_COUNT=$(grep -r "!important" pronto-static/src/ --include="*.css" | wc -l)
 if [ "$IMPORTANT_COUNT" -gt 10 ]; then
     echo "   ⚠️  Advertencia: Uso excesivo de !important ($IMPORTANT_COUNT ocurrencias)."
 else
@@ -27,7 +27,7 @@ fi
 
 # 3. Check for empty alt tags
 echo "   - Buscando atributos alt vacíos..."
-if grep -r 'alt=""' src/ --include="*.html" --include="*.vue" > /dev/null; then
+if grep -r 'alt=""' pronto-static/src/ --include="*.html" --include="*.vue" > /dev/null; then
     echo "   ⚠️  Advertencia: Imágenes sin texto alternativo (alt=\"\") encontradas."
 else
     echo "   ✅ Accesibilidad de imágenes básica correcta."

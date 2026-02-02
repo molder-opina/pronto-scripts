@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 # Configuration
 SERVER_USER="root"
 SERVER_HOST="89.116.212.110"
+PRONTO_APP_DIR="${PRONTO_APP_DIR:-~/pronto}"
 
 # Check if commit message is provided
 if [ -z "$1" ]; then
@@ -56,8 +57,9 @@ ssh -t ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
     su - pronto << 'ENDSU'
         set -e
 
+        PRONTO_APP_DIR="${PRONTO_APP_DIR:-~/pronto}"
         echo "Navegando al directorio de la aplicación..."
-        cd ~/pronto-app
+        cd "${PRONTO_APP_DIR}"
 
         echo "Haciendo git pull..."
         git pull

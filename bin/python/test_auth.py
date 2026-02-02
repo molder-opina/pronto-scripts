@@ -14,13 +14,15 @@ from pathlib import Path
 
 def _load_dependencies():
     """Load app dependencies after adjusting sys.path."""
-    # Agregar el directorio build al path para importaciones locales
-    # Ensure pronto_shared is importable
-try:
-    import pronto_shared
-except ImportError:
-    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
-    cd ../pronto-libs && pip install -e .")
+    repo_root = Path(__file__).resolve().parents[3]
+    sys.path.insert(0, str(repo_root / "pronto-libs/src"))
+    try:
+        import pronto_shared  # noqa: F401
+    except ImportError:
+        raise ImportError(
+            "pronto_shared package not found. Install it from pronto-libs repo:\n"
+            "cd ../pronto-libs && pip install -e ."
+        )
 
     from pronto_shared.db import get_session
     from pronto_shared.models import Employee
@@ -295,7 +297,7 @@ def main():
         if not test_employee_creation():
             print("\n" + "!" * 80)
             print("  ADVERTENCIA: No se encontraron empleados en la base de datos")
-            print("  Ejecuta: python src/shared/services/seed.py")
+            print("  Ejecuta: python pronto-libs/src/pronto_shared/services/seed.py")
             print("!" * 80)
             return
 

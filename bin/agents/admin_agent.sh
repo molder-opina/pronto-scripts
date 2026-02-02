@@ -6,19 +6,19 @@ echo "👨‍💼 [AGENTE ADMIN] Validando módulos administrativos (/admin)..."
 EXIT_CODE=0
 
 # 1. Check for Admin Sections template
-if [ ! -f "src/pronto_employees/templates/includes/_admin_sections.html" ]; then
+if [ ! -f "pronto-employees/src/pronto_employees/templates/includes/_admin_sections.html" ]; then
     echo "   ❌ Error: No se encuentra el template _admin_sections.html"
     EXIT_CODE=1
 fi
 
 # 2. Check for role management
-if ! grep -r "Permission" src/shared/permissions.py > /dev/null; then
+if ! grep -r "Permission" pronto-libs/src/pronto_shared/permissions.py > /dev/null; then
     echo "   ❌ Error: El sistema de permisos no parece estar configurado correctamente."
     EXIT_CODE=1
 fi
 
 # 3. Check for business config service
-if [ ! -f "src/shared/services/business_config_service.py" ]; then
+if [ ! -f "pronto-libs/src/pronto_shared/services/business_config_service.py" ]; then
     echo "   ❌ Error: Falta el servicio de configuración del negocio."
     EXIT_CODE=1
 fi

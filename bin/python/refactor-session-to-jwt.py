@@ -23,8 +23,10 @@ project_root = Path(__file__).parent.parent
 try:
     import pronto_shared
 except ImportError:
-    raise ImportError("pronto_shared package not found. Install it from pronto-libs repo:
-    cd ../pronto-libs && pip install -e .")
+    raise ImportError(
+        "pronto_shared package not found. Install it from pronto-libs repo:\n"
+        "cd ../pronto-libs && pip install -e ."
+    )
 
 
 def find_files_with_session_refs(base_dir):
@@ -130,8 +132,8 @@ def main():
     parser.add_argument(
         "--dir",
         type=str,
-        default="src/pronto_employees",
-        help="Directory to search (default: src/pronto_employees)",
+        default="pronto-employees/src/pronto_employees",
+        help="Directory to search (default: pronto-employees/src/pronto_employees)",
     )
 
     args = parser.parse_args()

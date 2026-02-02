@@ -34,9 +34,9 @@ fi
 if [ -d "venv" ]; then
     echo -e "${BLUE}Activando virtual environment local...${NC}"
     source venv/bin/activate
-elif [ -d "../pronto-app/.venv" ]; then
-    echo -e "${BLUE}Activando virtual environment del parent...${NC}"
-    source ../pronto-app/.venv/bin/activate
+elif [ -d "../../.venv" ]; then
+    echo -e "${BLUE}Activando virtual environment del repo...${NC}"
+    source ../../.venv/bin/activate
 fi
 
 # Instalar dependencias si faltan

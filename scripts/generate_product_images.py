@@ -28,6 +28,7 @@ from PIL import Image
 
 # Cargar variables de ambiente desde .env
 PROJECT_ROOT = Path(__file__).parent.parent
+REPO_ROOT = PROJECT_ROOT.parent
 ENV_FILE = PROJECT_ROOT / ".env"
 
 
@@ -52,8 +53,10 @@ def load_env_file(env_path):
 # Cargar archivos de configuración
 load_env_file(ENV_FILE)
 
-# Agregar el directorio build al path
-sys.path.insert(0, str(PROJECT_ROOT / "build"))
+# Agregar pronto-libs al path
+PRONTO_LIBS_SRC = REPO_ROOT / "pronto-libs/src"
+if PRONTO_LIBS_SRC.exists():
+    sys.path.insert(0, str(PRONTO_LIBS_SRC))
 
 from sqlalchemy import select  # noqa: E402
 
@@ -198,7 +201,7 @@ def generate_product_images(
                 # Usar la ruta definida en el producto
                 # Formato: /assets/pronto/menu/producto.png
                 relative_path = menu_item.image_path.lstrip("/")
-                output_path = PROJECT_ROOT / "static" / relative_path
+                output_path = REPO_ROOT / "pronto-static" / "src/static_content" / relative_path
             else:
                 # Generar nombre de archivo
                 filename = menu_item.name.lower().replace(" ", "_").replace("/", "_")
@@ -272,7 +275,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROJECT_ROOT / "static" / "assets" / "pronto" / "menu",
+        default=REPO_ROOT / "pronto-static" / "src/static_content" / "assets" / "pronto" / "menu",
         help="Directorio de salida para las imágenes",
     )
     parser.add_argument(

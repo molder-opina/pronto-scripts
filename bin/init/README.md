@@ -34,8 +34,8 @@ bash bin/init/init.sh --non-interactive --yes \
 
 ## Migraciones
 
-- Crear tabla de secretos: `build/shared/migrations/009_add_pronto_secrets.sql`
-- Rollback: `build/shared/migrations/009_add_pronto_secrets_rollback.sql`
+- Crear tabla de secretos: `pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets.sql`
+- Rollback: `pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets_rollback.sql`
 - Ejecuta automático en `bin/init/03_seed_params.sh` (usa `--skip-migrations`, `--rollback-migrations` o `--force-rollback`)
 - `bin/init/05_apply_migrations.sh` acepta `--force-rollback` para aplicar el rollback sin prompt
 
@@ -48,7 +48,7 @@ bash bin/init/init.sh --rollback-migrations --force-rollback --skip-build --non-
 ## Solo migración
 
 ```bash
-bash bin/init/05_apply_migrations.sh build/shared/migrations/009_add_pronto_secrets.sql
+bash bin/init/05_apply_migrations.sh pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets.sql
 ```
 
 ## Solo seed/sync

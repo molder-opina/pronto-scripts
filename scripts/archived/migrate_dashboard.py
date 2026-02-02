@@ -1,9 +1,10 @@
+import os
 import sys
 from pathlib import Path
 
-path = Path(
-    "/Users/molder/projects/github - molder/pronto-app/build/pronto_employees/templates/dashboard.html"
-)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_PATH = REPO_ROOT / "pronto-employees/src/pronto_employees/templates/dashboard.html"
+path = Path(os.environ.get("PRONTO_DASHBOARD_PATH", str(DEFAULT_PATH)))
 
 # PTH123: `open()` replaced by `Path.open()`
 if path.exists():

@@ -13,6 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
+REPO_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 CONFIG_FILE="${ROOT_DIR}/.env"
 
 # Cargar variables de entorno existentes
@@ -26,7 +27,7 @@ NGINX_HOST="${NGINX_HOST:-localhost}"
 NGINX_PORT="${NGINX_PORT:-9088}"
 NGINX_PREFIX="${NGINX_PREFIX:-}"
 NGINX_USER="${NGINX_USER:-root}"
-STATIC_CONTENT_DIR="${ROOT_DIR}/src/static_content"
+STATIC_CONTENT_DIR="${REPO_ROOT}/pronto-static/src/static_content"
 VERIFY_SSL="${VERIFY_SSL:-false}"
 
 # Colores

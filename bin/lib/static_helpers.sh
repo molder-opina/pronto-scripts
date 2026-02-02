@@ -188,8 +188,8 @@ sync_static_content() {
 
             # Copiar JS bundles
             echo "   - Copiando JS bundles..."
-            docker cp "${PROJECT_ROOT}/build/clients_app/static/js/dist/clients/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
-            docker cp "${PROJECT_ROOT}/build/employees_app/static/js/dist/employees/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
+            docker cp "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
+            docker cp "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
 
             # Copiar CSS
             echo "   - Copiando CSS..."
@@ -231,13 +231,13 @@ sync_static_content() {
             sudo install -d "${static_content_root}/assets/pronto/menu" || true
 
             # JS compilado clientes
-            if [[ -d "${PROJECT_ROOT}/build/clients_app/static/js/dist/clients" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/clients_app/static/js/dist/clients/" "${static_content_root}/assets/js/clients/"
+            if [[ -d "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients" ]]; then
+                sudo rsync -a "${PROJECT_ROOT}/build/pronto_clients/static/js/dist/clients/" "${static_content_root}/assets/js/clients/"
             fi
 
             # JS compilado empleados
-            if [[ -d "${PROJECT_ROOT}/build/employees_app/static/js/dist/employees" ]]; then
-                sudo rsync -a "${PROJECT_ROOT}/build/employees_app/static/js/dist/employees/" "${static_content_root}/assets/js/employees/"
+            if [[ -d "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees" ]]; then
+                sudo rsync -a "${PROJECT_ROOT}/build/pronto_employees/static/js/dist/employees/" "${static_content_root}/assets/js/employees/"
             fi
 
             # CSS compartido

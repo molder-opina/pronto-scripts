@@ -9,8 +9,7 @@ source "${SCRIPT_DIR}/lib/docker_runtime.sh"
 # shellcheck source=bin/lib/stack_helpers.sh
 source "${SCRIPT_DIR}/lib/stack_helpers.sh"
 
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 
 SERVICES=()
@@ -59,7 +58,6 @@ fi
 detect_compose_command "${COMPOSE_FILE}"
 if [[ " ${COMPOSE_CMD[*]} " != *" --env-file "* ]]; then
   COMPOSE_CMD+=(--env-file "${ENV_FILE}")
-  [[ -f "${SECRETS_FILE}" ]] && COMPOSE_CMD+=(--env-file "${SECRETS_FILE}")
 fi
 
 CLIENT_PORT="${CLIENT_APP_HOST_PORT:-6080}"

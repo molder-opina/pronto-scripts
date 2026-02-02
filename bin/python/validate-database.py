@@ -115,7 +115,7 @@ class DatabaseValidator:
             self.db_config["host"] = "localhost"
 
         # Try to load from config files for additional settings
-        config_file = Path("config/general.env")
+        config_file = Path(".env")
         if config_file.exists():
             with open(config_file) as f:
                 for line in f:
@@ -128,7 +128,11 @@ class DatabaseValidator:
                             config_key = key.replace("POSTGRES_", "").lower()
                             if config_key == "port":
                                 self.db_config[config_key] = int(value)
-                            elif config_key == "host" and value == "postgres" and use_local:
+                            elif (
+                                config_key == "host"
+                                and value == "postgres"
+                                and use_local
+                            ):
                                 self.db_config[config_key] = "localhost"
 
         self.log(
@@ -214,7 +218,9 @@ class DatabaseValidator:
                     all_found = False
 
             if all_found:
-                self.log(f"All {len(self.REQUIRED_TABLES)} required tables found", "PASS")
+                self.log(
+                    f"All {len(self.REQUIRED_TABLES)} required tables found", "PASS"
+                )
             else:
                 self.log("Some required tables are missing", "ERROR")
 
@@ -263,7 +269,9 @@ class DatabaseValidator:
             )
 
             if not has_critical_data:
-                self.warnings.append("Critical data (menu) is missing - seed data may be needed")
+                self.warnings.append(
+                    "Critical data (menu) is missing - seed data may be needed"
+                )
 
             return True
 
@@ -366,7 +374,9 @@ class DatabaseValidator:
             if tables_without_indexes == 0:
                 self.passed.append("All tables have indexes")
             else:
-                self.warnings.append(f"{tables_without_indexes} tables may need indexes")
+                self.warnings.append(
+                    f"{tables_without_indexes} tables may need indexes"
+                )
 
             cursor.close()
             conn.close()
@@ -504,7 +514,9 @@ class DatabaseValidator:
             print(f"  ... and {len(results['passed']) - 5} more")
 
         if results["warnings"]:
-            print(f"\n{Colors.YELLOW}Warnings:{Colors.RESET} {len(results['warnings'])}")
+            print(
+                f"\n{Colors.YELLOW}Warnings:{Colors.RESET} {len(results['warnings'])}"
+            )
             for item in results["warnings"][:3]:
                 print(f"  ⚠ {item}")
             if len(results["warnings"]) > 3:
@@ -533,11 +545,15 @@ def main():
     parser = argparse.ArgumentParser(
         description="Database Validation Script - Check database health and integrity"
     )
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show verbose output")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show verbose output"
+    )
     parser.add_argument(
         "--quick", "-q", action="store_true", help="Quick check (connectivity only)"
     )
-    parser.add_argument("--fix", "-f", action="store_true", help="Attempt to fix common issues")
+    parser.add_argument(
+        "--fix", "-f", action="store_true", help="Attempt to fix common issues"
+    )
     parser.add_argument("--export", "-e", help="Export results to JSON file")
 
     args = parser.parse_args()

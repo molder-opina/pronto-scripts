@@ -101,11 +101,11 @@ employees = [
         "email": "admin@cafeteria.test",
         "role": "super_admin",
         "name": "Administrador",
-        "allow_scopes": '["admin", "waiter", "chef", "cashier"]',
+        "allow_scopes": '["system", "admin", "waiter", "chef", "cashier"]',
     },
     {
         "email": "admin-roles@cafeteria.test",
-        "role": "admin_roles",
+        "role": "admin",
         "name": "Admin Roles",
         "allow_scopes": '["admin", "waiter", "chef", "cashier"]',
     },
@@ -212,7 +212,7 @@ cursor.execute(
     """
     SELECT id, email_encrypted, role, allow_scopes, is_active
     FROM pronto_employees
-    WHERE role IN ('super_admin', 'admin_roles', 'waiter', 'chef', 'cashier')
+    WHERE role IN ('super_admin', 'admin', 'waiter', 'chef', 'cashier')
     ORDER BY id
     """
 )

@@ -4,8 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BASE_ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+BASE_ENV_FILE="${PROJECT_ROOT}/.env"
+SECRETS_FILE="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LOAD_SEED=false

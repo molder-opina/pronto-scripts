@@ -7,8 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Cargar configuración
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-# shellcheck source=../config/general.env
+ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck source=../.env
 [[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
 
 RESTAURANT_NAME="${RESTAURANT_NAME:-Mi Restaurante}"

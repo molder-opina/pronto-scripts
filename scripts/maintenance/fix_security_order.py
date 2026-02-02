@@ -1,7 +1,7 @@
 from pathlib import Path
 
 path = Path(
-    "/Users/molder/projects/github - molder/pronto-app/src/employees_app/templates/dashboard.html"
+    "/Users/molder/projects/github - molder/pronto-app/src/pronto_employees/templates/dashboard.html"
 )
 
 

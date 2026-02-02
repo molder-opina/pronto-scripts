@@ -6,7 +6,7 @@ echo "💰 [AGENTE CAJERO] Validando módulo de caja y pagos (/cashier)..."
 EXIT_CODE=0
 
 # 1. Check for Cashier Section template
-if [ ! -f "src/employees_app/templates/includes/_cashier_section.html" ]; then
+if [ ! -f "src/pronto_employees/templates/includes/_cashier_section.html" ]; then
     echo "   ❌ Error: No se encuentra el template _cashier_section.html"
     EXIT_CODE=1
 fi
@@ -17,7 +17,7 @@ if [ ! -d "src/shared/services/payment_providers" ]; then
 fi
 
 # 3. Check for currency formatting in payments
-if ! grep -r "formatCurrency" src/employees_app/static/js/src/modules/sessions-manager.ts > /dev/null; then
+if ! grep -r "formatCurrency" src/pronto_employees/static/js/src/modules/sessions-manager.ts > /dev/null; then
     echo "   ⚠️  Advertencia: El gestor de sesiones no parece usar formatCurrency."
 fi
 

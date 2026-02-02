@@ -26,7 +26,7 @@ fi
 # 2. Check for Currency Formatting usage
 echo "   - Verificando uso de formateo de moneda..."
 # Look for 'formatCurrency' usage in frontend code
-if ! grep -r "formatCurrency" src/clients_app/static/js/src > /dev/null && ! grep -r "formatCurrency" src/employees_app/static/js/src > /dev/null; then
+if ! grep -r "formatCurrency" src/pronto_clients/static/js/src > /dev/null && ! grep -r "formatCurrency" src/pronto_employees/static/js/src > /dev/null; then
     echo "   ⚠️  Advertencia: No se detectó uso de 'formatCurrency' en el frontend. Verifica que los precios se muestren correctamente."
 else
     echo "   ✅ Función de formateo de moneda en uso."

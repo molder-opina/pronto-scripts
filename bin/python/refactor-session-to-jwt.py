@@ -64,10 +64,10 @@ def refactor_file(filepath, dry_run=False):
 
     # 2. Agregar imports de JWT si no existen
     if "from shared.jwt_middleware import" not in content:
-        # Buscar la línea de imports de employees_app.decorators
-        if "from employees_app.decorators import" in content:
+        # Buscar la línea de imports de pronto_employees.decorators
+        if "from pronto_employees.decorators import" in content:
             content = re.sub(
-                r"(from employees_app\.decorators import [^\\n]+)",
+                r"(from pronto_employees\.decorators import [^\\n]+)",
                 r"\1\nfrom shared.jwt_middleware import get_current_user, get_employee_id",
                 content,
             )
@@ -125,8 +125,8 @@ def main():
     parser.add_argument(
         "--dir",
         type=str,
-        default="src/employees_app",
-        help="Directory to search (default: src/employees_app)",
+        default="src/pronto_employees",
+        help="Directory to search (default: src/pronto_employees)",
     )
 
     args = parser.parse_args()

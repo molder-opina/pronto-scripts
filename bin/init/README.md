@@ -5,7 +5,7 @@ Scripts para preparar un nuevo despliegue con variables de ambiente, sincronizac
 ## Flujo
 
 1. `01_backup_envs.sh` → crea backup con timestamp.
-2. `02_apply_envs.sh` → actualiza `config/general.env` y `config/secrets.env`.
+2. `02_apply_envs.sh` → actualiza `.env`.
 3. `03_seed_params.sh` → sincroniza env → DB y carga dummy opcional.
 4. `04_deploy.sh` → compila y despliega.
 
@@ -22,8 +22,7 @@ bash bin/init/init.sh --non-interactive --yes \
   --business-name "Mi Negocio" \
   --restaurant-slug "mi-negocio" \
   --set TAX_RATE=0.16 \
-  --general-env /ruta/general.env \
-  --secrets-env /ruta/secrets.env \
+  --general-env /ruta/.env \
   --dummy-data
   --skip-build
   --skip-migrations
@@ -60,4 +59,4 @@ bash bin/init/03_seed_params.sh --dummy-data
 
 ## Allowlist opcional
 
-- `GENERAL_ENV_ALLOWLIST` y `SECRETS_ENV_ALLOWLIST` (separadas por comas)
+- `ENV_ALLOWLIST` (separada por comas)

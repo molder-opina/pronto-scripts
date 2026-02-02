@@ -25,17 +25,10 @@ while [[ $# -gt 0 ]]; do
   esac
  done
 
-if [ -f "${PROJECT_ROOT}/config/general.env" ]; then
+if [ -f "${PROJECT_ROOT}/.env" ]; then
   set -a
   # shellcheck source=/dev/null
-  source "${PROJECT_ROOT}/config/general.env"
-  set +a
-fi
-
-if [ -f "${PROJECT_ROOT}/config/secrets.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "${PROJECT_ROOT}/config/secrets.env"
+  source "${PROJECT_ROOT}/.env"
   set +a
 fi
 

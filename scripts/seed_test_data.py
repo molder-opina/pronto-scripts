@@ -14,10 +14,9 @@ import os
 import sys
 from pathlib import Path
 
-# Cargar variables de ambiente desde config/general.env
+# Cargar variables de ambiente desde .env
 PROJECT_ROOT = Path(__file__).parent.parent
-ENV_FILE = PROJECT_ROOT / "conf" / "general.env"
-SECRETS_FILE = PROJECT_ROOT / "conf" / "secrets.env"
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 def load_env_file(env_path):
@@ -28,23 +27,18 @@ def load_env_file(env_path):
     with env_path.open() as f:
         for raw_line in f:
             line = raw_line.strip()
-            # Ignorar comentarios y líneas vacías
             if not line or line.startswith("#"):
                 continue
-            # Parsear KEY=VALUE
             if "=" in line:
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
-                # No sobrescribir si ya está definida
                 if key not in os.environ:
                     os.environ[key] = value
 
 
 # Cargar archivos de configuración
 load_env_file(ENV_FILE)
-if SECRETS_FILE.exists():
-    load_env_file(SECRETS_FILE)
 
 # Agregar el directorio build al path para importar los módulos
 sys.path.insert(0, str(PROJECT_ROOT / "build"))
@@ -109,22 +103,46 @@ def seed_additional_customers():
     print("👥 Creando clientes adicionales...")
 
     customers_data = [
-        {"name": "María García", "email": "maria.garcia@example.com", "phone": "+34611222333"},
-        {"name": "Juan Pérez", "email": "juan.perez@example.com", "phone": "+34622333444"},
-        {"name": "Ana López", "email": "ana.lopez@example.com", "phone": "+34633444555"},
+        {
+            "name": "María García",
+            "email": "maria.garcia@example.com",
+            "phone": "+34611222333",
+        },
+        {
+            "name": "Juan Pérez",
+            "email": "juan.perez@example.com",
+            "phone": "+34622333444",
+        },
+        {
+            "name": "Ana López",
+            "email": "ana.lopez@example.com",
+            "phone": "+34633444555",
+        },
         {
             "name": "Carlos Rodríguez",
             "email": "carlos.rodriguez@example.com",
             "phone": "+34644555666",
         },
-        {"name": "Laura Martínez", "email": "laura.martinez@example.com", "phone": "+34655666777"},
-        {"name": "Pedro Sánchez", "email": "pedro.sanchez@example.com", "phone": "+34666777888"},
+        {
+            "name": "Laura Martínez",
+            "email": "laura.martinez@example.com",
+            "phone": "+34655666777",
+        },
+        {
+            "name": "Pedro Sánchez",
+            "email": "pedro.sanchez@example.com",
+            "phone": "+34666777888",
+        },
         {
             "name": "Sofia Fernández",
             "email": "sofia.fernandez@example.com",
             "phone": "+34677888999",
         },
-        {"name": "Miguel Torres", "email": "miguel.torres@example.com", "phone": "+34688999000"},
+        {
+            "name": "Miguel Torres",
+            "email": "miguel.torres@example.com",
+            "phone": "+34688999000",
+        },
     ]
 
     with get_session() as session:
@@ -152,7 +170,9 @@ def seed_test_orders():
         modifier_groups_by_name = {mg.name: mg for mg in modifier_groups}
 
         if not customers or not menu_items:
-            print("⚠️  No hay clientes o items de menú. Ejecuta seed_basic_data primero.")
+            print(
+                "⚠️  No hay clientes o items de menú. Ejecuta seed_basic_data primero."
+            )
             return
 
         # Crear algunas mesas con órdenes
@@ -190,7 +210,9 @@ def seed_test_orders():
                 # Agregar 1-4 items a cada orden
                 num_items = ((i + j) % 4) + 1
                 for k in range(num_items):
-                    selected_menu_item = menu_items[(i * num_orders + j + k) % len(menu_items)]
+                    selected_menu_item = menu_items[
+                        (i * num_orders + j + k) % len(menu_items)
+                    ]
                     order_item = OrderItem(
                         order=order,
                         menu_item_id=selected_menu_item.id,
@@ -219,7 +241,9 @@ def seed_test_orders():
                             session.add(modifier_item)
 
                         # Agregar guarnición
-                        guarnicion_group = modifier_groups_by_name.get("Elige tu Guarnición")
+                        guarnicion_group = modifier_groups_by_name.get(
+                            "Elige tu Guarnición"
+                        )
                         if guarnicion_group and guarnicion_group.modifiers:
                             selected_guarnicion = guarnicion_group.modifiers[
                                 (k + 1) % len(guarnicion_group.modifiers)
@@ -258,7 +282,9 @@ def print_summary():
             "Modificadores": session.execute(select(func.count(Modifier.id))).scalar(),
             "Clientes": session.execute(select(func.count(Customer.id))).scalar(),
             "Empleados": session.execute(select(func.count(Employee.id))).scalar(),
-            "Sesiones (Mesas)": session.execute(select(func.count(DiningSession.id))).scalar(),
+            "Sesiones (Mesas)": session.execute(
+                select(func.count(DiningSession.id))
+            ).scalar(),
             "Órdenes": session.execute(select(func.count(Order.id))).scalar(),
         }
 
@@ -297,7 +323,9 @@ def print_summary():
 
 def main():
     """Función principal"""
-    parser = argparse.ArgumentParser(description="Poblar base de datos con datos de prueba")
+    parser = argparse.ArgumentParser(
+        description="Poblar base de datos con datos de prueba"
+    )
     parser.add_argument(
         "--reset", action="store_true", help="Borrar todos los datos antes de poblar"
     )
@@ -307,13 +335,15 @@ def main():
     print("=" * 60 + "\n")
 
     # Mostrar configuración cargada
-    print("📋 Configuración cargada desde config/general.env:")
-    print(f"   Base de datos: {os.getenv('MYSQL_DATABASE', 'N/A')}")
-    print(f"   Usuario: {os.getenv('MYSQL_USER', 'N/A')}")
-    print(f"   Host: {os.getenv('MYSQL_HOST', 'localhost')}")
-    print(f"   Puerto: {os.getenv('MYSQL_PORT', '3306')}")
+    print("📋 Configuración cargada desde .env:")
+    print(f"   Base de datos: {os.getenv('POSTGRES_DB', 'N/A')}")
+    print(f"   Usuario: {os.getenv('POSTGRES_USER', 'N/A')}")
+    print(f"   Host: {os.getenv('POSTGRES_HOST', 'localhost')}")
+    print(f"   Puerto: {os.getenv('POSTGRES_PORT', '5432')}")
     print(f"   Restaurante: {os.getenv('RESTAURANT_NAME', 'N/A')}")
-    print(f"   Password default empleados: {os.getenv('SEED_EMPLOYEE_PASSWORD', 'ChangeMe!123')}")
+    print(
+        f"   Password default empleados: {os.getenv('SEED_EMPLOYEE_PASSWORD', 'ChangeMe!123')}"
+    )
     print("")
 
     # Inicializar base de datos/engine

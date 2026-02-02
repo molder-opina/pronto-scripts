@@ -81,15 +81,15 @@ prepare_dependencies() {
     --implementation cp \
     --abi cp311 \
     --only-binary=:all: \
-    -r "${PROJECT_ROOT}/build/clients_app/requirements.txt" \
-    -r "${PROJECT_ROOT}/build/employees_app/requirements.txt" \
+    -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
+    -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
     gunicorn flask-cors flask-session requests==2.32.3 greenlet \
     --no-cache-dir || {
       echo "⚠️  Hubo un error descargando wheels binarias. Intentando descarga mixta (source + binary)..."
       "$PIP_CMD" download \
         --dest "${PROJECT_ROOT}/build/wheels" \
-        -r "${PROJECT_ROOT}/build/clients_app/requirements.txt" \
-        -r "${PROJECT_ROOT}/build/employees_app/requirements.txt" \
+        -r "${PROJECT_ROOT}/build/pronto_clients/requirements.txt" \
+        -r "${PROJECT_ROOT}/build/pronto_employees/requirements.txt" \
         gunicorn flask-cors flask-session requests==2.32.3 greenlet \
         --no-cache-dir
     }

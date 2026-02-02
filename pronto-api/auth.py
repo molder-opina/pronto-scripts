@@ -10,7 +10,7 @@ from http import HTTPStatus
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
-from clients_app.utils.input_sanitizer import (
+from pronto_clients.utils.input_sanitizer import (
     InputValidationError,
     sanitize_customer_name,
     sanitize_email,

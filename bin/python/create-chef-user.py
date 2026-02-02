@@ -34,7 +34,7 @@ def create_chef_user():
     import psycopg2
     from dotenv import load_dotenv
 
-    load_dotenv()
+    load_dotenv(os.path.join(project_root, ".env"))
 
     conn = psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "localhost"),

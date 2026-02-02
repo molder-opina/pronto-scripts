@@ -7,12 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Cargar configuración
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
-# shellcheck source=../config/general.env
+ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck source=../.env
 [[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
-# shellcheck source=../config/secrets.env
-[[ -f "${SECRETS_FILE}" ]] && source "${SECRETS_FILE}"
 
 RESTAURANT_SLUG="${RESTAURANT_NAME:-cafeteria-test}"
 OUTPUT_DIR="/var/www/pronto-static/assets/${RESTAURANT_SLUG}/products"

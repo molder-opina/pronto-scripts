@@ -1,7 +1,7 @@
 from pathlib import Path
 
 path = Path(
-    "/Users/molder/projects/github - molder/pronto-app/src/employees_app/templates/dashboard.html"
+    "/Users/molder/projects/github - molder/pronto-app/src/pronto_employees/templates/dashboard.html"
 )
 
 
@@ -52,7 +52,7 @@ if path.exists():
 
     # 3. Preparar bloques nuevos
     anonymous_sessions_block = """
-{% if employee_role in ['super_admin', 'admin_roles'] %}
+{% if employee_role in ['super_admin', 'admin'] %}
 <section class="section" id="anonymous-sessions" data-menu-title="Sesiones Anónimas" data-menu-group="Administración">
    <header class="section__header"><h2>🕵️ Sesiones Anónimas</h2><p>Gestiona sesiones sin registro.</p></header>
    <div class="empty-state"><div class="empty-state__icon">🚧</div><h3>En construcción</h3></div>
@@ -61,7 +61,7 @@ if path.exists():
 \n"""
 
     specials_block = """
-{% if employee_role in ['super_admin', 'admin_roles', 'waiter'] %}
+{% if employee_role in ['super_admin', 'admin', 'waiter'] %}
 <section class="section" id="recommendations" data-menu-title="Recomendaciones" data-menu-group="Especiales">
   <header class="section__header"><h2>✨ Recomendaciones</h2></header>
   <div class="empty-state"><h3>Próximamente</h3></div>

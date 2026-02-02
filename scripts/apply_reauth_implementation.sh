@@ -32,7 +32,7 @@ echo ""
 echo "2. Instalando dependencias..."
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    cd src/employees_app
+    cd src/pronto_employees
     pip install -q -r requirements.txt
     if [ $? -eq 0 ]; then
         echo "✅ Dependencias instaladas"
@@ -43,7 +43,7 @@ if [ -f ".venv/bin/activate" ]; then
     cd ../..
 elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
-    cd src/employees_app
+    cd src/pronto_employees
     pip install -q -r requirements.txt
     if [ $? -eq 0 ]; then
         echo "✅ Dependencias instaladas"
@@ -54,7 +54,7 @@ elif [ -f "venv/bin/activate" ]; then
     cd ../..
 else
     echo "⚠️  No se encontró virtualenv, intentando pip global..."
-    cd src/employees_app
+    cd src/pronto_employees
     python3 -m pip install -q -r requirements.txt 2>/dev/null || echo "⚠️  Instalación saltada (requiere virtualenv)"
     cd ../..
 fi
@@ -62,28 +62,28 @@ echo ""
 
 # 3. Verificar HANDOFF_PEPPER
 echo "3. Verificando HANDOFF_PEPPER..."
-if grep -q "^HANDOFF_PEPPER=" config/secrets.env; then
-    pepper_value=$(grep "^HANDOFF_PEPPER=" config/secrets.env | cut -d'=' -f2)
+if grep -q "^HANDOFF_PEPPER=" .env; then
+    pepper_value=$(grep "^HANDOFF_PEPPER=" .env | cut -d'=' -f2)
     if [ "$pepper_value" = "your-random-pepper-here-32chars-minimum" ] || [ -z "$pepper_value" ]; then
         echo "⚠️  HANDOFF_PEPPER tiene valor por defecto, generando uno nuevo..."
         new_pepper=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-        sed -i.bak "s/^HANDOFF_PEPPER=.*/HANDOFF_PEPPER=$new_pepper/" config/secrets.env
+        sed -i.bak "s/^HANDOFF_PEPPER=.*/HANDOFF_PEPPER=$new_pepper/" .env
         echo "✅ Nuevo HANDOFF_PEPPER generado"
     else
         echo "✅ HANDOFF_PEPPER configurado"
     fi
 else
-    echo "❌ Error: HANDOFF_PEPPER no encontrado en config/secrets.env"
+    echo "❌ Error: HANDOFF_PEPPER no encontrado en .env"
     exit 1
 fi
 echo ""
 
 # 4. Verificar SECRET_KEY
 echo "4. Verificando SECRET_KEY..."
-if grep -q "^SECRET_KEY=change-me-please" config/secrets.env; then
+if grep -q "^SECRET_KEY=change-me-please" .env; then
     echo "⚠️  SECRET_KEY tiene valor por defecto, generando uno nuevo..."
     new_secret=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-    sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=$new_secret/" config/secrets.env
+    sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=$new_secret/" .env
     echo "✅ Nuevo SECRET_KEY generado"
 else
     echo "✅ SECRET_KEY configurado"
@@ -94,7 +94,7 @@ echo ""
 echo "5. Verificando imports..."
 python3 << 'PYEOF'
 try:
-    from build.employees_app.extensions import csrf
+    from build.pronto_employees.extensions import csrf
     from shared.datetime_utils import utcnow
     from shared.models import SuperAdminHandoffToken, AuditLog
     print("✅ Todos los imports funcionan correctamente")
@@ -114,8 +114,7 @@ if [ -f "src/shared/migrations/010_add_super_admin_handoff_and_audit.sql" ]; the
     echo "✅ Archivo de migración existe"
 
     # Check if tables exist in database
-    source config/general.env 2>/dev/null
-    source config/secrets.env 2>/dev/null
+    source .env 2>/dev/null
 
     if command -v psql &> /dev/null && [ ! -z "${SUPABASE_DB_HOST:-}" ]; then
         echo "   Verificando si las tablas ya existen..."
@@ -142,9 +141,9 @@ echo ""
 
 # 7. Verificar configuración
 echo "7. Verificando configuración..."
-echo "   ALLOWED_HOSTS: $(grep '^ALLOWED_HOSTS=' config/secrets.env | cut -d'=' -f2)"
-echo "   NUM_PROXIES: $(grep '^NUM_PROXIES=' config/secrets.env | cut -d'=' -f2)"
-echo "   CORS_ALLOWED_ORIGINS: $(grep '^CORS_ALLOWED_ORIGINS=' config/secrets.env | cut -d'=' -f2 | head -c 50)"
+echo "   ALLOWED_HOSTS: $(grep '^ALLOWED_HOSTS=' .env | cut -d'=' -f2)"
+echo "   NUM_PROXIES: $(grep '^NUM_PROXIES=' .env | cut -d'=' -f2)"
+echo "   CORS_ALLOWED_ORIGINS: $(grep '^CORS_ALLOWED_ORIGINS=' .env | cut -d'=' -f2 | head -c 50)"
 echo ""
 
 # 8. Resumen
@@ -154,15 +153,15 @@ echo "========================================"
 echo ""
 echo "IMPORTANTE: Archivos que necesitan creación manual:"
 echo ""
-echo "1. src/employees_app/routes/system/auth.py (CRÍTICO)"
+echo "1. src/pronto_employees/routes/system/auth.py (CRÍTICO)"
 echo "   - Consola /system exclusiva super_admin"
 echo "   - Endpoints /system/reauth para handoff"
 echo ""
 echo "2. Actualizar cada scope auth.py (CRÍTICO):"
-echo "   - src/employees_app/routes/waiter/auth.py"
-echo "   - src/employees_app/routes/chef/auth.py"
-echo "   - src/employees_app/routes/cashier/auth.py"
-echo "   - src/employees_app/routes/admin/auth.py"
+echo "   - src/pronto_employees/routes/waiter/auth.py"
+echo "   - src/pronto_employees/routes/chef/auth.py"
+echo "   - src/pronto_employees/routes/cashier/auth.py"
+echo "   - src/pronto_employees/routes/admin/auth.py"
 echo "   Agregar endpoint @csrf.exempt super_admin_login"
 echo ""
 echo "3. Templates de login y reauth:"
@@ -170,7 +169,7 @@ echo "   - login_system.html"
 echo "   - system_reauth_confirm.html"
 echo "   - system_reauth_redirect.html"
 echo ""
-echo "4. Actualizar src/employees_app/app.py:"
+echo "4. Actualizar src/pronto_employees/app.py:"
 echo "   - Import csrf desde extensions"
 echo "   - CORS con orígenes explícitos"
 echo "   - ProxyFix si hay reverse proxy"

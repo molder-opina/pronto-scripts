@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Find the correct orders table for Pronto system"""
+
 import os
 
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv("config/general.env")
-load_dotenv("config/secrets.env")
+load_dotenv(".env")
 
 
 def find_orders():

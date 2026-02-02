@@ -56,7 +56,7 @@ try:
             try:
                 emp.name = name
                 emp.email = email
-            except:
+            except Exception:
                 # If setter fails or not present (e.g. if I need to use _encrypted)
                 emp.name_encrypted = encrypt_string(name)
                 emp.email_encrypted = encrypt_string(email)

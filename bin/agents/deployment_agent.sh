@@ -23,9 +23,9 @@ if echo "$CHANGED_FILES" | grep -q "migrations/.*\.sql\|migrations/.*\.py"; then
     fi
 fi
 
-# 2. Detectar nuevas variables de entorno críticas en secrets.env.example
-if echo "$CHANGED_FILES" | grep -q "config/secrets.env.example"; then
-    echo "   🔐 Detectados cambios en secrets.env.example"
+# 2. Detectar nuevas variables de entorno críticas en .env.example
+if echo "$CHANGED_FILES" | grep -q "\.env\.example"; then
+    echo "   🔐 Detectados cambios en .env.example"
     
     # Verificar que init scripts validen las nuevas variables
     if ! grep -r "validate_required_env_vars\|secrets.env" bin/init/ > /dev/null 2>&1; then

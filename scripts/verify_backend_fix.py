@@ -8,7 +8,7 @@ sys.path.append("/opt/pronto")
 
 from flask import Flask
 
-from employees_app.app import create_app
+from pronto_employees.app import create_app
 from shared.db import get_session, init_engine
 from shared.models import Customer, DiningSession, MenuItem, Order, OrderItem, OrderStatus
 from shared.services.order_service import list_orders

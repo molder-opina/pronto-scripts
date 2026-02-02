@@ -229,7 +229,7 @@ def test_all_employees_login():
 
     test_users = [
         ("admin@cafeteria.test", "Admin General", "super_admin"),
-        ("admin.roles@cafeteria.test", "Admin Roles", "admin_roles"),
+        ("admin.roles@cafeteria.test", "Admin Roles", "admin"),
         ("juan.mesero@cafeteria.test", "Juan Mesero", "waiter"),
         ("maria.mesera@cafeteria.test", "Maria Mesera", "waiter"),
         ("pedro.mesero@cafeteria.test", "Pedro Mesero", "waiter"),
@@ -237,7 +237,6 @@ def test_all_employees_login():
         ("ana.chef@cafeteria.test", "Ana Chef", "chef"),
         ("laura.cajera@cafeteria.test", "Laura Cajera", "cashier"),
         ("roberto.cajero@cafeteria.test", "Roberto Cajero", "cashier"),
-        ("sofia.contenido@cafeteria.test", "Sofia Contenido", "content_manager"),
     ]
 
     password = os.getenv("SEED_EMPLOYEE_PASSWORD", "ChangeMe!123")

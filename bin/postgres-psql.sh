@@ -7,10 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Load environment variables
-if [[ -f "${PROJECT_ROOT}/config/general.env" ]]; then
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a
     # shellcheck disable=SC1090
-    source "${PROJECT_ROOT}/config/general.env"
+    source "${PROJECT_ROOT}/.env"
     set +a
 fi
 

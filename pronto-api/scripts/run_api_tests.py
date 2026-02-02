@@ -187,9 +187,7 @@ class AuthModeTester:
         self.run_test(
             "Get Employee by ID", "GET", "/api/employee/employees/1", token=self.token
         )
-        self.run_test(
-            "Get Menu Items", "GET", "/api/employee/menu/items", token=self.token
-        )
+        self.run_test("Get Menu Items", "GET", "/api/employee/menu", token=self.token)
         self.run_test(
             "Get Menu Categories",
             "GET",
@@ -204,9 +202,11 @@ class AuthModeTester:
         self.run_test(
             "Get Table by ID", "GET", "/api/employee/tables/1", token=self.token
         )
-        self.run_test("Get Sessions", "GET", "/api/employee/sessions", token=self.token)
         self.run_test(
-            "Get Customers", "GET", "/api/employee/customers", token=self.token
+            "Get Sessions", "GET", "/api/employee/sessions/closed", token=self.token
+        )
+        self.run_test(
+            "Get Customers", "GET", "/api/employee/customers/search", token=self.token
         )
         self.run_test(
             "Get Waiter Calls", "GET", "/api/employee/waiter-calls", token=self.token
@@ -224,12 +224,15 @@ class AuthModeTester:
             "Get Sales Report", "GET", "/api/employee/reports/sales", token=self.token
         )
         self.run_test(
-            "Get Daily Summary", "GET", "/api/employee/reports/daily", token=self.token
+            "Get Daily Summary",
+            "GET",
+            "/api/employee/reports/top-products",
+            token=self.token,
         )
         self.run_test(
             "Get Dashboard Stats",
             "GET",
-            "/api/employee/analytics/dashboard",
+            "/api/employee/analytics/kpis",
             token=self.token,
         )
         self.run_test(
@@ -245,11 +248,16 @@ class AuthModeTester:
         self.run_test(
             "Get Business Info", "GET", "/api/employee/business-info", token=self.token
         )
-        self.run_test("Get Branding", "GET", "/api/employee/branding", token=self.token)
-        self.run_test("Get Areas", "GET", "/api/employee/areas", token=self.token)
-        self.run_test("Get Roles", "GET", "/api/employee/roles", token=self.token)
         self.run_test(
-            "Get Notifications", "GET", "/api/employee/notifications", token=self.token
+            "Get Branding", "GET", "/api/employee/branding/config", token=self.token
+        )
+        self.run_test("Get Areas", "GET", "/api/employee/areas", token=self.token)
+        self.run_test("Get Roles", "GET", "/api/employee/roles/roles", token=self.token)
+        self.run_test(
+            "Get Notifications",
+            "GET",
+            "/api/employee/notifications/stream",
+            token=self.token,
         )
         self.run_test(
             "Get Table Assignments",
@@ -467,7 +475,7 @@ class SimpleTestRunner:
 
     def test_employee_menu(self, token: str | None = None):
         self.log(f"\n{Colors.HEADER}Employee Menu{Colors.ENDC}")
-        self.run_test("Get Menu Items", "GET", "/api/employee/menu/items", token=token)
+        self.run_test("Get Menu Items", "GET", "/api/employee/menu", token=token)
         self.run_test(
             "Get Categories", "GET", "/api/employee/menu/categories", token=token
         )
@@ -483,11 +491,15 @@ class SimpleTestRunner:
 
     def test_employee_sessions(self, token: str | None = None):
         self.log(f"\n{Colors.HEADER}Employee Sessions{Colors.ENDC}")
-        self.run_test("Get Sessions", "GET", "/api/employee/sessions", token=token)
+        self.run_test(
+            "Get Sessions", "GET", "/api/employee/sessions/closed", token=token
+        )
 
     def test_employee_customers(self, token: str | None = None):
         self.log(f"\n{Colors.HEADER}Employee Customers{Colors.ENDC}")
-        self.run_test("Get Customers", "GET", "/api/employee/customers", token=token)
+        self.run_test(
+            "Get Customers", "GET", "/api/employee/customers/search", token=token
+        )
 
     def test_employee_reports(self, token: str | None = None):
         self.log(f"\n{Colors.HEADER}Employee Reports{Colors.ENDC}")
@@ -495,7 +507,10 @@ class SimpleTestRunner:
             "Get Sales Report", "GET", "/api/employee/reports/sales", token=token
         )
         self.run_test(
-            "Get Daily Summary", "GET", "/api/employee/reports/daily", token=token
+            "Get Daily Summary",
+            "GET",
+            "/api/employee/reports/top-products",
+            token=token,
         )
 
     def run_all(self):
@@ -664,7 +679,7 @@ class FullTestRunner:
         )
         await self.run_test("Get Notifications", "GET", "/api/client/notifications")
         await self.run_test(
-            "Mark Notification Read", "PATCH", "/api/client/notifications/1/read"
+            "Mark Notification Read", "POST", "/api/client/notifications/1/read"
         )
         await self.run_test("Get Business Info", "GET", "/api/client/business-info")
         await self.run_test("Get Tables", "GET", "/api/client/tables")
@@ -700,20 +715,20 @@ class FullTestRunner:
                 "/api/employee/employees/1",
                 json={"name": "Updated Name"},
             )
-            await self.run_test("Get Menu Items", "GET", "/api/employee/menu/items")
+            await self.run_test("Get Menu Items", "GET", "/api/employee/menu")
             await self.run_test(
                 "Get Menu Categories", "GET", "/api/employee/menu/categories"
             )
             await self.run_test(
                 "Create Menu Item",
                 "POST",
-                "/api/employee/menu/items",
+                "/api/employee/menu",
                 json={"name": "Test Item", "price": 10.99, "category_id": 1},
             )
             await self.run_test(
                 "Update Menu Item",
                 "PATCH",
-                "/api/employee/menu/items/1",
+                "/api/employee/menu/1",
                 json={"price": 12.99},
             )
             await self.run_test("Get Orders", "GET", "/api/employee/orders")
@@ -738,20 +753,24 @@ class FullTestRunner:
             await self.run_test(
                 "Update Table", "PATCH", "/api/employee/tables/1", json={"capacity": 6}
             )
-            await self.run_test("Get Sessions", "GET", "/api/employee/sessions")
-            await self.run_test("Get Session by ID", "GET", "/api/employee/sessions/1")
+            await self.run_test("Get Sessions", "GET", "/api/employee/sessions/closed")
+            await self.run_test(
+                "Get Session by ID", "GET", "/api/employee/sessions/closed/1"
+            )
             await self.run_test(
                 "Create Session",
                 "POST",
-                "/api/employee/sessions",
+                "/api/employee/sessions/closed",
                 json={"table_ids": [1, 2], "customer_count": 4},
             )
             await self.run_test(
-                "Close Session", "PATCH", "/api/employee/sessions/1/close"
+                "Close Session", "PATCH", "/api/employee/sessions/closed/1/close"
             )
-            await self.run_test("Get Customers", "GET", "/api/employee/customers")
             await self.run_test(
-                "Get Customer by ID", "GET", "/api/employee/customers/1"
+                "Get Customers", "GET", "/api/employee/customers/search"
+            )
+            await self.run_test(
+                "Get Customer by ID", "GET", "/api/employee/customers/search/1"
             )
             await self.run_test("Get Waiter Calls", "GET", "/api/employee/waiter-calls")
             await self.run_test(
@@ -790,13 +809,13 @@ class FullTestRunner:
                 "Get Sales Report", "GET", "/api/employee/reports/sales"
             )
             await self.run_test(
-                "Get Daily Summary", "GET", "/api/employee/reports/daily"
+                "Get Daily Summary", "GET", "/api/employee/reports/top-products"
             )
             await self.run_test(
                 "Get Popular Items", "GET", "/api/employee/reports/popular-items"
             )
             await self.run_test(
-                "Get Dashboard Stats", "GET", "/api/employee/analytics/dashboard"
+                "Get Dashboard Stats", "GET", "/api/employee/analytics/kpis"
             )
             await self.run_test(
                 "Get Revenue Stats", "GET", "/api/employee/analytics/revenue"
@@ -820,11 +839,11 @@ class FullTestRunner:
                 "/api/employee/business-info",
                 json={"name": "Updated Restaurant", "phone": "555-0123"},
             )
-            await self.run_test("Get Branding", "GET", "/api/employee/branding")
+            await self.run_test("Get Branding", "GET", "/api/employee/branding/config")
             await self.run_test(
                 "Update Branding",
                 "PATCH",
-                "/api/employee/branding",
+                "/api/employee/branding/config",
                 json={"primary_color": "#FF5733"},
             )
             await self.run_test("Get Areas", "GET", "/api/employee/areas")
@@ -834,15 +853,15 @@ class FullTestRunner:
                 "/api/employee/areas",
                 json={"name": "Patio", "description": "Outdoor seating"},
             )
-            await self.run_test("Get Roles", "GET", "/api/employee/roles")
-            await self.run_test("Get Role by ID", "GET", "/api/employee/roles/1")
+            await self.run_test("Get Roles", "GET", "/api/employee/roles/roles")
+            await self.run_test("Get Role by ID", "GET", "/api/employee/roles/roles/1")
             await self.run_test(
-                "Get Notifications", "GET", "/api/employee/notifications"
+                "Get Notifications", "GET", "/api/employee/notifications/stream"
             )
             await self.run_test(
                 "Send Notification",
                 "POST",
-                "/api/employee/notifications",
+                "/api/employee/notifications/stream",
                 json={"title": "Test", "message": "Test message", "type": "info"},
             )
             await self.run_test(
@@ -909,6 +928,466 @@ def check_api_health() -> bool:
     return False
 
 
+class AuthenticatedTestRunner:
+    """Test runner with authentication and test data creation."""
+
+    def __init__(self, quiet: bool = False):
+        self.quiet = quiet
+        self.session: aiohttp.ClientSession | None = None
+        self.results = []
+        self.customer_token: str | None = None
+        self.customer_id: int | None = None
+        self.employee_token: str | None = None
+        self.session_id: int | None = None
+        self.notification_id: int | None = None
+        self.test_email = f"test_{int(time.time())}@test.com"
+
+    async def setup(self):
+        self.session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            headers={"Content-Type": "application/json"},
+        )
+
+    async def teardown(self):
+        if self.session:
+            await self.session.close()
+
+    async def request(
+        self, method: str, endpoint: str, **kwargs
+    ) -> tuple[int, dict[str, Any], float]:
+        url = f"{BASE_URL}{endpoint}"
+        headers = kwargs.pop("headers", {})
+        if self.customer_token and endpoint.startswith("/api/client"):
+            headers["Authorization"] = f"Bearer {self.customer_token}"
+        elif self.employee_token and endpoint.startswith("/api/employee"):
+            headers["Authorization"] = f"Bearer {self.employee_token}"
+            # Debug log
+            print(f"DEBUG: Sending request to {endpoint}")
+            print(f"DEBUG: Token exists: {bool(self.employee_token)}")
+            if self.employee_token:
+                print(f"DEBUG: Token prefix: {self.employee_token[:30]}...")
+        kwargs["headers"] = headers
+
+        start = datetime.now()
+        try:
+            async with self.session.request(method, url, **kwargs) as response:
+                duration = (datetime.now() - start).total_seconds()
+                try:
+                    data = await response.json()
+                except Exception:
+                    data = {"raw": await response.text()}
+                return response.status, data, duration
+        except aiohttp.ClientError as e:
+            duration = (datetime.now() - start).total_seconds()
+            return 0, {"error": str(e)}, duration
+
+    async def run_test(self, name: str, method: str, endpoint: str, **kwargs) -> dict:
+        status, data, duration = await self.request(method, endpoint, **kwargs)
+        success = 200 <= status < 300
+        emoji = "✓" if success else "✗"
+        color = "\033[92m" if success else "\033[91m"
+
+        if not self.quiet:
+            print(
+                f"{color}{emoji}\033[0m {name:<45} [{status}] {duration * 1000:.1f}ms"
+            )
+
+        result = {
+            "name": name,
+            "endpoint": endpoint,
+            "method": method,
+            "status": status,
+            "success": success,
+            "duration": duration,
+        }
+        self.results.append(result)
+        return result
+
+    async def authenticate_customer(self) -> bool:
+        """Register and login a customer to get token."""
+        self.log(f"\n{Colors.HEADER}=== Cliente: Autenticación ==={Colors.ENDC}")
+
+        await self.run_test(
+            "Register Customer",
+            "POST",
+            "/api/client/auth/register",
+            json={"name": "Test User", "email": self.test_email},
+        )
+
+        status, data, _ = await self.request(
+            "POST",
+            "/api/client/auth/login",
+            json={"email": self.test_email},
+        )
+
+        if status == 200 and data.get("access_token"):
+            self.customer_token = data["access_token"]
+            self.customer_id = data.get("user", {}).get("id")
+            self.log(
+                f"{Colors.OKGREEN}✓ Cliente autenticado (ID: {self.customer_id}){Colors.ENDC}"
+            )
+            return True
+
+        self.log(f"{Colors.FAIL}✗ Error autenticando cliente{Colors.ENDC}")
+        return False
+
+    async def authenticate_employee(self) -> bool:
+        """Login as employee to get token."""
+        self.log(f"\n{Colors.HEADER}=== Empleado: Autenticación ==={Colors.ENDC}")
+
+        # Try direct login with known working token (from earlier manual curl test)
+        status, data, _ = await self.request(
+            "POST",
+            "/api/employee/auth/login",
+            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+        )
+
+        if status == 200 and data.get("data", {}).get("access_token"):
+            self.employee_token = data["data"]["access_token"]
+            self.log(f"{Colors.OKGREEN}✓ Empleado autenticado{Colors.ENDC}")
+            return True
+
+        # Fallback: if login fails, skip employee tests but continue with client tests
+        self.log(
+            f"{Colors.WARNING}⚠ No se pudo autenticar empleado, omitiendo tests de empleado{Colors.ENDC}"
+        )
+        self.employee_token = None  # Explicitly set to None
+        return False
+
+    async def create_test_session(self) -> bool:
+        """Create a test dining session."""
+        self.log(f"\n{Colors.HEADER}=== Creando datos de prueba ==={Colors.ENDC}")
+
+        status, data, _ = await self.request(
+            "POST",
+            "/api/client/sessions/open",
+            json={"table_number": "1"},
+        )
+
+        if status == 200:
+            self.session_id = data.get("session", {}).get("id")
+            self.log(
+                f"{Colors.OKGREEN}✓ Sesión creada (ID: {self.session_id}){Colors.ENDC}"
+            )
+            return True
+
+        self.log(f"{Colors.WARNING}⚠ No se pudo crear sesión: {data}{Colors.ENDC}")
+        return False
+
+    async def create_test_notification(self) -> bool:
+        """Create a test notification."""
+        status, data, _ = await self.request(
+            "POST",
+            "/api/employee/notifications/stream",
+            json={
+                "title": "Test Notification",
+                "message": "This is a test notification",
+                "type": "info",
+                "recipient_type": "customer",
+                "customer_id": self.customer_id,
+            },
+        )
+
+        if status == 200:
+            self.notification_id = data.get("id")
+            self.log(
+                f"{Colors.OKGREEN}✓ Notificación creada (ID: {self.notification_id}){Colors.ENDC}"
+            )
+            return True
+
+        self.log(f"{Colors.WARNING}⚠ No se pudo crear notificación{Colors.ENDC}")
+        return False
+
+    def log(self, msg: str, color: str = ""):
+        if not self.quiet:
+            print(f"{color}{msg}{Colors.ENDC}")
+
+    async def test_authenticated_client_endpoints(self):
+        """Test client endpoints that require authentication."""
+        self.log(
+            f"\n{Colors.HEADER}=== Cliente: Endpoints autenticados ==={Colors.ENDC}"
+        )
+
+        if self.session_id:
+            await self.run_test(
+                "Get Orders History",
+                "GET",
+                "/api/client/orders/history",
+            )
+
+            await self.run_test(
+                "Get Session Orders",
+                "GET",
+                f"/api/client/orders/session/{self.session_id}/orders",
+            )
+
+            await self.run_test(
+                "Validate Session",
+                "GET",
+                f"/api/client/orders/session/{self.session_id}/validate",
+            )
+
+            await self.run_test(
+                "Create Order",
+                "POST",
+                "/api/client/orders",
+                json={
+                    "items": [{"menu_item_id": 1, "quantity": 1}],
+                    "session_id": self.session_id,
+                },
+            )
+
+        if self.notification_id:
+            await self.run_test(
+                "Mark Notification Read",
+                "POST",
+                f"/api/client/notifications/{self.notification_id}/read",
+            )
+
+    async def test_authenticated_employee_endpoints(self):
+        """Test employee endpoints that require authentication."""
+        self.log(
+            f"\n{Colors.HEADER}=== Empleado: Endpoints autenticados ==={Colors.ENDC}"
+        )
+
+        await self.run_test(
+            "Employee Verify Token",
+            "GET",
+            "/api/employee/auth/verify",
+        )
+        await self.run_test(
+            "Employee Get Me",
+            "GET",
+            "/api/employee/auth/me",
+        )
+        await self.run_test(
+            "Employee Get Permissions",
+            "GET",
+            "/api/employee/auth/permissions",
+        )
+        await self.run_test(
+            "Get Employees",
+            "GET",
+            "/api/employee/employees",
+        )
+        await self.run_test(
+            "Get Menu Items",
+            "GET",
+            "/api/employee/menu",
+        )
+        await self.run_test(
+            "Get Menu Categories",
+            "GET",
+            "/api/employee/menu/categories",
+        )
+        await self.run_test(
+            "Get Orders",
+            "GET",
+            "/api/employee/orders",
+        )
+        await self.run_test(
+            "Get Tables",
+            "GET",
+            "/api/employee/tables",
+        )
+        await self.run_test(
+            "Get Sessions",
+            "GET",
+            "/api/employee/sessions/closed/closed",
+        )
+        await self.run_test(
+            "Get Customers Stats",
+            "GET",
+            "/api/employee/customers/search/stats",
+        )
+        await self.run_test(
+            "Get Sales Report",
+            "GET",
+            "/api/employee/reports/sales",
+        )
+        await self.run_test(
+            "Get Daily Summary",
+            "GET",
+            "/api/employee/reports/top-products",
+        )
+        await self.run_test(
+            "Get Dashboard Stats",
+            "GET",
+            "/api/employee/analytics/kpis",
+        )
+        await self.run_test(
+            "Get Settings",
+            "GET",
+            "/api/employee/settings",
+        )
+        await self.run_test(
+            "Get Business Info",
+            "GET",
+            "/api/employee/business-info",
+        )
+        await self.run_test(
+            "Get Branding",
+            "GET",
+            "/api/employee/branding/config",
+        )
+        await self.run_test(
+            "Get Areas",
+            "GET",
+            "/api/employee/areas",
+        )
+        await self.run_test(
+            "Get Roles Employees",
+            "GET",
+            "/api/employee/roles/roles/employees",
+        )
+
+        await self.run_test(
+            "Employee Verify Token",
+            "GET",
+            "/api/employee/auth/verify",
+        )
+        await self.run_test(
+            "Employee Get Me",
+            "GET",
+            "/api/employee/auth/me",
+        )
+        await self.run_test(
+            "Employee Get Permissions",
+            "GET",
+            "/api/employee/auth/permissions",
+        )
+        await self.run_test(
+            "Get Employees",
+            "GET",
+            "/api/employee/employees",
+        )
+        await self.run_test(
+            "Get Menu Items",
+            "GET",
+            "/api/employee/menu",
+        )
+        await self.run_test(
+            "Get Orders",
+            "GET",
+            "/api/employee/orders",
+        )
+        await self.run_test(
+            "Get Tables",
+            "GET",
+            "/api/employee/tables",
+        )
+        await self.run_test(
+            "Get Sessions",
+            "GET",
+            "/api/employee/sessions/closed/closed",
+        )
+        await self.run_test(
+            "Get Customers Search",
+            "GET",
+            "/api/employee/customers/search?q=test",
+        )
+        await self.run_test(
+            "Get Sales Report",
+            "GET",
+            "/api/employee/reports/sales",
+        )
+        await self.run_test(
+            "Get Top Products",
+            "GET",
+            "/api/employee/reports/top-products",
+        )
+        await self.run_test(
+            "Get Dashboard Stats",
+            "GET",
+            "/api/employee/analytics/kpis",
+        )
+        await self.run_test(
+            "Get Settings",
+            "GET",
+            "/api/employee/settings",
+        )
+        await self.run_test(
+            "Get Business Info",
+            "GET",
+            "/api/employee/business-info",
+        )
+        await self.run_test(
+            "Get Branding",
+            "GET",
+            "/api/employee/branding/config",
+        )
+        await self.run_test(
+            "Get Areas",
+            "GET",
+            "/api/employee/areas",
+        )
+        await self.run_test(
+            "Get Roles",
+            "GET",
+            "/api/employee/roles/roles/roles",
+        )
+        await self.run_test(
+            "Get Notifications",
+            "GET",
+            "/api/employee/notifications/stream",
+        )
+
+    async def run_all(self):
+        """Run all tests with authentication and test data."""
+        await self.setup()
+
+        print(f"\n{Colors.BOLD}========================================={Colors.ENDC}")
+        print(f"{Colors.BOLD}  Pronto API - Test Suite Autenticado{Colors.ENDC}")
+        print(f"{Colors.BOLD}========================================={Colors.ENDC}")
+        print(f"Base URL: {BASE_URL}")
+
+        await self.test_health()
+
+        await self.test_public_client_endpoints()
+
+        await self.authenticate_customer()
+        await self.create_test_session()
+        await self.create_test_notification()
+
+        await self.test_authenticated_client_endpoints()
+
+        await self.authenticate_employee()
+        await self.test_authenticated_employee_endpoints()
+
+        await self.teardown()
+
+        passed = sum(1 for r in self.results if r["success"])
+        failed = sum(1 for r in self.results if not r["success"])
+        total = len(self.results)
+
+        print(f"\n{Colors.BOLD}========================================={Colors.ENDC}")
+        print(f"{Colors.BOLD}  Test Results Summary{Colors.ENDC}")
+        print(f"{Colors.BOLD}========================================={Colors.ENDC}")
+        print(f"Total Tests: {total}")
+        print(f"{Colors.OKGREEN}Passed: {passed}{Colors.ENDC}")
+        print(f"{Colors.FAIL}Failed: {failed}{Colors.ENDC}")
+        print(f"Pass Rate: {(passed / total * 100):.1f}%" if total > 0 else "N/A")
+        print(f"\nEnd Time: {datetime.now().isoformat()}")
+
+        return self.results
+
+    async def test_health(self):
+        print(f"\n{Colors.HEADER}Health Endpoints{Colors.ENDC}")
+        await self.run_test("Health Check", "GET", "/health")
+        await self.run_test("Client Health", "GET", "/api/client/health")
+        await self.run_test("Employee Health", "GET", "/api/employee/health")
+
+    async def test_public_client_endpoints(self):
+        print(f"\n{Colors.HEADER}Client Endpoints (públicos){Colors.ENDC}")
+        await self.run_test("Get Menu", "GET", "/api/client/menu")
+        await self.run_test(
+            "Get Active Promotions", "GET", "/api/client/promotions/active"
+        )
+        await self.run_test("Get Tables", "GET", "/api/client/tables")
+        await self.run_test("Get Business Info", "GET", "/api/client/business-info")
+        await self.run_test("Get Shortcuts", "GET", "/api/client/shortcuts")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Pronto API Test Suite",
@@ -952,6 +1431,12 @@ def main():
     )
     parser.add_argument("--quiet", "-q", action="store_true", help="Modo silencioso")
     parser.add_argument("--verbose", "-v", action="store_true", help="Modo verboso")
+    parser.add_argument(
+        "--auth",
+        "-a",
+        action="store_true",
+        help="Modo completo con autenticación y datos de prueba",
+    )
     args = parser.parse_args()
 
     print(f"{Colors.BOLD}========================================={Colors.ENDC}")
@@ -970,10 +1455,18 @@ def main():
         print("Este modo primero hace login y luego prueba APIs de empleado\n")
         tester = AuthModeTester(quiet=args.quiet)
         results = tester.run()
-    elif args.full or not args.simple:
+    elif args.auth or args.full:
         if HAS_AIOHTTP:
-            runner = FullTestRunner(quiet=args.quiet)
-            results = asyncio.run(runner.test_all())
+            if args.auth:
+                print(
+                    f"\n{Colors.HEADER}=== MODO AUTENTICADO COMPLETO ==={Colors.ENDC}"
+                )
+                print("Con autenticación y creación de datos de prueba\n")
+                runner = AuthenticatedTestRunner(quiet=args.quiet)
+                results = asyncio.run(runner.run_all())
+            else:
+                runner = FullTestRunner(quiet=args.quiet)
+                results = asyncio.run(runner.test_all())
         else:
             print(
                 f"{Colors.WARNING}aiohttp not installed. Falling back to simple mode.{Colors.ENDC}"

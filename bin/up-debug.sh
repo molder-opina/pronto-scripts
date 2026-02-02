@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BASE_ENV_FILE="${PROJECT_ROOT}/config/general.env"
+ENV_FILE_SRC="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LIB_FILE="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"
@@ -57,15 +57,15 @@ if [ "$LOAD_SEED" = true ]; then
 fi
 
 # Verificar que el archivo de configuración existe
-if [[ ! -f "${BASE_ENV_FILE}" ]]; then
-    echo "❌ Error: ${BASE_ENV_FILE} no encontrado"
+if [[ ! -f "${ENV_FILE_SRC}" ]]; then
+    echo "❌ Error: ${ENV_FILE_SRC} no encontrado"
     exit 1
 fi
 
 echo "🔧 Configurando modo DEBUG..."
 
-cp "${BASE_ENV_FILE}" "${ENV_FILE}"
-echo "✅ Configuración base cargada desde config/general.env"
+cp "${ENV_FILE_SRC}" "${ENV_FILE}"
+echo "✅ Configuración base cargada desde .env"
 
 # Modificar entorno temporal para modo debug
 sed -i.bak 's/^DEBUG_MODE=.*/DEBUG_MODE=true/' "${ENV_FILE}" || true

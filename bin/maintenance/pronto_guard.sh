@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 LOG_DIR="${PROJECT_ROOT}/logs/systemd"
 RUNTIME_LIB="${PROJECT_ROOT}/bin/lib/docker_runtime.sh"
 STACK_HELPERS_LIB="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"

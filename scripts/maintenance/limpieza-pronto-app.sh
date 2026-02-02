@@ -58,8 +58,8 @@ echo "✅ Scripts de desarrollo archivados"
 
 # 6. Limpiar archivos de test en build
 echo "🧪 Eliminando archivos de test..."
-rm -rf src/clients_app/static/js/src/__tests__
-rm -rf src/employees_app/static/js/src/__tests__
+rm -rf src/pronto_clients/static/js/src/__tests__
+rm -rf src/pronto_employees/static/js/src/__tests__
 rm -f test-setup.ts
 echo "✅ Archivos de test eliminados"
 

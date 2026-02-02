@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
 
 # Cargar variables de entorno
-source "${ROOT_DIR}/config/general.env" 2>/dev/null || true
+source "${ROOT_DIR}/.env" 2>/dev/null || true
 
 # Colores
 RED='\033[0;31m'
@@ -44,8 +44,8 @@ log() {
 # Directorios
 STATIC_CONTENT_DIR="${ROOT_DIR}/src/static_content"
 STATIC_ASSETS_DIR="${STATIC_CONTENT_DIR}/assets"
-CLIENT_JS_DIST="${ROOT_DIR}/src/clients_app/static/js/dist/clients"
-EMPLOYEE_JS_DIST="${ROOT_DIR}/src/employees_app/static/js/dist/employees"
+CLIENT_JS_DIST="${ROOT_DIR}/src/pronto_clients/static/js/dist/clients"
+EMPLOYEE_JS_DIST="${ROOT_DIR}/src/pronto_employees/static/js/dist/employees"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FUNCIÓN: Compilar bundles JavaScript
@@ -108,15 +108,15 @@ copy_assets_to_static() {
     fi
 
     # Copiar CSS de clientes
-    if [ -d "${ROOT_DIR}/src/clients_app/static/css" ]; then
+    if [ -d "${ROOT_DIR}/src/pronto_clients/static/css" ]; then
         log INFO "Copiando CSS de clientes..."
-        cp -r "${ROOT_DIR}/src/clients_app/static/css/"* "${STATIC_ASSETS_DIR}/css/clients/" 2>/dev/null || true
+        cp -r "${ROOT_DIR}/src/pronto_clients/static/css/"* "${STATIC_ASSETS_DIR}/css/clients/" 2>/dev/null || true
     fi
 
     # Copiar CSS de empleados
-    if [ -d "${ROOT_DIR}/src/employees_app/static/css" ]; then
+    if [ -d "${ROOT_DIR}/src/pronto_employees/static/css" ]; then
         log INFO "Copiando CSS de empleados..."
-        cp -r "${ROOT_DIR}/src/employees_app/static/css/"* "${STATIC_ASSETS_DIR}/css/employees/" 2>/dev/null || true
+        cp -r "${ROOT_DIR}/src/pronto_employees/static/css/"* "${STATIC_ASSETS_DIR}/css/employees/" 2>/dev/null || true
     fi
 
     # Copiar branding
@@ -132,8 +132,8 @@ copy_assets_to_static() {
         notifications.js feedback_dashboard.js business_config.js roles_management.js \
         shortcuts_admin.js employees_manager_vanilla.js roles_manager_vanilla.js \
         reports.js; do
-        if [ -f "${ROOT_DIR}/src/employees_app/static/js/${file}" ]; then
-            cp -f "${ROOT_DIR}/src/employees_app/static/js/${file}" \
+        if [ -f "${ROOT_DIR}/src/pronto_employees/static/js/${file}" ]; then
+            cp -f "${ROOT_DIR}/src/pronto_employees/static/js/${file}" \
                 "${STATIC_ASSETS_DIR}/js/employees/" 2>/dev/null || true
         fi
     done
@@ -142,8 +142,8 @@ copy_assets_to_static() {
     log INFO "Copiando JS vanilla de clientes..."
     mkdir -p "${STATIC_ASSETS_DIR}/js/clients"
     for file in keyboard-shortcuts.js notifications.js; do
-        if [ -f "${ROOT_DIR}/src/clients_app/static/js/${file}" ]; then
-            cp -f "${ROOT_DIR}/src/clients_app/static/js/${file}" \
+        if [ -f "${ROOT_DIR}/src/pronto_clients/static/js/${file}" ]; then
+            cp -f "${ROOT_DIR}/src/pronto_clients/static/js/${file}" \
                 "${STATIC_ASSETS_DIR}/js/clients/" 2>/dev/null || true
         fi
     done

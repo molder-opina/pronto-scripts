@@ -6,13 +6,13 @@ echo "👑 [AGENTE SUPER ADMIN] Validando integridad del sistema y /system..."
 EXIT_CODE=0
 
 # 1. Check for system routes
-if ! grep -r "system_bp" src/employees_app/app.py > /dev/null; then
+if ! grep -r "system_bp" src/pronto_employees/app.py > /dev/null; then
     echo "   ❌ Error: No se detectó el blueprint de sistema (system_bp) en la app."
     EXIT_CODE=1
 fi
 
 # 2. Check for JWT Scope Guard protection
-if ! grep -r "apply_jwt_scope_guard" src/employees_app/app.py > /dev/null; then
+if ! grep -r "apply_jwt_scope_guard" src/pronto_employees/app.py > /dev/null; then
     echo "   ❌ Error: El Scope Guard no está aplicado en el punto de entrada."
     EXIT_CODE=1
 fi

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """List all tables in Supabase database"""
+
 import os
 
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv("config/general.env")
-load_dotenv("config/secrets.env")
+load_dotenv(".env")
 
 
 def list_tables():

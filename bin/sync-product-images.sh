@@ -8,10 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Cargar variables de entorno
-ENV_FILE="${PROJECT_ROOT}/conf/general.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
-  # shellcheck source=../conf/general.env
+  # shellcheck source=../.env
   source "${ENV_FILE}"
   set +a
 fi

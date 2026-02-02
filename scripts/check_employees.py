@@ -7,10 +7,9 @@ import os
 import sys
 from pathlib import Path
 
-# Cargar variables de ambiente desde config/general.env
+# Cargar variables de ambiente desde .env
 PROJECT_ROOT = Path(__file__).parent.parent
-ENV_FILE = PROJECT_ROOT / "conf" / "general.env"
-SECRETS_FILE = PROJECT_ROOT / "conf" / "secrets.env"
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 def load_env_file(env_path):
@@ -33,8 +32,6 @@ def load_env_file(env_path):
 
 # Cargar archivos de configuración
 load_env_file(ENV_FILE)
-if SECRETS_FILE.exists():
-    load_env_file(SECRETS_FILE)
 
 # Agregar el directorio build al path
 sys.path.insert(0, str(PROJECT_ROOT / "build"))
@@ -56,7 +53,9 @@ def main():
     init_engine(config)
 
     with get_session() as session:
-        employees = session.execute(select(Employee).order_by(Employee.id)).scalars().all()
+        employees = (
+            session.execute(select(Employee).order_by(Employee.id)).scalars().all()
+        )
 
         if not employees:
             print("❌ NO HAY EMPLEADOS EN LA BASE DE DATOS")
@@ -70,7 +69,9 @@ def main():
 
         for emp in employees:
             active_str = "✓ Sí" if emp.is_active else "✗ No"
-            print(f"{emp.id:<5} {emp.name:<25} {emp.email:<40} {emp.role:<15} {active_str:<8}")
+            print(
+                f"{emp.id:<5} {emp.name:<25} {emp.email:<40} {emp.role:<15} {active_str:<8}"
+            )
 
         print("\n" + "=" * 80)
         print("💡 Password por defecto para todos: ChangeMe!123")

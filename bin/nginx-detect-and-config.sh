@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
-CONFIG_FILE="${ROOT_DIR}/config/general.env"
+CONFIG_FILE="${ROOT_DIR}/.env"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Configuración
@@ -323,7 +323,7 @@ ${BOLD}Entornos soportados:${NC}
   Linux con Nginx  → http://localhost:9088
   Linux con Docker → http://static:80
 
-${BOLD}Variables generadas en config/general.env:${NC}
+${BOLD}Variables generadas en .env:${NC}
   NGINX_HOST       - Host del servidor nginx
   NGINX_PORT       - Puerto del servidor nginx
   NGINX_PREFIX     - Directorio root de nginx (opcional)

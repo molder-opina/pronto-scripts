@@ -3,8 +3,7 @@
 
 check_required_files() {
     local required_files=(
-        "${PROJECT_ROOT}/config/general.env"
-        "${PROJECT_ROOT}/config/secrets.env"
+        "${PROJECT_ROOT}/.env"
         "${PROJECT_ROOT}/docker-compose.yml"
     )
 

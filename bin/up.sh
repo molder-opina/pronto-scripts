@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BASE_ENV_FILE="${PROJECT_ROOT}/config/general.env"
+BASE_ENV_FILE="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LIB_FILE="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"
@@ -93,12 +93,12 @@ if [ "$LOAD_SEED" = true ]; then
 fi
 
 if [[ ! -f "${BASE_ENV_FILE}" ]]; then
-    echo "❌ No se encontró ${BASE_ENV_FILE}. Revisa config/general.env antes de continuar."
+    echo "❌ No se encontró ${BASE_ENV_FILE}. Revisa .env antes de continuar."
     exit 1
 fi
 
 cp "${BASE_ENV_FILE}" "${ENV_FILE}"
-echo "✅ Configuración base cargada desde config/general.env"
+echo "✅ Configuración base cargada desde .env"
 echo ""
 echo "⚙️  Ajustando configuración a modo normal..."
 sed -i 's/^DEBUG_MODE=.*/DEBUG_MODE=false/' "${ENV_FILE}"

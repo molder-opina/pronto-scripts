@@ -27,20 +27,20 @@ log() {
     echo -e "${color}[${level}]${NC} ${message}"
 }
 
-log INFO "Sincronizando shared static → employees_app..."
+log INFO "Sincronizando shared static → pronto_employees..."
 
 # JS compilados
 log INFO "Copiando JS compilados..."
 cp -f "${ROOT_DIR}/src/shared/static/js/dist/employees/"*.js \
-    "${ROOT_DIR}/src/employees_app/static/js/dist/employees/" 2>/dev/null || true
+    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/" 2>/dev/null || true
 
 # Chunks
 cp -rf "${ROOT_DIR}/src/shared/static/js/dist/employees/chunks/"* \
-    "${ROOT_DIR}/src/employees_app/static/js/dist/employees/chunks/" 2>/dev/null || true
+    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/chunks/" 2>/dev/null || true
 
 # Assets
 cp -rf "${ROOT_DIR}/src/shared/static/js/dist/employees/assets/"* \
-    "${ROOT_DIR}/src/employees_app/static/js/dist/employees/assets/" 2>/dev/null || true
+    "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/assets/" 2>/dev/null || true
 
 # CSS modules (vanilla JS)
 log INFO "Copiando módulos JS..."
@@ -49,7 +49,7 @@ for file in keyboard-shortcuts.js pagination.js realtime.js loading.js \
     shortcuts_admin.js employees_manager_vanilla.js roles_manager_vanilla.js; do
     if [ -f "${ROOT_DIR}/src/shared/static/js/${file}" ]; then
         cp -f "${ROOT_DIR}/src/shared/static/js/${file}" \
-            "${ROOT_DIR}/src/employees_app/static/js/${file}" 2>/dev/null || true
+            "${ROOT_DIR}/src/pronto_employees/static/js/${file}" 2>/dev/null || true
     fi
 done
 
@@ -58,20 +58,20 @@ log INFO "Copiando CSS..."
 for file in dashboard.css reports.css styles.css tokens.css waiter-pos-modern.css waiter.css; do
     if [ -f "${ROOT_DIR}/src/shared/static/css/${file}" ]; then
         cp -f "${ROOT_DIR}/src/shared/static/css/${file}" \
-            "${ROOT_DIR}/src/employees_app/static/css/${file}" 2>/dev/null || true
+            "${ROOT_DIR}/src/pronto_employees/static/css/${file}" 2>/dev/null || true
     fi
 done
 
 # Components CSS
 log INFO "Copiando CSS de componentes..."
 cp -rf "${ROOT_DIR}/src/shared/static/css/components/"* \
-    "${ROOT_DIR}/src/employees_app/static/css/components/" 2>/dev/null || true
+    "${ROOT_DIR}/src/pronto_employees/static/css/components/" 2>/dev/null || true
 
 # notifications.css
 if [ -f "${ROOT_DIR}/src/static_content/assets/css/notifications.css" ]; then
     cp -f "${ROOT_DIR}/src/static_content/assets/css/notifications.css" \
-        "${ROOT_DIR}/src/employees_app/static/css/notifications.css" 2>/dev/null || true
+        "${ROOT_DIR}/src/pronto_employees/static/css/notifications.css" 2>/dev/null || true
 fi
 
 log INFO "Sincronización completada"
-log INFO "Archivos en employees/dist/employees: $(ls "${ROOT_DIR}/src/employees_app/static/js/dist/employees/"*.js 2>/dev/null | wc -l)"
+log INFO "Archivos en employees/dist/employees: $(ls "${ROOT_DIR}/src/pronto_employees/static/js/dist/employees/"*.js 2>/dev/null | wc -l)"

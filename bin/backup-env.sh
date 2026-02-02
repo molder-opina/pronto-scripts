@@ -34,15 +34,14 @@ backup_file() {
 }
 
 # Hacer backup de archivos críticos
-backup_file "config/general.env"
-backup_file "config/secrets.env"
+backup_file ".env"
 
 # Opcional: Limpiar backups antiguos (mantener últimos 10)
 echo -e "\n${YELLOW}🧹 Limpiando backups antiguos...${NC}"
 cd "$BACKUP_DIR"
 
 # Mantener solo los últimos 10 backups de cada archivo
-for base_file in "general.env" "secrets.env"; do
+for base_file in ".env"; do
     ls -t ${base_file}.* 2>/dev/null | tail -n +11 | xargs -r rm -f
     count=$(ls -1 ${base_file}.* 2>/dev/null | wc -l)
     echo -e "${GREEN}📦 Backups de ${base_file}: ${count}${NC}"

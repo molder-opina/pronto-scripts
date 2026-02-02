@@ -9,20 +9,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 BUILD_DIR = PROJECT_ROOT / "build"
 STATIC_CONTENT_DIR = BUILD_DIR / "static_content"
-CONFIG_FILE = PROJECT_ROOT / "config" / "general.env"
-
-# Apps to scan for usage
-APPS = {
-    "employees_app": BUILD_DIR / "employees_app" / "templates",
-    "clients_app": BUILD_DIR / "clients_app" / "templates",
-}
+CONFIG_FILE = PROJECT_ROOT / ".env"
 
 
 def check_env_config():
-    """Checks the PRONTO_STATIC_CONTAINER_HOST in config/general.env"""
+    """Checks the PRONTO_STATIC_CONTAINER_HOST in .env"""
     print(f"\nScanning configuration at {CONFIG_FILE}...")
     if not CONFIG_FILE.exists():
-        print("❌ Error: config/general.env not found.")
+        print("❌ Error: .env not found.")
         return None
 
     url = None
@@ -55,7 +49,7 @@ def check_env_config():
             else:
                 print("✅ Configuration looks appropriate for Linux (production).")
     else:
-        print("❌ Error: PRONTO_STATIC_CONTAINER_HOST not found in config/general.env")
+        print("❌ Error: PRONTO_STATIC_CONTAINER_HOST not found in .env")
 
     return url
 
@@ -80,7 +74,9 @@ def find_expected_assets():
 
     for app_name, template_dir in APPS.items():
         if not template_dir.exists():
-            print(f"Warning: Template directory for {app_name} not found at {template_dir}")
+            print(
+                f"Warning: Template directory for {app_name} not found at {template_dir}"
+            )
             continue
 
         print(f"Scanning {app_name} templates...")
@@ -178,7 +174,9 @@ def main():
     print(f"Missing Assets: {missing_count}")
 
     if missing_count > 0:
-        print("\nFAILURE: Some static assets are missing from the container build directory.")
+        print(
+            "\nFAILURE: Some static assets are missing from the container build directory."
+        )
         sys.exit(1)
     else:
         print("\nSUCCESS: All referenced static assets are present.")

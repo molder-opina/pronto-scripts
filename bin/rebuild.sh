@@ -16,17 +16,13 @@ source "${SCRIPT_DIR}/lib/cleanup_helpers.sh"
 # shellcheck source=bin/lib/static_helpers.sh
 source "${SCRIPT_DIR}/lib/static_helpers.sh"
 
-ENV_FILE_DOT="${PROJECT_ROOT}/.env"
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 LOAD_SEED=false
 
 # Carga variables de entorno
 set -a
 # shellcheck disable=SC1090
 [[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
-# shellcheck disable=SC1090
-[[ -f "${SECRETS_FILE}" ]] && source "${SECRETS_FILE}"
 set +a
 
 # Detectar runtime/compose disponible

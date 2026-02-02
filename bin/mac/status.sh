@@ -47,15 +47,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 
 # Load environment variables
 set -a
-# shellcheck source=../../config/general.env
+# shellcheck source=../../.env
 [[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
-# shellcheck source=../../config/secrets.env
-[[ -f "${SECRETS_FILE}" ]] && source "${SECRETS_FILE}"
 set +a
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-pronto}"

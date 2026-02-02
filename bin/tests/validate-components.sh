@@ -260,7 +260,7 @@ check_redis() {
 check_jwt_config() {
     log_section "JWT Configuration"
 
-    local secret_file="config/secrets.env"
+    local secret_file=".env"
 
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [ -f "$secret_file" ]; then
@@ -315,7 +315,7 @@ check_static_assets() {
 check_env_config() {
     log_section "Environment Configuration"
 
-    local config_files=("config/general.env" "config/secrets.env")
+    local config_files=(".env")
 
     for config_file in "${config_files[@]}"; do
         TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -334,7 +334,7 @@ check_env_config() {
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     local all_present=true
     for var in "${required_vars[@]}"; do
-        if ! grep -q "^$var=" config/general.env 2>/dev/null && ! grep -q "^$var=" config/secrets.env 2>/dev/null; then
+        if ! grep -q "^$var=" .env 2>/dev/null; then
             all_present=false
             break
         fi
@@ -363,9 +363,9 @@ main() {
     echo ""
 
     # Load environment variables
-    if [ -f "config/general.env" ]; then
+    if [ -f ".env" ]; then
         set -a
-        source config/general.env 2>/dev/null || true
+        source .env 2>/dev/null || true
         set +a
     fi
 

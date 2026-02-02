@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 path = Path(
-    "/Users/molder/projects/github - molder/pronto-app/build/employees_app/templates/dashboard.html"
+    "/Users/molder/projects/github - molder/pronto-app/build/pronto_employees/templates/dashboard.html"
 )
 
 # PTH123: `open()` replaced by `Path.open()`
@@ -67,7 +67,7 @@ report_block_str = report_block_str.replace(
 
 # Marketing Block
 marketing_block = """
-{% if employee_role in ['super_admin', 'admin_roles'] %}
+{% if employee_role in ['super_admin', 'admin'] %}
 <section class="section" id="marketing" data-menu-title="Marketing" data-menu-group="📊 REPORTES">
   <header class="section__header">
     <h2>📈 Marketing</h2>
@@ -92,7 +92,7 @@ placeholders = {
 {% endif %}
 """,
     "especiales": """
-{% if employee_role in ['super_admin', 'admin_roles', 'waiter'] %}
+{% if employee_role in ['super_admin', 'admin', 'waiter'] %}
 <section class="section" id="recommendations" data-menu-title="Recomendaciones" data-menu-group="Especiales">
   <header class="section__header"><h2>✨ Recomendaciones</h2></header>
   <div class="empty-state"><h3>Próximamente</h3></div>
@@ -108,7 +108,7 @@ placeholders = {
 {% endif %}
 """,
     "admin-extras": """
-{% if employee_role in ['super_admin', 'admin_roles'] %}
+{% if employee_role in ['super_admin', 'admin'] %}
 <section class="section" id="anonymous-sessions-ph" data-menu-title="Sesiones Anónimas" data-menu-group="Administración">
    <header class="section__header"><h2>🕵️ Sesiones Anónimas</h2></header><div class="empty-state"><h3>Próximamente</h3></div>
 </section>

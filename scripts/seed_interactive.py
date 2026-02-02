@@ -69,7 +69,7 @@ def _resolve_password() -> str:
 
 
 def _choose_role() -> str:
-    roles = ["waiter", "chef", "cashier", "admin", "admin_roles", "super_admin", "content_manager"]
+    roles = ["waiter", "chef", "cashier", "admin", "super_admin"]
     print("Roles disponibles:")
     for idx, role in enumerate(roles, start=1):
         print(f"  {idx}. {role}")

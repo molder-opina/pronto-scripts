@@ -103,11 +103,11 @@ class DatabaseValidator:
         print("\n🌱 Creando empleados...")
 
         employees_data = [
-            # Super Admin (system role)
+            # Super Admin
             {
                 "name": "Admin General",
                 "email": "admin@cafeteria.test",
-                "role": "system",
+                "role": "super_admin",
                 "additional_roles": None,
             },
             # Admin Roles
@@ -163,13 +163,16 @@ class DatabaseValidator:
                 "additional_roles": None,
             },
             # Content Manager
-            {
-                "name": "Sofia",
-                "email": "sofia.contenido@cafeteria.test",
-                "role": "content_manager",
-                "additional_roles": None,
-            },
         ]
+
+        role_scopes = {
+            "super_admin": ["system", "admin", "waiter", "chef", "cashier"],
+            "system": ["system", "admin", "waiter", "chef", "cashier"],
+            "admin": ["admin", "waiter", "chef", "cashier"],
+            "waiter": ["waiter", "cashier"],
+            "chef": ["chef"],
+            "cashier": ["cashier"],
+        }
 
         password = "ChangeMe!123"
 
@@ -179,11 +182,16 @@ class DatabaseValidator:
 
             # Check if employee already exists by email_hash
             existing = db.query(Employee).filter(Employee.email_hash == email_hash).first()
+            allow_scopes = emp_data.get("allow_scopes") or role_scopes.get(
+                emp_data["role"], []
+            )
+
             if existing:
                 # Update existing employee
                 existing.name = emp_data["name"]
                 existing.role = emp_data["role"]
                 existing.additional_roles = emp_data["additional_roles"]
+                existing.allow_scopes = allow_scopes
                 print(f"  ⏭️  {emp_data['name']} ya existe (actualizado)")
                 continue
 
@@ -194,6 +202,7 @@ class DatabaseValidator:
                 auth_hash=hash_credentials(email, password),
                 role=emp_data["role"],
                 additional_roles=emp_data["additional_roles"],
+                allow_scopes=allow_scopes,
                 is_active=True,
             )
             db.add(employee)

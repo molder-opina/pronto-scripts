@@ -6,8 +6,7 @@ PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
 
 source "${SCRIPT_DIR}/_env_utils.sh"
 
-GENERAL_ENV="${PROJECT_ROOT}/config/general.env"
-SECRETS_ENV="${PROJECT_ROOT}/config/secrets.env"
+GENERAL_ENV="${PROJECT_ROOT}/.env"
 
 GENERAL_ENV_SRC=""
 SECRETS_ENV_SRC=""
@@ -47,16 +46,9 @@ confirm_replace() {
 }
 
 if [ -n "$GENERAL_ENV_SRC" ]; then
-  if confirm_replace "config/general.env"; then
+  if confirm_replace ".env"; then
     replace_env_file "$GENERAL_ENV" "$GENERAL_ENV_SRC"
-    echo "✅ config/general.env actualizado desde $GENERAL_ENV_SRC"
-  fi
-fi
-
-if [ -n "$SECRETS_ENV_SRC" ]; then
-  if confirm_replace "config/secrets.env"; then
-    replace_env_file "$SECRETS_ENV" "$SECRETS_ENV_SRC"
-    echo "✅ config/secrets.env actualizado desde $SECRETS_ENV_SRC"
+    echo "✅ .env actualizado desde $GENERAL_ENV_SRC"
   fi
 fi
 

@@ -9,8 +9,8 @@ source "${SCRIPT_DIR}/lib/docker_runtime.sh"
 # shellcheck source=bin/lib/static_helpers.sh
 source "${SCRIPT_DIR}/lib/static_helpers.sh"
 
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
+SECRETS_FILE="${PROJECT_ROOT}/.env"
 
 # Load environment variables
 set -a

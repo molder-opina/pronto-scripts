@@ -5,8 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
 
 source "${SCRIPT_DIR}/_check_required_files.sh" 2>/dev/null || true
 
@@ -16,10 +15,8 @@ source "${SCRIPT_DIR}/../lib/static_helpers.sh"
 
 # Load environment variables
 set -a
-# shellcheck source=../../config/general.env
+# shellcheck source=../../.env
 [[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
-# shellcheck source=../../config/secrets.env
-[[ -f "${SECRETS_FILE}" ]] && source "${SECRETS_FILE}"
 set +a
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-pronto}"

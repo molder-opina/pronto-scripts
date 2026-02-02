@@ -17,9 +17,9 @@ fi
 
 # 2. Check for console.log/print in production code (stricter than pre-commit maybe?)
 echo "   - Buscando print() olvidados en Python..."
-if grep -rn "^\s*print(" src/ --include="*.py" --exclude-dir="employees_app_backup" --exclude-dir="bin" --exclude-dir=".venv" --exclude-dir="orchestrator" 2>/dev/null | grep -v "scripts/" | grep -v "test" > /dev/null; then
+if grep -rn "^\s*print(" src/ --include="*.py" --exclude-dir="pronto_employees_backup" --exclude-dir="bin" --exclude-dir=".venv" --exclude-dir="orchestrator" 2>/dev/null | grep -v "scripts/" | grep -v "test" > /dev/null; then
     echo "   ❌ Error: Se encontraron 'print()' en código de producción (Python). Usa logger."
-    grep -rn "^\s*print(" src/ --include="*.py" --exclude-dir="employees_app_backup" --exclude-dir="bin" --exclude-dir=".venv" --exclude-dir="orchestrator" 2>/dev/null | grep -v "scripts/" | grep -v "test" | head -n 3
+    grep -rn "^\s*print(" src/ --include="*.py" --exclude-dir="pronto_employees_backup" --exclude-dir="bin" --exclude-dir=".venv" --exclude-dir="orchestrator" 2>/dev/null | grep -v "scripts/" | grep -v "test" | head -n 3
     EXIT_CODE=1
 else
     echo "   ✅ No hay 'print()' en código productivo."

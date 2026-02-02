@@ -6,7 +6,7 @@ echo "👨‍💼 [AGENTE ADMIN] Validando módulos administrativos (/admin)..."
 EXIT_CODE=0
 
 # 1. Check for Admin Sections template
-if [ ! -f "src/employees_app/templates/includes/_admin_sections.html" ]; then
+if [ ! -f "src/pronto_employees/templates/includes/_admin_sections.html" ]; then
     echo "   ❌ Error: No se encuentra el template _admin_sections.html"
     EXIT_CODE=1
 fi

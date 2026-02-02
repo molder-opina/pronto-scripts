@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Check orders table schema in Supabase"""
+
 import os
 
 import psycopg2
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv("config/general.env")
-load_dotenv("config/secrets.env")
+load_dotenv(".env")
 
 
 def check_schema():

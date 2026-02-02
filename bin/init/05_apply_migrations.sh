@@ -29,15 +29,9 @@ if [ ! -f "$MIGRATION_FILE" ]; then
 fi
 
 # Load environment variables
-if [ -f "${PROJECT_ROOT}/config/general.env" ]; then
+if [ -f "${PROJECT_ROOT}/.env" ]; then
     set -a
-    source "${PROJECT_ROOT}/config/general.env"
-    set +a
-fi
-
-if [ -f "${PROJECT_ROOT}/config/secrets.env" ]; then
-    set -a
-    source "${PROJECT_ROOT}/config/secrets.env"
+    source "${PROJECT_ROOT}/.env"
     set +a
 fi
 

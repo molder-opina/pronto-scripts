@@ -9,7 +9,7 @@ Este script:
 
 Empleados a crear/actualizar:
 - super_admin (admin@cafeteria.test)
-- admin_roles (admin-roles@cafeteria.test)
+- admin (admin-roles@cafeteria.test)
 - chef (carlos.chef@cafeteria.test)
 - waiter (juan.mesero@cafeteria.test)
 - cashier (laura.cajera@cafeteria.test)
@@ -83,11 +83,11 @@ test_employees = [
         "is_active": True,
         "name_encrypted": "Administrador",
         "phone_encrypted": "",
-        "allow_scopes": '["admin", "waiter", "chef", "cashier"]',
+        "allow_scopes": '["system", "admin", "waiter", "chef", "cashier"]',
     },
     {
         "email_encrypted": "admin-roles@cafeteria.test",
-        "role": "admin_roles",
+        "role": "admin",
         "name": "Admin Roles",
         "phone": "",
         "is_active": True,
@@ -199,7 +199,7 @@ cursor.execute(
     """
     SELECT id, email_encrypted, role, allow_scopes, is_active
     FROM pronto_employees
-    WHERE role IN ('super_admin', 'admin_roles', 'waiter', 'chef', 'cashier')
+    WHERE role IN ('super_admin', 'admin', 'waiter', 'chef', 'cashier')
     ORDER BY id
     """
 )

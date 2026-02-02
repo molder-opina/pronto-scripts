@@ -4,7 +4,7 @@ import sys
 # Add app context
 sys.path.append("/opt/pronto")
 
-from employees_app.app import create_app
+from pronto_employees.app import create_app
 from shared.db import get_session
 from shared.models import Employee
 

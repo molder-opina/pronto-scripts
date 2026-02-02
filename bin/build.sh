@@ -19,8 +19,8 @@ source "${SCRIPT_DIR}/lib/docker_runtime.sh"
 # shellcheck source=bin/lib/static_helpers.sh
 source "${SCRIPT_DIR}/lib/static_helpers.sh"
 
-ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE="${PROJECT_ROOT}/.env"
+SECRETS_FILE="${PROJECT_ROOT}/.env"
 
 # Carga variables de entorno
 set -a
@@ -187,14 +187,14 @@ NGINX_STATIC_ROOT="/var/www/pronto-static"
 if [[ -d "${NGINX_STATIC_ROOT}" ]]; then
   echo ">> Sincronizando assets al nginx local en ${NGINX_STATIC_ROOT} ..."
   # JS compilado clientes
-  sudo rsync -a "${PROJECT_ROOT}/src/clients_app/static/js/dist/clients/" "${NGINX_STATIC_ROOT}/static/js/dist/clients/" || true
+  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/static/js/dist/clients/" "${NGINX_STATIC_ROOT}/static/js/dist/clients/" || true
   # JS compilado empleados
-  sudo rsync -a "${PROJECT_ROOT}/src/employees_app/static/js/dist/employees/" "${NGINX_STATIC_ROOT}/static/js/dist/employees/" || true
+  sudo rsync -a "${PROJECT_ROOT}/src/pronto_employees/static/js/dist/employees/" "${NGINX_STATIC_ROOT}/static/js/dist/employees/" || true
   # CSS
   sudo install -d "${NGINX_STATIC_ROOT}/static/css" || true
-  sudo rsync -a "${PROJECT_ROOT}/src/clients_app/static/css/menu.css" "${NGINX_STATIC_ROOT}/static/css/" || true
+  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/static/css/menu.css" "${NGINX_STATIC_ROOT}/static/css/" || true
   # Plantilla base
-  sudo rsync -a "${PROJECT_ROOT}/src/clients_app/templates/base.html" "${NGINX_STATIC_ROOT}/base.html" || true
+  sudo rsync -a "${PROJECT_ROOT}/src/pronto_clients/templates/base.html" "${NGINX_STATIC_ROOT}/base.html" || true
   # JS global (keyboard shortcuts y otros assets compartidos)
   sudo install -d "${NGINX_STATIC_ROOT}/assets/js" || true
   sudo rsync -a "${PROJECT_ROOT}/src/static_content/assets/js/" "${NGINX_STATIC_ROOT}/assets/js/" || true

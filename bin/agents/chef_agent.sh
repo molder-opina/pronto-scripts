@@ -6,7 +6,7 @@ echo "👨‍🍳 [AGENTE CHEF] Validando consola de cocina (/chef)..."
 EXIT_CODE=0
 
 # 1. Check for Chef Section template
-if [ ! -f "src/employees_app/templates/includes/_chef_section.html" ]; then
+if [ ! -f "src/pronto_employees/templates/includes/_chef_section.html" ]; then
     echo "   ❌ Error: No se encuentra el template _chef_section.html"
     EXIT_CODE=1
 fi

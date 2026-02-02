@@ -13,7 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
-CONFIG_FILE="${ROOT_DIR}/config/general.env"
+CONFIG_FILE="${ROOT_DIR}/.env"
 
 # Cargar variables de entorno existentes
 source "${CONFIG_FILE}" 2>/dev/null || true
@@ -147,7 +147,7 @@ detect_nginx() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 update_nginx_env() {
-    log STEP "Actualizando config/general.env con variables de nginx..."
+    log STEP "Actualizando .env con variables de nginx..."
 
     local nginx_prefix="$1"
     local nginx_host="${NGINX_HOST:-localhost}"
@@ -419,7 +419,7 @@ init_nginx() {
     fi
 
     log WARN "No se pudo detectar nginx automáticamente"
-    log INFO "Configura las variables manualmente en config/general.env:"
+    log INFO "Configura las variables manualmente en .env:"
     log INFO "  NGINX_PREFIX=/ruta/a/nginx"
     log INFO "  NGINX_HOST=localhost"
     log INFO "  NGINX_PORT=9088"

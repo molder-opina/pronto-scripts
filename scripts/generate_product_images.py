@@ -26,10 +26,9 @@ import requests
 from openai import OpenAI
 from PIL import Image
 
-# Cargar variables de ambiente desde config/general.env
+# Cargar variables de ambiente desde .env
 PROJECT_ROOT = Path(__file__).parent.parent
-ENV_FILE = PROJECT_ROOT / "conf" / "general.env"
-SECRETS_FILE = PROJECT_ROOT / "conf" / "secrets.env"
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 def load_env_file(env_path):
@@ -52,8 +51,6 @@ def load_env_file(env_path):
 
 # Cargar archivos de configuración
 load_env_file(ENV_FILE)
-if SECRETS_FILE.exists():
-    load_env_file(SECRETS_FILE)
 
 # Agregar el directorio build al path
 sys.path.insert(0, str(PROJECT_ROOT / "build"))
@@ -81,10 +78,13 @@ CATEGORY_STYLES = {
 }
 
 
-def generate_product_prompt(product_name: str, description: str, category_name: str) -> str:
+def generate_product_prompt(
+    product_name: str, description: str, category_name: str
+) -> str:
     """Genera un prompt optimizado para DALL-E basado en el producto."""
     base_style = CATEGORY_STYLES.get(
-        category_name, "professional food photography, white background, studio lighting"
+        category_name,
+        "professional food photography, white background, studio lighting",
     )
 
     # Limpiar descripción de caracteres especiales
@@ -164,7 +164,7 @@ def generate_product_images(
 
     if not api_key:
         print("❌ Error: Se requiere API key de OpenAI")
-        print("   Configura OPENAI_API_KEY en config/secrets.env o usa --api-key")
+        print("   Configura OPENAI_API_KEY en .env o usa --api-key")
         return
 
     config = load_config("generate-product-images")
@@ -222,7 +222,9 @@ def generate_product_images(
                 continue
 
             # Generar prompt
-            prompt = generate_product_prompt(menu_item.name, menu_item.description, category.name)
+            prompt = generate_product_prompt(
+                menu_item.name, menu_item.description, category.name
+            )
 
             # Generar imagen
             success = generate_image_with_dalle(prompt, output_path, api_key)
@@ -235,7 +237,9 @@ def generate_product_images(
                     restaurant_slug = (
                         os.getenv("RESTAURANT_NAME", "pronto").lower().replace(" ", "-")
                     )
-                    menu_item.image_path = f"/assets/{restaurant_slug}/menu/{output_path.name}"
+                    menu_item.image_path = (
+                        f"/assets/{restaurant_slug}/menu/{output_path.name}"
+                    )
                     session.commit()
                     print(f"  💾 Actualizada ruta en BD: {menu_item.image_path}")
             else:
@@ -275,13 +279,18 @@ def main():
         "--force", action="store_true", help="Regenerar imágenes incluso si ya existen"
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="Mostrar qué se haría sin generar imágenes"
+        "--dry-run",
+        action="store_true",
+        help="Mostrar qué se haría sin generar imágenes",
     )
 
     args = parser.parse_args()
 
     generate_product_images(
-        api_key=args.api_key, output_dir=args.output_dir, force=args.force, dry_run=args.dry_run
+        api_key=args.api_key,
+        output_dir=args.output_dir,
+        force=args.force,
+        dry_run=args.dry_run,
     )
 
 

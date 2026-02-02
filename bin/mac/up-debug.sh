@@ -6,8 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-BASE_ENV_FILE="${PROJECT_ROOT}/config/general.env"
-SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+ENV_FILE_SRC="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LOAD_SEED=false
@@ -72,15 +71,15 @@ if [[ "$LOAD_SEED" = true ]]; then
 fi
 
 # Verificar que el archivo de configuracion existe
-if [[ ! -f "${BASE_ENV_FILE}" ]]; then
-    echo "Error: ${BASE_ENV_FILE} no encontrado"
+if [[ ! -f "${ENV_FILE_SRC}" ]]; then
+    echo "Error: ${ENV_FILE_SRC} no encontrado"
     exit 1
 fi
 
 echo "Configurando modo DEBUG..."
 
-cp "${BASE_ENV_FILE}" "${ENV_FILE}"
-echo "Configuracion base cargada desde config/general.env"
+cp "${ENV_FILE_SRC}" "${ENV_FILE}"
+echo "Configuracion base cargada desde .env"
 
 # Modificar entorno temporal para modo debug (macOS sed syntax)
 sed -i '' 's/^DEBUG_MODE=.*/DEBUG_MODE=true/' "${ENV_FILE}" 2>/dev/null || true
@@ -105,10 +104,8 @@ echo ""
 
 # Load environment variables
 set -a
-# shellcheck source=../../config/general.env
-source "${BASE_ENV_FILE}"
-# shellcheck source=../../config/secrets.env
-[[ -f "${SECRETS_FILE}" ]] && source "${SECRETS_FILE}"
+# shellcheck source=../../.env
+source "${ENV_FILE_SRC}"
 set +a
 
 CLIENT_PORT="${CLIENT_APP_HOST_PORT:-6080}"

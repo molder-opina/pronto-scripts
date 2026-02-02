@@ -11,7 +11,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/../config/general.env"
+CONFIG_FILE="${SCRIPT_DIR}/../.env"
 
 # Colores para输出
 RED='\033[0;31m'
@@ -234,7 +234,7 @@ main() {
             echo "Comandos:"
             echo "  detect        - Solo detectar y mostrar la URL sugerida"
             echo "  export        - Detectar y exportar variables de entorno"
-            echo "  update-config - Detectar y actualizar config/general.env"
+            echo "  update-config - Detectar y actualizar .env"
             echo "  status        - Mostrar estado de servicios relacionados"
             echo "  help          - Mostrar esta ayuda"
             echo ""

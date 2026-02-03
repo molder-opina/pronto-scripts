@@ -17,21 +17,76 @@ pronto-scripts/
 ### Development
 
 ```bash
-# Setup development environment
-./bin/setup-dev.sh
+# Run all services
+./bin/up.sh
 
-# Run all services locally
-./bin/start-local.sh
+# Run all services in debug mode
+./bin/up-debug.sh
+
+# Start services
+./bin/start.sh
+
+# Stop services
+./bin/stop.sh
+
+# Down services (stop and remove containers)
+./bin/down.sh
+
+# Restart services
+./bin/restart.sh
+
+# Build Docker images
+./bin/build.sh
+
+# Rebuild and restart
+./bin/rebuild.sh
 ```
 
 ### Database
 
 ```bash
-# Run migrations
-./scripts/migrate.sh
+# Start PostgreSQL
+./bin/postgres-up.sh
 
-# Seed test data
-./scripts/seed.sh
+# Stop PostgreSQL
+./bin/postgres-down.sh
+
+# PostgreSQL status
+./bin/postgres-status.sh
+
+# Open PostgreSQL shell
+./bin/postgres-psql.sh
+
+# View PostgreSQL logs
+./bin/postgres-logs.sh
+
+# Backup database
+./bin/postgres-backup.sh
+
+# Restore database
+./bin/postgres-restore.sh
+
+# Rebuild PostgreSQL
+./bin/postgres-rebuild.sh
+
+# Apply migration
+./bin/apply_migration.sh
+
+# Apply migration with compose
+./bin/apply_migration_compose.sh
+```
+
+### Seed & Test Data
+
+```bash
+# Check seed status
+./bin/check-seed-status.sh
+
+# Validate seed
+./bin/validate-seed.sh
+
+# Interactive seed
+./bin/seed-interactive.sh
 ```
 
 ### Deployment

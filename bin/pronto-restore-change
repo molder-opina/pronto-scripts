@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+CHANGE_ID="${1:-}"
+
+if [[ -z "$CHANGE_ID" ]]; then
+  echo "Usage: pronto-restore-change <CHANGE_ID>"; exit 1
+fi
+
+BKROOT="$REPO_ROOT/pronto-backups/changes/$CHANGE_ID"
+if [[ ! -d "$BKROOT" ]]; then
+  echo "Backup not found: $BKROOT"; exit 1
+fi
+
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
+  echo "Workspace not clean. Aborting restore."; exit 1
+fi
+
+LOG="$BKROOT/logs/restore.log"
+{
+  echo "restore_ts=$(date -Iseconds)"
+  echo "change_id=$CHANGE_ID"
+} > "$LOG"
+
+if [[ -f "$BKROOT/patch/working_tree.diff" ]]; then
+  git -C "$REPO_ROOT" apply --3way "$BKROOT/patch/working_tree.diff" >> "$LOG" 2>&1 || true
+fi
+
+for tgz in "$BKROOT"/files/*.tgz; do
+  if [[ -f "$tgz" ]]; then
+    tar -xzf "$tgz" -C "$REPO_ROOT" >> "$LOG" 2>&1
+  fi
+done
+
+echo "Restore completed. See $LOG"

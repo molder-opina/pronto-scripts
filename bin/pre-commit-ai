@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-commit hook: busca inconsistencias generales en archivos modificados
+# Analiza: pronto-static, pronto-api, pronto-employees, pronto-client
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+STAGED_FILES="$(git diff --cached --name-only)"
+
+[ -z "$STAGED_FILES" ] && echo "No hay archivos staged" && exit 0
+
+OUT_DIR="docs/change-logs/PRECOMMIT-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$OUT_DIR"
+
+INCONSISTENCIES=""
+
+add_inconsistency() {
+  INCONSISTENCIES="${INCONSISTENCIES}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
+}
+
+echo "Analizando archivos modificados..."
+
+# Archivos modificados en cada proyecto
+STATIC_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-static/" || true)
+API_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-api/" || true)
+EMPLOYEES_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-employees/" || true)
+CLIENT_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-client/" || true)
+
+# ==================== PRONTO-API ====================
+if [ -n "$API_FILES" ]; then
+  echo "  Revisando pronto-api..."
+  
+  for f in $API_FILES; do
+    [ -f "$f" ] || continue
+    
+    # Flask session prohibido
+    if rg -q "flask\.session" "$f" 2>/dev/null; then
+      add_inconsistencia "flask.session usado (solo JWT permitido)" "$f" "$(rg -n "flask\.session" "$f" | head -2)"
+    fi
+    
+    # Secretos hardcodeados
+    if rg -q "api_key.*=.*['\"][a-zA-Z0-9]{8,}['\"]" "$f" 2>/dev/null; then
+      add_inconsistencia "api_key hardcodeado" "$f" "$(rg -n "api_key.*=.*['\"]" "$f" | head -2)"
+    fi
+    if rg -q "password.*=.*['\"][^'\"]+['\"]" "$f" 2>/dev/null | grep -v "os\.getenv\|os\.environ\|secret_service\|get_secret" | grep -v "# "; then
+      add_inconsistencia "password hardcodeado" "$f" "$(rg -n "password.*=.*['\"]" "$f" | grep -v "os\.getenv\|os\.environ\|secret_service\|get_secret" | head -2)"
+    fi
+    
+    # Imports duplicados de pronto-libs
+    if rg -q "^from pronto_shared\.services\.(\w+) import" "$f" 2>/dev/null; then
+      # Verificar si hay lógica duplicada
+      :
+    fi
+  done
+fi
+
+# ==================== PRONTO-EMPLOYEES ====================
+if [ -n "$EMPLOYEES_FILES" ]; then
+  echo "  Revisando pronto-employees..."
+  
+  for f in $EMPLOYEES_FILES; do
+    [ -f "$f" ] || continue
+    
+    # Flask session prohibido
+    if rg -q "flask\.session" "$f" 2>/dev/null; then
+      add_inconsistencia "flask.session usado (solo JWT permitido)" "$f" "$(rg -n "flask\.session" "$f" | head -2)"
+    fi
+    
+    # Static local prohibido
+    if rg -q "static_folder|static_url_path" "$f" 2>/dev/null; then
+      add_inconsistencia "static local configurado (debe usar pronto-static)" "$f" "$(rg -n "static_folder|static_url_path" "$f" | head -2)"
+    fi
+    
+    # Templates deben estar en templates/<rol>/
+    if [[ "$f" =~ \.html$ ]] && [[ ! "$f" =~ templates/(waiter|chef|cashier|admin|system)/ ]]; then
+      add_inconsistencia "template fuera de templates/<rol>/" "$f" "$f"
+    fi
+    
+    # Secretos hardcodeados
+    if rg -q "api_key.*=.*['\"][a-zA-Z0-9]{8,}['\"]" "$f" 2>/dev/null; then
+      add_inconsistencia "api_key hardcodeado" "$f" "$(rg -n "api_key.*=.*['\"]" "$f" | head -2)"
+    fi
+  done
+fi
+
+# ==================== PRONTO-CLIENT ====================
+if [ -n "$CLIENT_FILES" ]; then
+  echo "  Revisando pronto-client..."
+  
+  for f in $CLIENT_FILES; do
+    [ -f "$f" ] || continue
+    
+    # Static local prohibido
+    if rg -q "static_folder|static_url_path" "$f" 2>/dev/null; then
+      add_inconsistencia "static local configurado (debe usar pronto-static)" "$f" "$(rg -n "static_folder|static_url_path" "$f" | head -2)"
+    fi
+    
+    # Sesión solo puede tener dining_session_id o customer_ref
+    if rg -q "session\[" "$f" 2>/dev/null; then
+      SESSION_KEYS=$(rg -n "session\[(['\"])[^'\"]+['\"]\]" "$f" 2>/dev/null | sed 's/.*session\[\([^\]*\)\].*/\1/' | sort -u)
+      for key in $SESSION_KEYS; do
+        if [[ "$key" != "dining_session_id" ]] && [[ "$key" != "customer_ref" ]]; then
+          add_inconsistencia "clave de sesión no permitida: $key" "$f" "solo dining_session_id, customer_ref"
+        fi
+      done
+    fi
+  done
+fi
+
+# ==================== PRONTO-STATIC ====================
+if [ -n "$STATIC_FILES" ]; then
+  echo "  Revisando pronto-static..."
+  
+  for f in $STATIC_FILES; do
+    [ -f "$f" ] || continue
+    
+    # No JS vanilla en employees/client
+    if [[ "$f" =~ employees/ ]] || [[ "$f" =~ clients/ ]]; then
+      if [[ "$f" =~ \.js$ ]] && [[ ! "$f" =~ clientsvue/ ]]; then
+        add_inconsistencia "JS vanilla en employees/clients (usar Vue)" "$f" "$f"
+      fi
+    fi
+    
+    # No inline JS en HTML
+    if [[ "$f" =~ \.html$ ]] && rg -q "<script>" "$f" 2>/dev/null; then
+      add_inconsistencia "inline JS encontrado" "$f" "$(rg -n "<script>" "$f" | head -2)"
+    fi
+  done
+fi
+
+# ==================== GENERAL (todos los proyectos) ====================
+echo "  Revisando reglas generales..."
+
+# Roles no canónicos
+for f in $STAGED_FILES; do
+  [ -f "$f" ] || continue
+  if rg -q "admin_roles|super_roles|custom_roles|user_roles" "$f" 2>/dev/null; then
+    add_inconsistencia "rol no canónico detectado" "$f" "$(rg -n "admin_roles|super_roles|custom_roles|user_roles" "$f" | head -2)"
+  fi
+done
+
+# PostgreSQL 13 en docs
+for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/"); do
+  [ -f "$f" ] || continue
+  if rg -q "PostgreSQL 13|postgres:13|13-alpine" "$f" 2>/dev/null; then
+    add_inconsistencia "PostgreSQL 13 referenciado" "$f" "$(rg -n "PostgreSQL 13|postgres:13|13-alpine" "$f" | head -2)"
+  fi
+done
+
+# Docker compose modificado
+for f in $STAGED_FILES; do
+  if [[ "$f" =~ docker-compose ]] || [[ "$f" =~ Dockerfile ]]; then
+    add_inconsistencia "docker-compose/Dockerfile modificado" "$f" "requiere aprobación"
+  fi
+done
+
+# Contratos modificados
+for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/contracts|pronto-ai/"); do
+  add_inconsistencia "contrato modificado" "$f" "verificar impacto en consumers"
+done
+
+echo ""
+
+# ==================== REPORTE ====================
+{
+  echo "# Pre-commit Audit"
+  echo "Fecha: $(date)"
+  echo ""
+  echo "Archivos staged:"
+  echo "$STAGED_FILES" | head -20
+  echo ""
+  
+  if [ -n "$INCONSISTENCIES" ]; then
+    echo "INCONSISTENCIAS DETECTADAS:"
+    echo ""
+    echo -e "$INCONSISTENCIES"
+    echo "Corrige antes de hacer commit."
+    echo -e "$INCONSISTENCIES" > "$OUT_DIR/inconsistencies.md"
+    exit 1
+  fi
+  
+  echo "OK: sin inconsistencias detectadas"
+} > "$OUT_DIR/result.md"
+
+cat "$OUT_DIR/result.md"
+exit 0

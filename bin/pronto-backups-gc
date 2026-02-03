@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+BKDIR="$REPO_ROOT/pronto-backups/changes"
+
+if [[ ! -d "$BKDIR" ]]; then
+  exit 0
+fi
+
+# keep last 20 and those within 30 days
+NOW=$(date +%s)
+KEEP=20
+
+mapfile -t entries < <(ls -dt "$BKDIR"/CHG-* 2>/dev/null || true)
+count=0
+for entry in "${entries[@]}"; do
+  count=$((count+1))
+  if [[ $count -le $KEEP ]]; then
+    continue
+  fi
+  mtime=$(stat -f %m "$entry" 2>/dev/null || stat -c %Y "$entry")
+  age=$(( (NOW - mtime) / 86400 ))
+  if [[ $age -gt 30 ]]; then
+    rm -rf "$entry"
+  fi
+done

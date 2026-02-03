@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+import hashlib
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+LOG_DIR = REPO_ROOT / "docs" / "changes"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+args = sys.argv[1:]
+params = {"agent": "Codex", "files": "", "reason": "", "result": "Aplicado", "modules": "", "backup_id": "", "commit_sha": ""}
+
+for i in range(0, len(args), 2):
+    if i + 1 >= len(args):
+        break
+    key = args[i].lstrip("-")
+    params[key] = args[i + 1]
+
+now = datetime.now()
+window = "00-07" if now.hour < 8 else "08-15" if now.hour < 16 else "16-23"
+file_path = LOG_DIR / f"{now:%Y%m%d}_{window}.md"
+
+entry = {
+    "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+    "agent": params["agent"],
+    "files": params["files"],
+    "reason": params["reason"],
+    "result": params["result"],
+    "modules": params["modules"],
+    "backup_id": params["backup_id"],
+    "commit_sha": params["commit_sha"],
+}
+
+normalized = json.dumps(entry, sort_keys=True)
+entry_hash = hashlib.sha256(normalized.encode()).hexdigest()
+
+if file_path.exists():
+    if entry_hash in file_path.read_text():
+        sys.exit(0)
+
+with file_path.open("a") as f:
+    f.write(f"### {entry['timestamp']}\n\n")
+    f.write("| Campo | Valor |\n|---|---|\n")
+    f.write(f"| Agente | {entry['agent']} |\n")
+    f.write(f"| Archivos | {entry['files']} |\n")
+    f.write(f"| Razón | {entry['reason']} |\n")
+    f.write(f"| Resultado | {entry['result']} |\n")
+    f.write(f"| Módulos | {entry['modules']} |\n")
+    f.write(f"| Backup ID | {entry['backup_id']} |\n")
+    f.write(f"| Commit | {entry['commit_sha']} |\n")
+    f.write(f"| Hash | {entry_hash} |\n\n")

@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_REF="${BASE_REF:-origin/main}"
+CHANGED_FILES="$(git diff --name-only "$BASE_REF"...HEAD 2>/dev/null || true)"
+
+TS="$(date +%Y%m%d-%H%M%S)"
+OUT_DIR="docs/change-logs/CHG-${TS}"
+mkdir -p "$OUT_DIR"
+
+PROMPT_FILE="pronto-scripts/prompts/inconsistency_check.md"
+
+fail_blocker() {
+  echo "BLOCKER detectado. Ver $OUT_DIR"
+  exit 10
+}
+
+echo "=== PRONTO Inconsistency Check ==="
+echo "BASE_REF: $BASE_REF"
+echo "Archivos cambiados: ${CHANGED_FILES:-ninguno}"
+
+# -------------------------
+# 1) Invariantes locales
+# -------------------------
+echo ""
+echo "[1/4] Ejecutando invariantes locales..."
+
+LOCAL_BLOCKER=0
+
+if rg -n "flask\.session" pronto-api pronto-employees 2>/dev/null; then
+  echo "- BLOCKER: flask.session en api/employees" | tee "$OUT_DIR/inconsistencies.local.md"
+  LOCAL_BLOCKER=1
+fi
+
+if rg -n "admin_roles" . 2>/dev/null; then
+  echo "- BLOCKER: rol no canónico admin_roles" | tee -a "$OUT_DIR/inconsistencies.local.md"
+  LOCAL_BLOCKER=1
+fi
+
+if rg -n "PostgreSQL 13|postgres:13|13-alpine" pronto-docs 2>/dev/null; then
+  echo "- BLOCKER: referencia a Postgres 13" | tee -a "$OUT_DIR/inconsistencies.local.md"
+  LOCAL_BLOCKER=1
+fi
+
+if [ "$LOCAL_BLOCKER" -eq 1 ]; then
+  exit 10
+fi
+
+# -------------------------
+# 2) Validación con LLMs
+# -------------------------
+echo ""
+echo "[2/4] Preparando validación con LLMs..."
+
+command -v opencode >/dev/null 2>&1 || {
+  echo "WARN: opencode no disponible, saltando validación LLM"
+  echo "OK: invariantes locales pasadas (sin validación LLM)" | tee "$OUT_DIR/result.md"
+  exit 0
+}
+
+export BASE_REF CHANGED_FILES
+
+run_llm() {
+  local MODEL="$1"
+  local OUT="$2"
+
+  echo "Ejecutando $MODEL..."
+  opencode run \
+    --model "$MODEL" \
+    --prompt-file "$PROMPT_FILE" \
+    --out "$OUT" 2>/dev/null || echo "ERROR: $MODEL falló" > "$OUT"
+}
+
+OUT_GLM="$OUT_DIR/inconsistencies.glm47.md"
+OUT_MINIMAX="$OUT_DIR/inconsistencies.minimax21.md"
+
+run_llm "glm-4.7" "$OUT_GLM"
+run_llm "minimax-2.1" "$OUT_MINIMAX"
+
+# -------------------------
+# 3) Evaluación de resultados
+# -------------------------
+echo ""
+echo "[3/4] Evaluando resultados..."
+
+GLM_OK=0
+MINIMAX_OK=0
+
+if rg -n "^OK:" "$OUT_GLM" 2>/dev/null; then
+  GLM_OK=1
+  echo "  GLM-4.7: OK"
+else
+  echo "  GLM-4.7: Sin OK explícito"
+fi
+
+if rg -n "^OK:" "$OUT_MINIMAX" 2>/dev/null; then
+  MINIMAX_OK=1
+  echo "  MiniMax-2.1: OK"
+else
+  echo "  MiniMax-2.1: Sin OK explícito"
+fi
+
+if rg -n "^-\s*BLOCKER:" "$OUT_GLM" 2>/dev/null; then
+  echo "  GLM-4.7: BLOCKER detectado"
+  cat "$OUT_GLM"
+  fail_blocker
+fi
+
+if rg -n "^-\s*BLOCKER:" "$OUT_MINIMAX" 2>/dev/null; then
+  echo "  MiniMax-2.1: BLOCKER detectado"
+  cat "$OUT_MINIMAX"
+  fail_blocker
+fi
+
+# -------------------------
+# 4) Resultado final
+# -------------------------
+echo ""
+echo "[4/4] Resultado final..."
+
+if [ "$GLM_OK" -eq 1 ] && [ "$MINIMAX_OK" -eq 1 ]; then
+  echo "OK: sin inconsistencias detectadas por GLM-4.7 y MiniMax-2.1" | tee "$OUT_DIR/result.md"
+  exit 0
+else
+  echo "WARN: los modelos no devolvieron OK explícito"
+  echo "Ver logs en: $OUT_DIR"
+  exit 2
+fi

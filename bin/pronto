@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+# Script de Gestión Maestro para el Entorno de Desarrollo de Pronto
+#
+# Uso: ./pronto <comando> [servicio...]
+#
+# Comandos:
+#   up          - Inicia todos los servicios en segundo plano.
+#   down        - Detiene y elimina todos los contenedores, volúmenes y redes.
+#   ps          - Muestra los contenedores en ejecución.
+#   restart     - Reinicia todos los servicios o los especificados.
+#   logs        - Muestra los logs de todos los servicios o los especificados.
+#   build       - Reconstruye la imagen de todos los servicios o los especificados.
+#   redeploy    - Reconstruye y reinicia los servicios especificados (o todos).
+#   sql         - Aplica un archivo SQL a la base de datos. Uso: ./pronto sql <ruta_al_archivo.sql>
+# ==============================================================================
+
+set -euo pipefail
+
+# --- Configuración y Variables Globales ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
+# Lista de servicios de aplicación que pueden ser gestionados individualmente
+APP_SERVICES=("api" "client" "employees" "static")
+
+# --- Funciones de Ayuda ---
+
+# Muestra un mensaje de log con formato
+log() {
+    echo "⚙️  [pronto] $1"
+}
+
+# Muestra un mensaje de error y sale
+fail() {
+    echo "❌ [pronto] ERROR: $1" >&2
+    exit 1
+}
+
+# Verifica que docker y docker-compose están instalados
+check_deps() {
+    if ! command -v docker &>/dev/null; then
+        fail "Docker no está instalado. Por favor, instálalo para continuar."
+    fi
+    if ! command -v docker-compose &>/dev/null; then
+        fail "docker-compose no está instalado. Por favor, instálalo para continuar."
+    fi
+}
+
+# Carga las variables de entorno desde el archivo .env en la raíz del proyecto
+load_env() {
+    local env_file="${PROJECT_ROOT}/.env"
+    if [ -f "$env_file" ]; then
+        log "Cargando configuración desde ${env_file}"
+        set -a
+        source "$env_file"
+        set +a
+    else
+        fail "Archivo .env no encontrado en la raíz del proyecto. Por favor, crea uno a partir de .env.example."
+    fi
+}
+
+# --- Lógica de Comandos ---
+
+handle_up() {
+    log "Levantando todos los servicios en segundo plano..."
+    docker-compose -f "$COMPOSE_FILE" up -d --remove-orphans
+    log "✅ Entorno iniciado. Usa './pronto ps' para ver el estado."
+}
+
+handle_down() {
+    log "Deteniendo y eliminando todos los contenedores, volúmenes y redes..."
+    docker-compose -f "$COMPOSE_FILE" down -v --remove-orphans
+    log "✅ Entorno detenido."
+}
+
+handle_ps() {
+    log "Mostrando estado de los contenedores:"
+    docker-compose -f "$COMPOSE_FILE" ps
+}
+
+handle_restart() {
+    local services=("$@")
+    if [ ${#services[@]} -eq 0 ]; then
+        log "Reiniciando todos los servicios..."
+        docker-compose -f "$COMPOSE_FILE" restart
+    else
+        log "Reiniciando servicios: ${services[*]}"
+        docker-compose -f "$COMPOSE_FILE" restart "${services[@]}"
+    fi
+    log "✅ Reinicio completado."
+}
+
+handle_logs() {
+    local services=("$@")
+    if [ ${#services[@]} -eq 0 ]; then
+        log "Mostrando logs de todos los servicios (presiona Ctrl+C para salir)..."
+        docker-compose -f "$COMPOSE_FILE" logs -f
+    else
+        log "Mostrando logs de: ${services[*]} (presiona Ctrl+C para salir)..."
+        docker-compose -f "$COMPOSE_FILE" logs -f "${services[@]}"
+    fi
+}
+
+handle_build() {
+    local services=("$@")
+    if [ ${#services[@]} -eq 0 ]; then
+        log "Reconstruyendo imágenes de todos los servicios..."
+        docker-compose -f "$COMPOSE_FILE" build --no-cache
+    else
+        log "Reconstruyendo imágenes de: ${services[*]}"
+        docker-compose -f "$COMPOSE_FILE" build --no-cache "${services[@]}"
+    fi
+    log "✅ Reconstrucción de imágenes completada."
+}
+
+handle_redeploy() {
+    local services=("$@")
+    if [ ${#services[@]} -eq 0 ]; then
+        services=("${APP_SERVICES[@]}")
+    fi
+    
+    log "Redesplegando servicios: ${services[*]}"
+    log "Paso 1/2: Reconstruyendo imágenes..."
+    docker-compose -f "$COMPOSE_FILE" build "${services[@]}"
+    
+    log "Paso 2/2: Reiniciando contenedores..."
+    docker-compose -f "$COMPOSE_FILE" up -d --no-deps "${services[@]}"
+    
+    log "✅ Redespliegue completado para: ${services[*]}"
+}
+
+handle_sql() {
+    local sql_file="$1"
+    if [ -z "$sql_file" ]; then
+        fail "Debes especificar la ruta al archivo SQL. Uso: ./pronto sql <ruta_al_archivo.sql>"
+    fi
+    if [ ! -f "$sql_file" ]; then
+        fail "Archivo SQL no encontrado en: $sql_file"
+    fi
+
+    local db_container="postgres"
+    local db_user="${POSTGRES_USER:-pronto}"
+    local db_name="${POSTGRES_DB:-pronto}"
+
+    log "Verificando que el contenedor de la base de datos ('$db_container') esté en ejecución..."
+    if ! docker-compose -f "$COMPOSE_FILE" ps -q "$db_container" | grep -q .; then
+        fail "El contenedor '$db_container' no está en ejecución. Por favor, inicia el entorno con './pronto up'."
+    fi
+
+    log "Aplicando archivo SQL '$sql_file' a la base de datos '$db_name'..."
+    docker-compose -f "$COMPOSE_FILE" exec -T "$db_container" psql -U "$db_user" -d "$db_name" < "$sql_file"
+    log "✅ Archivo SQL aplicado exitosamente."
+}
+
+
+# --- Script Principal ---
+main() {
+    cd "$PROJECT_ROOT"
+    check_deps
+    load_env
+
+    COMMAND="${1:-}"
+    shift || true
+    
+    case "$COMMAND" in
+        up) handle_up ;;
+        down) handle_down ;;
+        ps) handle_ps ;;
+        restart) handle_restart "$@" ;;
+        logs) handle_logs "$@" ;;
+        build) handle_build "$@" ;;
+        redeploy) handle_redeploy "$@" ;;
+        sql) handle_sql "$1" ;;
+        *)
+            echo "Comando no válido: $COMMAND" >&2
+            echo "Uso: ./pronto <up|down|ps|restart|logs|build|redeploy|sql> [servicio...]" >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

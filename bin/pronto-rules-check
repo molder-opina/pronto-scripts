@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+MODULES_FILE = REPO_ROOT / "pronto-docs" / "modules.yml"
+SCHEMA_FILE = REPO_ROOT / "pronto-docs" / "contracts" / "pronto-scripts" / "modules.schema.json"
+CONTRACT_ENUM = REPO_ROOT / "pronto-docs" / "contracts" / "pronto-scripts" / "contracts.enum.json"
+ROUTER_FILE = REPO_ROOT / "pronto-ai" / "router.yml"
+AGENTS_FILE = REPO_ROOT / "agents.md"
+
+H2_ORDER = [
+    "## Resumen Operativo",
+    "## Reglas Clave",
+    "## Contratos Públicos",
+    "## Matriz de Dependencias",
+    "## Operación / Ejecución",
+    "## Validaciones / Tests",
+    "## Anti-reglas",
+    "## Referencias",
+]
+H3_ORDER = [
+    "### Reglas",
+    "### Hechos verificados",
+    "### Pendiente de verificación",
+]
+
+CONTRACT_FILES = {
+    "http_api": "openapi.yaml",
+    "redis_keys": "redis_keys.md",
+    "events": "events.md",
+    "db_schema": "db_schema.sql",
+    "http_assets": "files.md",
+    "asset_manifest": "files.md",
+    "cookies": "cookies.md",
+    "csrf": "csrf.md",
+}
+
+
+def run(cmd, cwd=REPO_ROOT):
+    return subprocess.run(cmd, cwd=cwd, shell=False, capture_output=True, text=True)
+
+
+def load_json(path: Path):
+    return json.loads(path.read_text())
+
+
+def fail(msg):
+    print(f"ERROR: {msg}")
+    sys.exit(1)
+
+
+def validate_schema(modules):
+    if not SCHEMA_FILE.exists():
+        fail("modules.schema.json missing")
+    schema = load_json(SCHEMA_FILE)
+    required = set(schema.get("properties", {}).get("modules", {}).get("items", {}).get("required", []))
+    for mod in modules:
+        missing = required - set(mod.keys())
+        if missing:
+            fail(f"modules.yml missing keys for {mod.get('name')}: {sorted(missing)}")
+    if CONTRACT_ENUM.exists():
+        enum = set(load_json(CONTRACT_ENUM).get("contracts", []))
+        for mod in modules:
+            for k in mod.get("produces", []) + mod.get("consumes", []):
+                if k not in enum:
+                    fail(f"Invalid contract enum '{k}' in {mod.get('name')}")
+
+
+def sha256(path: Path):
+    data = path.read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+
+def check_router_hash():
+    if not ROUTER_FILE.exists() or not AGENTS_FILE.exists():
+        fail("router.yml or agents.md missing")
+    hash_val = sha256(ROUTER_FILE)
+    agents = AGENTS_FILE.read_text()
+    m = re.search(r"Router-Hash:\s*`([a-f0-9]+)`", agents)
+    if not m:
+        fail("Router-Hash missing in agents.md")
+    if m.group(1) != hash_val:
+        fail("Router-Hash does not match router.yml")
+
+
+def check_docs_structure(doc_path: Path):
+    lines = doc_path.read_text().splitlines()
+    if not lines or not lines[0].startswith("# "):
+        fail(f"{doc_path} missing title")
+    header_block = "\n".join(lines[:5])
+    if "Version-Reglas:" not in header_block or "Ultima-Revision:" not in header_block:
+        fail(f"{doc_path} missing header fields")
+    # H2 order
+    h2_positions = []
+    for h2 in H2_ORDER:
+        try:
+            idx = lines.index(h2)
+        except ValueError:
+            fail(f"{doc_path} missing section {h2}")
+        h2_positions.append(idx)
+    if h2_positions != sorted(h2_positions):
+        fail(f"{doc_path} sections out of order")
+    # H3 order within Reglas Clave
+    reg_idx = lines.index("## Reglas Clave")
+    next_h2 = min([i for i in h2_positions if i > reg_idx], default=len(lines))
+    sub = lines[reg_idx:next_h2]
+    for h3 in H3_ORDER:
+        if h3 not in sub:
+            fail(f"{doc_path} missing subsection {h3}")
+    # Evidence check
+    has_ok = any(line.startswith("- [✅]") for line in lines)
+    if not has_ok:
+        fail(f"{doc_path} missing [✅] evidence")
+    # Pending count
+    pend_idx = lines.index("### Pendiente de verificación")
+    pend_end = len(lines)
+    for i in range(pend_idx + 1, len(lines)):
+        if lines[i].startswith("### ") or lines[i].startswith("## "):
+            pend_end = i
+            break
+    pending_lines = [l for l in lines[pend_idx:pend_end] if l.startswith("- [")]
+    if len(pending_lines) > 5:
+        fail(f"{doc_path} pending items > 5")
+
+
+def check_contracts(mod, mode):
+    contracts_path = REPO_ROOT / Path(mod["contracts_path"]) 
+    produces = mod.get("produces", [])
+    for item in produces:
+        fname = CONTRACT_FILES.get(item)
+        if not fname:
+            continue
+        path = contracts_path / fname
+        if not path.exists():
+            fail(f"Missing contract file {path}")
+
+
+def check_postgres_version():
+    res = run(["rg", "-n", "PostgreSQL 13", "pronto-docs", "pronto-postgresql"], cwd=REPO_ROOT)
+    if res.returncode == 0:
+        fail("Found PostgreSQL 13 in docs")
+
+
+def check_session_rules():
+    # forbid session in api/employees
+    for path in ["pronto-api", "pronto-employees"]:
+        res = run(["rg", "-n", "flask\\.session|session\\[", path], cwd=REPO_ROOT)
+        if res.returncode == 0:
+            fail(f"flask.session usage forbidden in {path}")
+    # client allowlist
+    allowlist = set()
+    allow_file = REPO_ROOT / "pronto-client" / "src" / "pronto_clients" / "utils" / "customer_session.py"
+    if allow_file.exists():
+        m = re.search(r"ALLOWED_SESSION_KEYS\s*=\s*\{([^}]+)\}", allow_file.read_text())
+        if m:
+            for k in m.group(1).split(","):
+                k = k.strip().strip("'\"")
+                if k:
+                    allowlist.add(k)
+    if not allowlist:
+        fail("ALLOWED_SESSION_KEYS missing")
+    res = run(["rg", "-n", "session\\s*\\[\\s*['\"]([^'\"]+)['\"]", "pronto-client"], cwd=REPO_ROOT)
+    if res.returncode == 0:
+        keys = set()
+        for line in res.stdout.splitlines():
+            m = re.search(r"session\s*\[\s*['\"]([^'\"]+)['\"]", line)
+            if m:
+                keys.add(m.group(1))
+        extra = keys - allowlist
+        if extra:
+            fail(f"Session keys outside allowlist: {sorted(extra)}")
+    res = run(["rg", "-n", "session\\s*\\[\\s*['\"](email|phone|name|address|token|jwt|auth|roles|permissions|card|payment|customer_data)", "pronto-client"], cwd=REPO_ROOT)
+    if res.returncode == 0:
+        fail("PII keys found in session usage")
+
+
+def load_modules():
+    data = json.loads(MODULES_FILE.read_text())
+    return data["modules"]
+
+
+def determine_changed_modules(modules):
+    base = "origin/main"
+    res = run(["git", "merge-base", base, "HEAD"], cwd=REPO_ROOT)
+    if res.returncode != 0:
+        base = "HEAD~1"
+    diff = run(["git", "diff", "--name-only", f"{base}...HEAD"], cwd=REPO_ROOT)
+    if diff.returncode != 0:
+        return set()
+    files = [f for f in diff.stdout.splitlines() if f.strip()]
+    touched = set()
+    for f in files:
+        fpath = Path(f)
+        best = None
+        for mod in modules:
+            root = Path(mod["path_root"].lstrip("./"))
+            if root in fpath.parents or fpath.parts[:1] == (root.parts[0],):
+                if best is None or len(str(root)) > len(str(best)):
+                    best = root
+                    best_name = mod["name"]
+        if best is not None:
+            touched.add(best_name)
+    return touched
+
+
+def main():
+    mode = "full"
+    if len(sys.argv) > 1:
+        mode = sys.argv[1]
+    modules = load_modules()
+    validate_schema(modules)
+    check_router_hash()
+    check_postgres_version()
+    check_session_rules()
+
+    if mode == "fast":
+        for mod in modules:
+            doc_path = REPO_ROOT / "pronto-docs" / f"{mod['name']}.md"
+            check_docs_structure(doc_path)
+        print("OK")
+        return
+
+    if mode == "changed":
+        changed = determine_changed_modules(modules)
+        impacted = set(changed)
+        # expand via router
+        router = load_json(ROUTER_FILE)["router"]
+        added = True
+        while added:
+            added = False
+            for name in list(impacted):
+                key = f"{name}.md"
+                touches = router.get(key, {}).get("touches", [])
+                for t in touches:
+                    if t not in impacted:
+                        impacted.add(t)
+                        added = True
+        for mod in modules:
+            if mod["name"] in impacted:
+                doc_path = REPO_ROOT / "pronto-docs" / f"{mod['name']}.md"
+                check_docs_structure(doc_path)
+                check_contracts(mod, mode)
+        # require backup
+        backups = sorted((REPO_ROOT / "pronto-backups" / "changes").glob("CHG-*"), reverse=True)
+        if not backups:
+            fail("No backup found in pronto-backups/changes")
+        info = backups[0] / "meta" / "info.env"
+        if not info.exists():
+            fail("Backup missing meta/info.env")
+        print("OK")
+        return
+
+    # full
+    for mod in modules:
+        doc_path = REPO_ROOT / "pronto-docs" / f"{mod['name']}.md"
+        check_docs_structure(doc_path)
+        check_contracts(mod, mode)
+    print("OK")
+
+
+if __name__ == "__main__":
+    main()

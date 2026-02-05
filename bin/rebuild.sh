@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Source library modules
 # shellcheck source=bin/lib/docker_runtime.sh
@@ -31,7 +31,7 @@ detect_compose_command "${PROJECT_ROOT}/docker-compose.yml"
 # Nombre de proyecto para filtrar contenedores
 PROJECT_PREFIX="${PROJECT_PREFIX:-pronto}"
 
-AVAILABLE_SERVICES=("client" "employee")
+AVAILABLE_SERVICES=("client" "employees")
 
 show_usage() {
   cat <<EOF
@@ -41,7 +41,7 @@ Reconstruye y redespliega servicios específicos del stack Pronto.
 
 Servicios disponibles:
   client     - Aplicación de clientes
-  employee   - Aplicación de empleados
+  employees  - Aplicación de empleados
   all        - Todos los servicios (client + employee)
 
 Opciones:
@@ -84,7 +84,7 @@ while [[ $# -gt 0 ]]; do
     --seed) LOAD_SEED=true; shift;;
     --keep-sessions) KEEP_SESSIONS=true; shift;;
     all) SERVICES=(); break;;
-    client|employee) SERVICES+=("$1"); shift;;
+    client|employees) SERVICES+=("$1"); shift;;
     *)
       echo "Error: Opción o servicio desconocido '$1'"
       echo ""
@@ -115,7 +115,7 @@ if [[ "$KEEP_SESSIONS" == "false" ]]; then
   cleanup_sessions=0
   for service in "${SERVICES[@]}"; do
     case "$service" in
-      client|employee) cleanup_sessions=1 ;;
+      client|employees) cleanup_sessions=1 ;;
     esac
   done
 
@@ -191,7 +191,7 @@ for service in "${SERVICES[@]}"; do
   HOST_PORT=""
   case "$service" in
     client) HOST_PORT="${CLIENT_APP_HOST_PORT:-}" ;;
-    employee) HOST_PORT="${EMPLOYEE_APP_HOST_PORT:-}" ;;
+    employees) HOST_PORT="${EMPLOYEE_APP_HOST_PORT:-}" ;;
   esac
   if [[ -n "${HOST_PORT}" ]]; then
     echo "   - Verificando puerto ${HOST_PORT}..."

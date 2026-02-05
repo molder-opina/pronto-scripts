@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULES_FILE = REPO_ROOT / "pronto-docs" / "modules.yml"
@@ -189,7 +190,7 @@ def check_no_legacy():
         fail("Legacy references found (see pronto-no-legacy)")
 
 
-def _run_gate(script_name: str, args: list[str] | None = None, *, needs_db: bool = False) -> None:
+def _run_gate(script_name: str, args: Optional[List[str]] = None, *, needs_db: bool = False) -> None:
     script = REPO_ROOT / "pronto-scripts" / "bin" / script_name
     if not script.exists():
         fail(f"{script_name} script missing")

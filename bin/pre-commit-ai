@@ -15,9 +15,14 @@ OUT_DIR="docs/change-logs/PRECOMMIT-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUT_DIR"
 
 INCONSISTENCIES=""
+WARNINGS=""
 
 add_inconsistencia() {
   INCONSISTENCIES="${INCONSISTENCIES}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
+}
+
+add_warning() {
+  WARNINGS="${WARNINGS}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
 }
 
 echo "Analizando archivos modificados..."
@@ -157,8 +162,12 @@ for f in $STAGED_FILES; do
 done
 
 # Contratos modificados
-for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/contracts|pronto-ai/"); do
-  add_inconsistencia "contrato modificado" "$f" "verificar impacto en consumers"
+for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/contracts|pronto-ai/" || true); do
+  if [ "${PRONTO_ALLOW_CONTRACT_CHANGES:-}" = "1" ]; then
+    add_warning "contrato modificado (permitido por PRONTO_ALLOW_CONTRACT_CHANGES=1)" "$f" "verificar impacto en consumers"
+  else
+    add_inconsistencia "contrato modificado" "$f" "set PRONTO_ALLOW_CONTRACT_CHANGES=1 si fue aprobado explicitamente"
+  fi
 done
 
 echo ""
@@ -171,7 +180,13 @@ echo ""
   echo "Archivos staged:"
   echo "$STAGED_FILES" | head -20
   echo ""
-  
+
+  if [ -n "$WARNINGS" ]; then
+    echo "WARNINGS:"
+    echo ""
+    echo -e "$WARNINGS"
+  fi
+
   if [ -n "$INCONSISTENCIES" ]; then
     echo "INCONSISTENCIAS DETECTADAS:"
     echo ""

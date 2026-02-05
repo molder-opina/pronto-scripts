@@ -216,11 +216,19 @@ def check_sql_safety():
 
 
 def check_migrate_check():
-    _run_gate("pronto-migrate", ["--check"], needs_db=True)
+    if os.environ.get("DATABASE_URL"):
+        _run_gate("pronto-migrate", ["--check"], needs_db=True)
+        return
+    # Allow running the rules gate without a live DB by using the SQL safety checks.
+    _run_gate("pronto-migrate", ["--dry-run"])
 
 
 def check_init_check():
-    _run_gate("pronto-init", ["--check"], needs_db=True)
+    if os.environ.get("DATABASE_URL"):
+        _run_gate("pronto-init", ["--check"], needs_db=True)
+        return
+    # Allow running the rules gate without a live DB by using the deny checks.
+    _run_gate("pronto-init", ["--dry-run"])
 
 
 def load_modules():

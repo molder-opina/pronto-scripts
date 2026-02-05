@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command -v rg >/dev/null || { echo "pronto-no-runtime-ddl: requiere rg" >&2; exit 1; }
+
+# NOTE: We intentionally treat Python and SQL differently:
+# - Python commonly uses ".execute(...)" via SQLAlchemy; banning "EXECUTE" there would be a false positive.
+# - In SQL (if any exists in apps/libs), "EXECUTE" is a strong signal of runtime DDL/migration-like behavior.
+DENY_PY='(?i)(create_all\s*\(|metadata\.create_all|\bALTER\s+TABLE\b|\bCREATE\s+(TABLE|INDEX|EXTENSION|TYPE|VIEW|FUNCTION)\b|\bDROP\s+(TABLE|SCHEMA|DATABASE|INDEX|VIEW)\b|\bTRUNCATE\b|DO\s+\$\$)'
+DENY_SQL='(?i)(\bALTER\s+TABLE\b|\bCREATE\s+(TABLE|INDEX|EXTENSION|TYPE|VIEW|FUNCTION)\b|\bDROP\s+(TABLE|SCHEMA|DATABASE|INDEX|VIEW)\b|\bTRUNCATE\b|DO\s+\$\$|\bEXECUTE\b)'
+
+TARGETS=(pronto-api pronto-client pronto-employees pronto-libs/src)
+
+hits=0
+for t in "${TARGETS[@]}"; do
+  [[ -e "$t" ]] || continue
+  while IFS= read -r line; do
+    echo "$line" >&2
+    hits=$((hits+1))
+  done < <(rg -n --pcre2 "$DENY_PY" "$t" --glob '*.py' || true)
+  while IFS= read -r line; do
+    echo "$line" >&2
+    hits=$((hits+1))
+  done < <(rg -n --pcre2 "$DENY_SQL" "$t" --glob '*.sql' || true)
+done
+
+if (( hits > 0 )); then
+  echo "pronto-no-runtime-ddl: FAIL (hits=$hits)" >&2
+  exit 1
+fi
+
+echo "OK: no runtime DDL hits"

@@ -1,0 +1,14 @@
+schema_version: 1
+postgres_major: 16
+schema: public
+min_schemas: [public]
+search_path: public
+min_extensions: []
+min_tables:
+  pronto_schema_migrations: [file_name, sha256, sql_norm_sha, executed_at, status, error]
+  pronto_init_runs: [run_id, phase, file_name, sha256, sql_norm_sha, executed_at, status, error]
+  branding_config: [id, config, logo_bytes, logo_mime, updated_at]
+min_indexes:
+  - name: ix_pronto_init_runs_phase
+    table: pronto_init_runs
+    columns: [phase]

@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "pronto-migrate: requiere $1" >&2; exit 1; }
+}
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+MIG_DIR="$REPO_ROOT/pronto-scripts/init/sql/migrations"
+DB="${DATABASE_URL:-}"
+
+if [[ ! -d "$MIG_DIR" ]]; then
+  echo "pronto-migrate: missing dir $MIG_DIR" >&2
+  exit 1
+fi
+
+sha256_file() {
+  python3 - <<'PY' "$1"
+import hashlib, sys
+p=sys.argv[1]
+h=hashlib.sha256()
+with open(p,'rb') as f:
+  for b in iter(lambda:f.read(1024*1024), b''):
+    h.update(b)
+print(h.hexdigest())
+PY
+}
+
+sql_norm_sha() {
+  python3 - <<'PY' "$1"
+import hashlib, re, sys
+p=sys.argv[1]
+s=open(p,'r',encoding='utf-8').read()
+# remove /* ... */
+s=re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+# remove -- ...
+s=re.sub(r"--[^\n]*", "", s)
+lines=[ln.strip() for ln in s.splitlines()]
+s=" ".join([ln for ln in lines if ln])
+s=re.sub(r"\s+", " ", s).strip()
+print(hashlib.sha256(s.encode('utf-8')).hexdigest())
+PY
+}
+
+list_sql_files() {
+  find "$MIG_DIR" -maxdepth 1 -type f -name "*.sql" -print0 | sort -z | xargs -0 -n1 echo
+}
+
+require_db() {
+  if [[ -z "$DB" ]]; then
+    echo "pronto-migrate: DATABASE_URL requerido" >&2
+    exit 1
+  fi
+}
+
+PSQL_BASE=(psql "$DB" -X -v ON_ERROR_STOP=1)
+
+safety_check_file() {
+  local f="$1"
+  # hard blocks
+  if rg -n --pcre2 '(?i)\b(DROP\s+TABLE|DROP\s+SCHEMA|DROP\s+DATABASE|TRUNCATE|--clean|DO\s+\$\$)\b' "$f" >/dev/null; then
+    echo "pronto-migrate: SQL peligroso bloqueado en $f" >&2
+    rg -n --pcre2 '(?i)\b(DROP\s+TABLE|DROP\s+SCHEMA|DROP\s+DATABASE|TRUNCATE|--clean|DO\s+\$\$)\b' "$f" >&2 || true
+    exit 1
+  fi
+
+  # DROP INDEX must include IF EXISTS
+  python3 - <<'PY' "$f"
+import re, sys
+p=sys.argv[1]
+s=open(p,'r',encoding='utf-8').read()
+# Allow only DROP INDEX IF EXISTS
+bad=list(re.finditer(r"(?is)\bDROP\s+INDEX\b(?!\s+IF\s+EXISTS)\s+[^;]+;", s))
+if bad:
+  print("pronto-migrate: DROP INDEX sin IF EXISTS bloqueado:", file=sys.stderr)
+  for m in bad[:5]:
+    frag=m.group(0)[:220].replace("\n"," ")
+    print("  -", frag, file=sys.stderr)
+  sys.exit(1)
+PY
+}
+
+dry_run() {
+  need_cmd rg
+  need_cmd python3
+  need_cmd psql
+  "$REPO_ROOT/pronto-scripts/bin/pronto-sql-safety"
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    safety_check_file "$f"
+  done < <(list_sql_files)
+  echo "OK dry-run (safety checks passed)."
+}
+
+check() {
+  need_cmd python3
+  need_cmd psql
+  require_db
+
+  local pending=0 drift=0
+
+  # strict: control table must exist
+  if ! "${PSQL_BASE[@]}" -q -c "SELECT 1 FROM pronto_schema_migrations LIMIT 1;" >/dev/null 2>&1; then
+    echo "pronto-migrate: pronto_schema_migrations no existe. Ejecuta pronto-init --apply (00_bootstrap)." >&2
+    exit 1
+  fi
+
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    bn="$(basename "$f")"
+    sha="$(sha256_file "$f")"
+    norm="$(sql_norm_sha "$f")"
+
+    row="$("${PSQL_BASE[@]}" -A -t -q -c "SELECT sha256||'|'||sql_norm_sha||'|'||status FROM pronto_schema_migrations WHERE file_name='${bn}' LIMIT 1;" || true)"
+
+    if [[ -z "$row" ]]; then
+      pending=$((pending+1))
+      echo "PENDING: $bn" >&2
+      continue
+    fi
+
+    IFS='|' read -r db_sha db_norm db_status <<<"$row"
+    if [[ "$db_status" != "applied" ]]; then
+      pending=$((pending+1))
+      echo "PENDING: $bn (status=$db_status)" >&2
+      continue
+    fi
+
+    if [[ "$db_sha" != "$sha" || "$db_norm" != "$norm" ]]; then
+      drift=$((drift+1))
+      echo "DRIFT: $bn" >&2
+    fi
+  done < <(list_sql_files)
+
+  echo "pending=$pending drift=$drift"
+  if (( pending > 0 || drift > 0 )); then
+    exit 1
+  fi
+}
+
+apply() {
+  need_cmd rg
+  need_cmd python3
+  need_cmd psql
+  require_db
+
+  "$REPO_ROOT/pronto-scripts/bin/pronto-sql-safety"
+
+  local lock_timeout="${PRONTO_LOCK_TIMEOUT:-5s}"
+  local statement_timeout="${PRONTO_STATEMENT_TIMEOUT:-5min}"
+
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    bn="$(basename "$f")"
+    sha="$(sha256_file "$f")"
+    norm="$(sql_norm_sha "$f")"
+
+    safety_check_file "$f"
+
+    set +e
+    "${PSQL_BASE[@]}" -q <<SQL
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-migrate'));
+SET LOCAL lock_timeout = '${lock_timeout}';
+SET LOCAL statement_timeout = '${statement_timeout}';
+SET LOCAL client_encoding = 'UTF8';
+\i '${f}'
+INSERT INTO pronto_schema_migrations(file_name, sha256, sql_norm_sha, status, error, executed_by, app_version, git_sha, sql_head_sha)
+VALUES ('${bn}', '${sha}', '${norm}', 'applied', NULL, '${USER:-}', '${APP_VERSION:-}', '${GIT_SHA:-}', '${SQL_HEAD_SHA:-}')
+ON CONFLICT (file_name) DO UPDATE
+SET sha256=EXCLUDED.sha256,
+    sql_norm_sha=EXCLUDED.sql_norm_sha,
+    executed_at=now(),
+    status='applied',
+    error=NULL,
+    executed_by=EXCLUDED.executed_by,
+    app_version=EXCLUDED.app_version,
+    git_sha=EXCLUDED.git_sha,
+    sql_head_sha=EXCLUDED.sql_head_sha;
+COMMIT;
+SQL
+    rc=$?
+    set -e
+
+    if [[ $rc -ne 0 ]]; then
+      "${PSQL_BASE[@]}" -q <<SQL || true
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-migrate'));
+INSERT INTO pronto_schema_migrations(file_name, sha256, sql_norm_sha, status, error, executed_by, app_version, git_sha, sql_head_sha)
+VALUES ('${bn}', '${sha}', '${norm}', 'failed', 'psql execution failed', '${USER:-}', '${APP_VERSION:-}', '${GIT_SHA:-}', '${SQL_HEAD_SHA:-}')
+ON CONFLICT (file_name) DO UPDATE
+SET sha256=EXCLUDED.sha256,
+    sql_norm_sha=EXCLUDED.sql_norm_sha,
+    executed_at=now(),
+    status='failed',
+    error=EXCLUDED.error,
+    executed_by=EXCLUDED.executed_by,
+    app_version=EXCLUDED.app_version,
+    git_sha=EXCLUDED.git_sha,
+    sql_head_sha=EXCLUDED.sql_head_sha;
+COMMIT;
+SQL
+      echo "pronto-migrate: FAILED $bn" >&2
+      exit 1
+    fi
+
+    echo "applied: $bn"
+  done < <(list_sql_files)
+}
+
+usage() {
+  cat >&2 <<USG
+Usage:
+  pronto-migrate --check
+  pronto-migrate --apply
+  pronto-migrate --dry-run
+USG
+  exit 2
+}
+
+case "${1:-}" in
+  --check) check ;;
+  --apply) apply ;;
+  --dry-run) dry_run ;;
+  *) usage ;;
+esac

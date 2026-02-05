@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "pronto-init: requiere $1" >&2; exit 1; }
+}
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SQL_ROOT="$REPO_ROOT/pronto-scripts/init/sql"
+LOADER="$REPO_ROOT/pronto-scripts/init/python/manifest_loader.py"
+DB="${DATABASE_URL:-}"
+
+PHASES=(00_bootstrap 10_schema 20_constraints 30_indexes 40_seeds)
+
+sha256_file() {
+  python3 - <<'PY' "$1"
+import hashlib, sys
+p=sys.argv[1]
+h=hashlib.sha256()
+with open(p,'rb') as f:
+  for b in iter(lambda:f.read(1024*1024), b''):
+    h.update(b)
+print(h.hexdigest())
+PY
+}
+
+sql_norm_sha() {
+  python3 - <<'PY' "$1"
+import hashlib, re, sys
+p=sys.argv[1]
+s=open(p,'r',encoding='utf-8').read()
+# remove /* ... */
+s=re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+# remove -- ...
+s=re.sub(r"--[^\n]*", "", s)
+lines=[ln.strip() for ln in s.splitlines()]
+s=" ".join([ln for ln in lines if ln])
+s=re.sub(r"\s+", " ", s).strip()
+print(hashlib.sha256(s.encode('utf-8')).hexdigest())
+PY
+}
+
+require_db() {
+  if [[ -z "$DB" ]]; then
+    echo "pronto-init: DATABASE_URL requerido" >&2
+    exit 1
+  fi
+}
+
+PSQL_BASE=(psql "$DB" -X -v ON_ERROR_STOP=1)
+
+list_phase_files() {
+  local phase="$1"
+  local dir="$SQL_ROOT/$phase"
+  [[ -d "$dir" ]] || { echo "pronto-init: missing dir $dir" >&2; exit 1; }
+  find "$dir" -maxdepth 1 -type f -name "*.sql" -print0 | sort -z | xargs -0 -n1 echo
+}
+
+deny_check_phase_file() {
+  local phase="$1" f="$2"
+
+  if [[ "$phase" == "00_bootstrap" ]]; then
+    return 0
+  fi
+
+  # hard deny in 10..40
+  if rg -n --pcre2 '(?i)\b(ALTER\s+TABLE|RENAME\b|UPDATE\b|DELETE\b|DO\s+\$\$|EXECUTE\b|CREATE\s+EXTENSION\b|DROP\s+INDEX\b|CREATE\s+VIEW\b|DROP\s+VIEW\b|CREATE\s+TYPE\b|CREATE\s+FUNCTION\b)\b' "$f" >/dev/null; then
+    echo "pronto-init: deny hit en fase=$phase archivo=$f" >&2
+    rg -n --pcre2 '(?i)\b(ALTER\s+TABLE|RENAME\b|UPDATE\b|DELETE\b|DO\s+\$\$|EXECUTE\b|CREATE\s+EXTENSION\b|DROP\s+INDEX\b|CREATE\s+VIEW\b|DROP\s+VIEW\b|CREATE\s+TYPE\b|CREATE\s+FUNCTION\b)\b' "$f" >&2 || true
+    exit 1
+  fi
+
+  if [[ "$phase" == "40_seeds" ]]; then
+    if rg -n --pcre2 '(?i)\bINSERT\s+INTO\b' "$f" >/dev/null; then
+      if ! rg -n --pcre2 '(?i)\bON\s+CONFLICT\s+DO\s+NOTHING\b' "$f" >/dev/null; then
+        echo "pronto-init: 40_seeds INSERT requiere ON CONFLICT DO NOTHING: $f" >&2
+        exit 1
+      fi
+    fi
+  else
+    if rg -n --pcre2 '(?i)\bINSERT\s+INTO\b' "$f" >/dev/null; then
+      echo "pronto-init: INSERT fuera de 40_seeds bloqueado: $f" >&2
+      exit 1
+    fi
+  fi
+}
+
+apply_phase() {
+  local phase="$1"
+  local lock_timeout="${PRONTO_LOCK_TIMEOUT:-5s}"
+  local statement_timeout="${PRONTO_STATEMENT_TIMEOUT:-5min}"
+  local -a pending_bootstrap=()
+
+  flush_bootstrap_pending() {
+    # Only flush once `pronto_init_runs` exists (created by 00_bootstrap/0020__init_runs.sql).
+    if ! "${PSQL_BASE[@]}" -q -c "SELECT 1 FROM pronto_init_runs LIMIT 1;" >/dev/null 2>&1; then
+      return 0
+    fi
+    if (( ${#pending_bootstrap[@]} == 0 )); then
+      return 0
+    fi
+    local item
+    for item in "${pending_bootstrap[@]}"; do
+      IFS='|' read -r p_phase p_file p_sha p_norm <<<"$item"
+      "${PSQL_BASE[@]}" -q <<SQL
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-init'));
+INSERT INTO pronto_init_runs(phase, file_name, sha256, sql_norm_sha, status, error, executed_by, app_version, git_sha, sql_head_sha)
+VALUES ('${p_phase}', '${p_file}', '${p_sha}', '${p_norm}', 'applied', NULL, '${USER:-}', '${APP_VERSION:-}', '${GIT_SHA:-}', '${SQL_HEAD_SHA:-}');
+COMMIT;
+SQL
+    done
+    pending_bootstrap=()
+  }
+
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    deny_check_phase_file "$phase" "$f"
+
+    local base sha norm
+    base="$(basename "$f")"
+    sha="$(sha256_file "$f")"
+    norm="$(sql_norm_sha "$f")"
+
+    if [[ "$phase" == "00_bootstrap" ]]; then
+      # Bootstrap can't assume `pronto_init_runs` exists yet; defer logging until it does.
+      set +e
+      "${PSQL_BASE[@]}" -q <<SQL
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-init'));
+SET LOCAL lock_timeout = '${lock_timeout}';
+SET LOCAL statement_timeout = '${statement_timeout}';
+SET LOCAL client_encoding = 'UTF8';
+\i '${f}'
+COMMIT;
+SQL
+      rc=$?
+      set -e
+    else
+      if ! "${PSQL_BASE[@]}" -q -c "SELECT 1 FROM pronto_init_runs LIMIT 1;" >/dev/null 2>&1; then
+        echo "pronto-init: pronto_init_runs no existe. Ejecuta fase 00_bootstrap." >&2
+        exit 1
+      fi
+      set +e
+      "${PSQL_BASE[@]}" -q <<SQL
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-init'));
+SET LOCAL lock_timeout = '${lock_timeout}';
+SET LOCAL statement_timeout = '${statement_timeout}';
+SET LOCAL client_encoding = 'UTF8';
+\i '${f}'
+INSERT INTO pronto_init_runs(phase, file_name, sha256, sql_norm_sha, status, error, executed_by, app_version, git_sha, sql_head_sha)
+VALUES ('${phase}', '${base}', '${sha}', '${norm}', 'applied', NULL, '${USER:-}', '${APP_VERSION:-}', '${GIT_SHA:-}', '${SQL_HEAD_SHA:-}');
+COMMIT;
+SQL
+      rc=$?
+      set -e
+    fi
+
+    if [[ $rc -ne 0 ]]; then
+      "${PSQL_BASE[@]}" -q <<SQL || true
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('pronto-init'));
+INSERT INTO pronto_init_runs(phase, file_name, sha256, sql_norm_sha, status, error, executed_by, app_version, git_sha, sql_head_sha)
+VALUES ('${phase}', '${base}', '${sha}', '${norm}', 'failed', 'psql execution failed', '${USER:-}', '${APP_VERSION:-}', '${GIT_SHA:-}', '${SQL_HEAD_SHA:-}');
+COMMIT;
+SQL
+      echo "pronto-init: FAILED phase=$phase file=$base" >&2
+      exit 1
+    fi
+
+    if [[ "$phase" == "00_bootstrap" ]]; then
+      pending_bootstrap+=("${phase}|${base}|${sha}|${norm}")
+      flush_bootstrap_pending
+    fi
+
+    echo "applied: $phase/$base"
+  done < <(list_phase_files "$phase")
+
+  if [[ "$phase" == "00_bootstrap" ]]; then
+    flush_bootstrap_pending
+  fi
+}
+
+dry_run() {
+  need_cmd rg
+  for phase in "${PHASES[@]}"; do
+    while IFS= read -r f; do
+      [[ -n "$f" ]] || continue
+      deny_check_phase_file "$phase" "$f"
+    done < <(list_phase_files "$phase")
+  done
+  echo "OK dry-run (deny checks passed)."
+}
+
+check() {
+  need_cmd python3
+  need_cmd psql
+  require_db
+
+  if [[ ! -x "$LOADER" ]]; then
+    echo "pronto-init: missing loader $LOADER" >&2
+    exit 1
+  fi
+
+  "$LOADER" --check --json
+  "$REPO_ROOT/pronto-scripts/bin/pronto-migrate" --check
+  echo "OK: pronto-init --check"
+}
+
+apply() {
+  need_cmd rg
+  need_cmd python3
+  need_cmd psql
+  require_db
+
+  "$REPO_ROOT/pronto-scripts/bin/pronto-sql-safety"
+
+  for phase in "${PHASES[@]}"; do
+    apply_phase "$phase"
+  done
+
+  echo "OK: init applied"
+}
+
+usage() {
+  cat >&2 <<USG
+Usage:
+  pronto-init --apply
+  pronto-init --check
+  pronto-init --dry-run
+USG
+  exit 2
+}
+
+case "${1:-}" in
+  --apply) apply ;;
+  --check) check ;;
+  --dry-run) dry_run ;;
+  *) usage ;;
+esac

@@ -105,9 +105,9 @@ echo ""
 echo -e "${YELLOW}=== 2. PRUEBAS DE AUTENTICACIÓN ===${NC}"
 
 # Login exitoso
-echo "2.1 Login exitoso (Super Admin)"
+echo "2.1 Login exitoso (System)"
 result=$(api_request POST "/auth/login" '{"email":"admin@cafeteria.test","password":"ChangeMe!123"}')
-print_test "Login como super admin" "$result"
+print_test "Login como system" "$result"
 
 # Guardar cookie de sesión
 SESSION_COOKIE="/tmp/pronto_session_cookie.txt"

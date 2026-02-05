@@ -52,7 +52,10 @@ except ImportError:
     HAS_AIOHTTP = False
 
 
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:6082")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:6082")
+CLIENT_BASE_URL = os.getenv("CLIENT_BASE_URL", "http://localhost:6080")
+EMPLOYEES_BASE_URL = os.getenv("EMPLOYEES_BASE_URL", "http://localhost:6081")
+BASE_URL = API_BASE_URL  # Back-compat for existing runners in this script.
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@cafeteria.test")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ChangeMe!123")
 
@@ -75,6 +78,7 @@ class AuthModeTester:
         self.quiet = quiet
         self.token = None
         self.results = []
+        self._auth_scope = (os.getenv("EMPLOYEE_AUTH_SCOPE", "system") or "system").strip()
 
     def log(self, msg: str, color: str = ""):
         if not self.quiet:
@@ -83,11 +87,12 @@ class AuthModeTester:
     def make_request(
         self,
         method: str,
+        base_url: str,
         endpoint: str,
         data: dict | None = None,
         token: str | None = None,
     ) -> tuple:
-        url = f"{BASE_URL}{endpoint}"
+        url = f"{base_url}{endpoint}"
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -119,11 +124,12 @@ class AuthModeTester:
         self,
         name: str,
         method: str,
+        base_url: str,
         endpoint: str,
         json: dict | None = None,
         token: str | None = None,
     ) -> dict:
-        status, data, duration = self.make_request(method, endpoint, json, token)
+        status, data, duration = self.make_request(method, base_url, endpoint, json, token)
         success = 200 <= status < 300
         emoji = "✓" if success else "✗"
         color = Colors.OKGREEN if success else Colors.FAIL
@@ -144,22 +150,86 @@ class AuthModeTester:
         self.results.append(result)
         return result
 
+    def _make_form_post_no_redirect(
+        self, base_url: str, endpoint: str, form: dict[str, str]
+    ) -> tuple[int, dict, float, dict[str, str]]:
+        """
+        POST application/x-www-form-urlencoded and return the redirect response (no follow),
+        including headers for cookie extraction.
+        """
+        from urllib.parse import urlencode
+        import urllib.request
+
+        url = f"{base_url}{endpoint}"
+        body = urlencode(form).encode("utf-8")
+
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, hdrs, newurl):  # type: ignore[override]
+                return None
+
+        opener = urllib.request.build_opener(_NoRedirect)
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+
+        start_time = time.time()
+        try:
+            resp = opener.open(req, timeout=30)
+            duration = time.time() - start_time
+            headers = dict(resp.headers.items())
+            raw = resp.read().decode("utf-8", errors="replace")
+            try:
+                data = json.loads(raw)
+            except Exception:
+                data = {"raw": raw}
+            return resp.status, data, duration, headers
+        except HTTPError as e:
+            duration = time.time() - start_time
+            headers = dict(getattr(e, "headers", {}).items()) if getattr(e, "headers", None) else {}
+            try:
+                raw = e.read().decode("utf-8", errors="replace")
+                data = json.loads(raw)
+            except Exception:
+                data = {"error": str(e)}
+            return e.code, data, duration, headers
+        except URLError as e:
+            duration = time.time() - start_time
+            return 0, {"error": str(e)}, duration, {}
+
+    @staticmethod
+    def _extract_cookie_value(set_cookie: str, name: str) -> str | None:
+        parts = [p.strip() for p in set_cookie.split(",") if p.strip()]
+        for part in parts:
+            if part.startswith(f"{name}="):
+                return part.split(";", 1)[0].split("=", 1)[1]
+        return None
+
     def authenticate(self) -> bool:
         """Autenticarse y obtener token."""
         self.log(f"\n{Colors.HEADER}=== AUTENTICACIÓN ==={Colors.ENDC}")
 
-        status, data, duration = self.make_request(
-            "POST",
-            "/api/employee/auth/login",
-            data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+        if self._auth_scope != "system":
+            self.log(
+                f"{Colors.FAIL}✗ EMPLOYEE_AUTH_SCOPE={self._auth_scope!r} no soportado. Usa 'system'.{Colors.ENDC}"
+            )
+            return False
+
+        status, data, duration, headers = self._make_form_post_no_redirect(
+            EMPLOYEES_BASE_URL,
+            "/system/login",
+            {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
         )
 
-        if status == 200:
-            self.token = data.get("access_token") if isinstance(data, dict) else None
-            if self.token:
-                self.log(f"{Colors.OKGREEN}✓ Login exitoso{Colors.ENDC}")
-                self.log(f"  Token: {self.token[:20]}...")
-                return True
+        set_cookie = headers.get("Set-Cookie") or headers.get("set-cookie") or ""
+        token = self._extract_cookie_value(set_cookie, "access_token")
+        if token:
+            self.token = token
+            self.log(f"{Colors.OKGREEN}✓ Login exitoso{Colors.ENDC}")
+            self.log(f"  Token(cookie): {self.token[:20]}...")
+            return True
 
         self.log(f"{Colors.FAIL}✗ Login fallido: {data}{Colors.ENDC}")
         return False
@@ -174,116 +244,50 @@ class AuthModeTester:
             f"\n{Colors.HEADER}=== APIs DE EMPLEADO (AUTENTICADO) ==={Colors.ENDC}"
         )
 
+        # Employees service owns BFF APIs like /api/orders and /api/promotions.
         self.run_test(
-            "Verify Token", "GET", "/api/employee/auth/verify", token=self.token
-        )
-        self.run_test("Get Me", "GET", "/api/employee/auth/me", token=self.token)
-        self.run_test(
-            "Get Permissions", "GET", "/api/employee/auth/permissions", token=self.token
-        )
-        self.run_test(
-            "Get Employees", "GET", "/api/employee/employees", token=self.token
-        )
-        self.run_test(
-            "Get Employee by ID", "GET", "/api/employee/employees/1", token=self.token
-        )
-        self.run_test("Get Menu Items", "GET", "/api/employee/menu", token=self.token)
-        self.run_test(
-            "Get Menu Categories",
+            "Employees: List Orders",
             "GET",
-            "/api/employee/menu/categories",
-            token=self.token,
-        )
-        self.run_test("Get Orders", "GET", "/api/employee/orders", token=self.token)
-        self.run_test(
-            "Get Order by ID", "GET", "/api/employee/orders/1", token=self.token
-        )
-        self.run_test("Get Tables", "GET", "/api/employee/tables", token=self.token)
-        self.run_test(
-            "Get Table by ID", "GET", "/api/employee/tables/1", token=self.token
-        )
-        self.run_test(
-            "Get Sessions", "GET", "/api/employee/sessions/closed", token=self.token
-        )
-        self.run_test(
-            "Get Customers", "GET", "/api/employee/customers/search", token=self.token
-        )
-        self.run_test(
-            "Get Waiter Calls", "GET", "/api/employee/waiter-calls", token=self.token
-        )
-        self.run_test(
-            "Get Promotions", "GET", "/api/employee/promotions", token=self.token
-        )
-        self.run_test(
-            "Get Discount Codes",
-            "GET",
-            "/api/employee/discount-codes",
+            EMPLOYEES_BASE_URL,
+            "/api/orders",
             token=self.token,
         )
         self.run_test(
-            "Get Sales Report", "GET", "/api/employee/reports/sales", token=self.token
-        )
-        self.run_test(
-            "Get Daily Summary",
+            "Employees: List Promotions",
             "GET",
-            "/api/employee/reports/top-products",
+            EMPLOYEES_BASE_URL,
+            "/api/promotions",
             token=self.token,
         )
         self.run_test(
-            "Get Dashboard Stats",
+            "Employees: Branding Config",
             "GET",
-            "/api/employee/analytics/kpis",
+            EMPLOYEES_BASE_URL,
+            "/api/branding/config",
+            token=self.token,
+        )
+
+        # Core API owns realtime + notifications.
+        self.run_test(
+            "API: Realtime Orders",
+            "GET",
+            API_BASE_URL,
+            "/api/realtime/orders",
             token=self.token,
         )
         self.run_test(
-            "Get Revenue Stats",
+            "API: Realtime Notifications",
             "GET",
-            "/api/employee/analytics/revenue",
+            API_BASE_URL,
+            "/api/realtime/notifications",
             token=self.token,
         )
         self.run_test(
-            "Get Order Stats", "GET", "/api/employee/analytics/orders", token=self.token
-        )
-        self.run_test("Get Settings", "GET", "/api/employee/settings", token=self.token)
-        self.run_test(
-            "Get Business Info", "GET", "/api/employee/business-info", token=self.token
-        )
-        self.run_test(
-            "Get Branding", "GET", "/api/employee/branding/config", token=self.token
-        )
-        self.run_test("Get Areas", "GET", "/api/employee/areas", token=self.token)
-        self.run_test("Get Roles", "GET", "/api/employee/roles/roles", token=self.token)
-        self.run_test(
-            "Get Notifications",
+            "API: Waiter Calls Pending",
             "GET",
-            "/api/employee/notifications/stream",
+            API_BASE_URL,
+            "/api/notifications/waiter/pending",
             token=self.token,
-        )
-        self.run_test(
-            "Get Table Assignments",
-            "GET",
-            "/api/employee/table-assignments",
-            token=self.token,
-        )
-        self.run_test(
-            "Get Day Periods", "GET", "/api/employee/day-periods", token=self.token
-        )
-        self.run_test("Get Feedback", "GET", "/api/employee/feedback", token=self.token)
-        self.run_test("Get Images", "GET", "/api/employee/images", token=self.token)
-        self.run_test(
-            "Get Modifiers", "GET", "/api/employee/modifiers", token=self.token
-        )
-        self.run_test(
-            "Get Realtime Status",
-            "GET",
-            "/api/employee/realtime/status",
-            token=self.token,
-        )
-        self.run_test(
-            "Get Admin Config", "GET", "/api/employee/admin/config", token=self.token
-        )
-        self.run_test(
-            "Get Debug Info", "GET", "/api/employee/debug/info", token=self.token
         )
 
     def run(self):
@@ -772,11 +776,11 @@ class FullTestRunner:
             await self.run_test(
                 "Get Customer by ID", "GET", "/api/employee/customers/search/1"
             )
-            await self.run_test("Get Waiter Calls", "GET", "/api/employee/waiter-calls")
+            await self.run_test("Get Waiter Calls", "GET", "/api/notifications/waiter/pending")
             await self.run_test(
                 "Acknowledge Waiter Call",
                 "PATCH",
-                "/api/employee/waiter-calls/1/acknowledge",
+                "/api/notifications/waiter/confirm/1",
             )
             await self.run_test("Get Promotions", "GET", "/api/employee/promotions")
             await self.run_test(
@@ -856,12 +860,12 @@ class FullTestRunner:
             await self.run_test("Get Roles", "GET", "/api/employee/roles/roles")
             await self.run_test("Get Role by ID", "GET", "/api/employee/roles/roles/1")
             await self.run_test(
-                "Get Notifications", "GET", "/api/employee/notifications/stream"
+                "Get Notifications", "GET", "/api/realtime/notifications"
             )
             await self.run_test(
                 "Send Notification",
                 "POST",
-                "/api/employee/notifications/stream",
+                "/api/realtime/notifications",
                 json={"title": "Test", "message": "Test message", "type": "info"},
             )
             await self.run_test(
@@ -886,7 +890,7 @@ class FullTestRunner:
                 json={"name": "Extra Cheese", "price": 1.50},
             )
             await self.run_test(
-                "Get Realtime Status", "GET", "/api/employee/realtime/status"
+                "Get Realtime Status", "GET", "/api/realtime/orders"
             )
             await self.run_test("Get Admin Config", "GET", "/api/employee/admin/config")
             await self.run_test(
@@ -1078,7 +1082,7 @@ class AuthenticatedTestRunner:
         """Create a test notification."""
         status, data, _ = await self.request(
             "POST",
-            "/api/employee/notifications/stream",
+            "/api/realtime/notifications",
             json={
                 "title": "Test Notification",
                 "message": "This is a test notification",
@@ -1329,7 +1333,7 @@ class AuthenticatedTestRunner:
         await self.run_test(
             "Get Notifications",
             "GET",
-            "/api/employee/notifications/stream",
+            "/api/realtime/notifications",
         )
 
     async def run_all(self):
@@ -1442,7 +1446,9 @@ def main():
     print(f"{Colors.BOLD}========================================={Colors.ENDC}")
     print(f"{Colors.BOLD}  Pronto API Test Suite{Colors.ENDC}")
     print(f"{Colors.BOLD}========================================={Colors.ENDC}")
-    print(f"Base URL: {BASE_URL}")
+    print(f"API_BASE_URL: {API_BASE_URL}")
+    print(f"CLIENT_BASE_URL: {CLIENT_BASE_URL}")
+    print(f"EMPLOYEES_BASE_URL: {EMPLOYEES_BASE_URL}")
     print(f"Start Time: {datetime.now().isoformat()}")
     print("")
 
@@ -1455,6 +1461,8 @@ def main():
         print("Este modo primero hace login y luego prueba APIs de empleado\n")
         tester = AuthModeTester(quiet=args.quiet)
         results = tester.run()
+        if not results or any(not r.get("success") for r in results):
+            raise SystemExit(1)
     elif args.auth or args.full:
         if HAS_AIOHTTP:
             if args.auth:

@@ -235,7 +235,7 @@ def test_all_employees_login():
     print_separator("PRUEBA 6: Login de Todos los Empleados Seed")
 
     test_users = [
-        ("admin@cafeteria.test", "Admin General", "super_admin"),
+        ("admin@cafeteria.test", "Admin General", "system"),
         ("admin.roles@cafeteria.test", "Admin Roles", "admin"),
         ("juan.mesero@cafeteria.test", "Juan Mesero", "waiter"),
         ("maria.mesera@cafeteria.test", "Maria Mesera", "waiter"),

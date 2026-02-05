@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 ENV_FILE="${PROJECT_ROOT}/.env"
 
@@ -105,15 +105,19 @@ fi
 for service in "${SERVICES[@]}"; do
   if [[ "$service" == "employee" ]] && command -v npm &> /dev/null; then
     echo ">> Construyendo bundle TypeScript para empleados..."
-    (cd "${PROJECT_ROOT}" && npm run build:employees)
+    (cd "${PROJECT_ROOT}/pronto-static" && npm run build:employees)
   elif [[ "$service" == "client" ]] && command -v npm &> /dev/null; then
     echo ">> Construyendo bundle TypeScript para clientes..."
-    (cd "${PROJECT_ROOT}" && npm run build:clients)
+    (cd "${PROJECT_ROOT}/pronto-static" && npm run build:clients)
   fi
 done
 
 for service in "${SERVICES[@]}"; do
   echo ">> Reconstruyendo ${service}..."
+  compose_service="${service}"
+  if [[ "${service}" == "employee" ]]; then
+    compose_service="employees"
+  fi
 
   # Handle Redis and PostgreSQL specially - don't recreate, just ensure running
   if [[ "$service" == "redis" || "$service" == "postgres" ]]; then
@@ -141,8 +145,8 @@ for service in "${SERVICES[@]}"; do
 
   # Stop and remove containers using the old image
   echo "   - Deteniendo y removiendo contenedores anteriores..."
-  "${COMPOSE_CMD[@]}" stop "${service}" 2>/dev/null || true
-  "${COMPOSE_CMD[@]}" rm -f "${service}" 2>/dev/null || true
+  "${COMPOSE_CMD[@]}" stop "${compose_service}" 2>/dev/null || true
+  "${COMPOSE_CMD[@]}" rm -f "${compose_service}" 2>/dev/null || true
 
   # Ensure the host port is free before starting a new container.
   HOST_PORT=""
@@ -170,11 +174,11 @@ for service in "${SERVICES[@]}"; do
 
   # Build new image
   echo "   - Construyendo nueva imagen..."
-  "${COMPOSE_CMD[@]}" build --no-cache "${service}"
+  "${COMPOSE_CMD[@]}" build --no-cache "${compose_service}"
 
   # Start new container (--no-deps to avoid starting redis/postgres dependencies)
   echo "   - Iniciando nuevo contenedor..."
-  "${COMPOSE_CMD[@]}" up -d --no-deps "${service}"
+  "${COMPOSE_CMD[@]}" up -d --no-deps "${compose_service}"
 
   echo "   ✅ ${service} reconstruido y reiniciado"
   echo ""

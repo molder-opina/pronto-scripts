@@ -61,7 +61,7 @@ if PRONTO_LIBS_SRC.exists():
 from sqlalchemy import select  # noqa: E402
 
 from pronto_shared.config import load_config  # noqa: E402
-from pronto_shared.db import get_session, init_db, init_engine  # noqa: E402
+from pronto_shared.db import get_session, init_engine, validate_schema  # noqa: E402
 from pronto_shared.models import Base, MenuCategory, MenuItem  # noqa: E402
 
 # Mapeo de categorías a estilos de imagen
@@ -172,7 +172,7 @@ def generate_product_images(
 
     config = load_config("generate-product-images")
     init_engine(config)
-    init_db(Base.metadata)
+    validate_schema()
 
     with get_session() as session:
         # Obtener todos los productos con sus categorías

@@ -16,7 +16,7 @@ mkdir -p "$OUT_DIR"
 
 INCONSISTENCIES=""
 
-add_inconsistency() {
+add_inconsistencia() {
   INCONSISTENCIES="${INCONSISTENCIES}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
 }
 

@@ -114,7 +114,7 @@ class DatabaseValidator:
             {
                 "name": "Admin General",
                 "email": "admin@cafeteria.test",
-                "role": "super_admin",
+                "role": "system",
                 "additional_roles": None,
             },
             # Admin Roles
@@ -173,7 +173,7 @@ class DatabaseValidator:
         ]
 
         role_scopes = {
-            "super_admin": ["system", "admin", "waiter", "chef", "cashier"],
+            "system": ["system", "admin", "waiter", "chef", "cashier"],
             "system": ["system", "admin", "waiter", "chef", "cashier"],
             "admin": ["admin", "waiter", "chef", "cashier"],
             "waiter": ["waiter", "cashier"],

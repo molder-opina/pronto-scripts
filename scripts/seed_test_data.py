@@ -46,7 +46,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "build"))
 from sqlalchemy import func, select, text  # noqa: E402
 
 from pronto_shared.config import load_config  # noqa: E402
-from pronto_shared.db import get_session, init_db, init_engine  # noqa: E402
+from pronto_shared.db import get_session, init_engine, validate_schema  # noqa: E402
 from pronto_shared.models import (  # noqa: E402
     Base,
     Customer,
@@ -349,7 +349,7 @@ def main():
     # Inicializar base de datos/engine
     config = load_config("seed-script")
     init_engine(config)
-    init_db(Base.metadata)
+    validate_schema()
 
     if args.reset:
         confirm = input(

@@ -68,13 +68,12 @@
 | 18 | Get Promotions | GET | `/api/client/promotions` | Obtener promociones disponibles | ☐ |
 | 19 | Validate Promo Code | POST | `/api/client/promotions/validate` | Validar código promocional | ☐ |
 
-### Llamadas de Mesero (`/api/client/waiter-calls`)
+### Llamadas de Mesero (`/api/notifications/waiter`)
 
 | # | Endpoint | Método | Ruta | Descripción | Validado |
 |---|----------|--------|------|-------------|----------|
-| 20 | Get Waiter Calls | GET | `/api/client/waiter-calls` | Obtener llamadas al mesero | ☐ |
-| 21 | Call Waiter | POST | `/api/client/waiter-calls` | Llamar al mesero | ☐ |
-| 22 | Cancel Waiter Call | DELETE | `/api/client/waiter-calls/{id}` | Cancelar llamada al mesero | ☐ |
+| 20 | Call Waiter | POST | `/api/call-waiter` | Llamar al mesero | ☐ |
+| 21 | Waiter Call Status | GET | `/api/notifications/waiter/status/{id}` | Consultar estado de llamada | ☐ |
 
 ### Notificaciones (`/api/client/notifications`)
 
@@ -161,12 +160,12 @@
 | 57 | Get Customers | GET | `/api/employee/customers` | Obtener lista de clientes | ☐ |
 | 58 | Get Customer by ID | GET | `/api/employee/customers/{id}` | Obtener cliente específico | ☐ |
 
-### Llamadas de Mesero (`/api/employee/waiter-calls`)
+### Llamadas de Mesero (`/api/notifications/waiter`)
 
 | # | Endpoint | Método | Ruta | Descripción | Validado |
 |---|----------|--------|------|-------------|----------|
-| 59 | Get Waiter Calls | GET | `/api/employee/waiter-calls` | Obtener llamadas al mesero | ☐ |
-| 60 | Acknowledge Waiter Call | PATCH | `/api/employee/waiter-calls/{id}/acknowledge` | Reconocer llamada al mesero | ☐ |
+| 59 | Get Waiter Calls | GET | `/api/notifications/waiter/pending` | Obtener llamadas al mesero | ☐ |
+| 60 | Confirm Waiter Call | POST | `/api/notifications/waiter/confirm/{id}` | Confirmar llamada al mesero | ☐ |
 
 ### Promociones (`/api/employee/promotions`)
 

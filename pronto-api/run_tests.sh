@@ -45,8 +45,10 @@ $PYTHON_CMD -c "import aiohttp" 2>/dev/null || $PYTHON_CMD -m pip install aiohtt
 
 # Configurar variables de entorno por defecto
 export API_BASE_URL="${API_BASE_URL:-http://localhost:6082}"
-export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@pronto.com}"
-export ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
+export CLIENT_BASE_URL="${CLIENT_BASE_URL:-http://localhost:6080}"
+export EMPLOYEES_BASE_URL="${EMPLOYEES_BASE_URL:-http://localhost:6081}"
+export ADMIN_EMAIL="${ADMIN_EMAIL:-system@cafeteria.test}"
+export ADMIN_PASSWORD="${ADMIN_PASSWORD:-${SEED_EMPLOYEE_PASSWORD:-ChangeMe!123}}"
 
 # Verificar que el script de tests existe
 SCRIPT_PATH="scripts/run_api_tests.py"
@@ -90,8 +92,10 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0 --auth-mode          # Login + tests autenticados"
     echo "  $0 -o results.json      # Guardar resultados"
     echo ""
-    echo "Variables de entorno:"
-    echo "  API_BASE_URL     URL del API (default: http://localhost:6082)"
+echo "Variables de entorno:"
+echo "  API_BASE_URL         URL core API (default: http://localhost:6082)"
+echo "  CLIENT_BASE_URL      URL app cliente (default: http://localhost:6080)"
+echo "  EMPLOYEES_BASE_URL   URL app empleados (default: http://localhost:6081)"
     echo "  ADMIN_EMAIL      Email para autenticación"
     echo "  ADMIN_PASSWORD   Password para autenticación"
     exit 0

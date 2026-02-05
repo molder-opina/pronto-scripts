@@ -64,14 +64,25 @@ else:
 
 # 4. Check Paid Recent List (Paid Tab view)
 print("\n--- 4. Checking Paid Recent List ---")
-paid_list = api_call("/sessions/paid-recent", None, method="GET")
-if paid_list and "sessions" in paid_list:
-    found = any(s["id"] == SESSION_ID for s in paid_list["sessions"])
-    if found:
-        print(f"✅ Session {SESSION_ID} found in Paid Recent list")
+paid_resp = api_call("/orders?status=paid&paid_recent_minutes=120", None, method="GET")
+if paid_resp:
+    payload = paid_resp.get("data", paid_resp)
+    orders = payload.get("orders") or payload.get("data") or []
+    session_ids = sorted({int(o.get("session_id")) for o in orders if o.get("session_id")})
+    if SESSION_ID in session_ids:
+        print(f"✅ Session {SESSION_ID} found in paid_recent derived list")
     else:
-        print(
-            f"❌ Session {SESSION_ID} NOT found in Paid Recent list. Found IDs: {[s['id'] for s in paid_list['sessions']]}"
-        )
+        print(f"❌ Session {SESSION_ID} NOT found. Found IDs: {session_ids}")
+
+    # Invariant: paid => paid_at not null
+    missing_paid_at = [
+        o.get("id")
+        for o in orders
+        if str(o.get("workflow_status")) == "paid" and not o.get("paid_at")
+    ]
+    if missing_paid_at:
+        print(f"❌ Invariant failed: paid_at missing for orders: {missing_paid_at}")
+        sys.exit(2)
+    print("✅ Invariant OK: all paid orders have paid_at")
 else:
-    print("❌ Failed to fetch Paid Recent list")
+    print("❌ Failed to fetch orders for paid_recent check")

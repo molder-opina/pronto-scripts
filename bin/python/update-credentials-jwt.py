@@ -106,7 +106,7 @@ print("👥 Actualizando empleados...")
 employees = [
     {
         "email": "admin@cafeteria.test",
-        "role": "super_admin",
+        "role": "system",
         "name": "Administrador",
         "allow_scopes": '["system", "admin", "waiter", "chef", "cashier"]',
     },
@@ -219,7 +219,7 @@ cursor.execute(
     """
     SELECT id, email_encrypted, role, allow_scopes, is_active
     FROM pronto_employees
-    WHERE role IN ('super_admin', 'admin', 'waiter', 'chef', 'cashier')
+    WHERE role IN ('system', 'admin', 'waiter', 'chef', 'cashier')
     ORDER BY id
     """
 )

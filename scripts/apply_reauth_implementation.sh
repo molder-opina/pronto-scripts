@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script para aplicar implementación de reautenticación super_admin
+# Script para aplicar implementación de reautenticación system
 # Uso: bash scripts/apply_reauth_implementation.sh
 
 set -e  # Exit on error
@@ -110,7 +110,7 @@ echo ""
 
 # 6. Verificar migración de base de datos
 echo "6. Verificando migración de base de datos..."
-if [ -f "pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql" ]; then
+if [ -f "pronto-libs/src/pronto_shared/migrations/010_add_system_handoff_and_audit.sql" ]; then
     echo "✅ Archivo de migración existe"
 
     # Check if tables exist in database
@@ -119,7 +119,7 @@ if [ -f "pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_an
     if command -v psql &> /dev/null && [ ! -z "${SUPABASE_DB_HOST:-}" ]; then
         echo "   Verificando si las tablas ya existen..."
         export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
-        table_exists=$(psql -h "$SUPABASE_DB_HOST" -p "${SUPABASE_DB_PORT:-6543}" -U "$SUPABASE_DB_USER" -d "${SUPABASE_DB_NAME:-postgres}" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='super_admin_handoff_tokens')" 2>/dev/null || echo "f")
+        table_exists=$(psql -h "$SUPABASE_DB_HOST" -p "${SUPABASE_DB_PORT:-6543}" -U "$SUPABASE_DB_USER" -d "${SUPABASE_DB_NAME:-postgres}" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='system_handoff_tokens')" 2>/dev/null || echo "f")
         unset PGPASSWORD
 
         if [ "$table_exists" = "t" ]; then
@@ -128,7 +128,7 @@ if [ -f "pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_an
             echo "⚠️  Migración NO aplicada aún"
             echo ""
             echo "Para aplicar la migración ejecuta:"
-            echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql"
+            echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_system_handoff_and_audit.sql"
         fi
     else
         echo "   (psql no disponible o DB no configurada, saltando verificación)"
@@ -154,7 +154,7 @@ echo ""
 echo "IMPORTANTE: Archivos que necesitan creación manual:"
 echo ""
 echo "1. pronto-employees/src/pronto_employees/routes/system/auth.py (CRÍTICO)"
-echo "   - Consola /system exclusiva super_admin"
+echo "   - Consola /system exclusiva system"
 echo "   - Endpoints /system/reauth para handoff"
 echo ""
 echo "2. Actualizar cada scope auth.py (CRÍTICO):"
@@ -162,7 +162,7 @@ echo "   - pronto-employees/src/pronto_employees/routes/waiter/auth.py"
 echo "   - pronto-employees/src/pronto_employees/routes/chef/auth.py"
 echo "   - pronto-employees/src/pronto_employees/routes/cashier/auth.py"
 echo "   - pronto-employees/src/pronto_employees/routes/admin/auth.py"
-echo "   Agregar endpoint @csrf.exempt super_admin_login"
+echo "   Agregar endpoint @csrf.exempt system_login"
 echo ""
 echo "3. Templates de login y reauth:"
 echo "   - login_system.html"
@@ -178,5 +178,5 @@ echo ""
 echo "Ver IMPLEMENTACION_REAUTH.md para detalles completos."
 echo ""
 echo "Si la migración no está aplicada, siguiente paso:"
-echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_super_admin_handoff_and_audit.sql"
+echo "  bash bin/apply_migration.sh pronto-libs/src/pronto_shared/migrations/010_add_system_handoff_and_audit.sql"
 echo ""

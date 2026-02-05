@@ -8,7 +8,7 @@ Este script:
 4. Usa hash_identifier y hash_credentials de pronto_shared.security
 
 Empleados a crear/actualizar:
-- super_admin (admin@cafeteria.test)
+- system (admin@cafeteria.test)
 - admin (admin-roles@cafeteria.test)
 - chef (carlos.chef@cafeteria.test)
 - waiter (juan.mesero@cafeteria.test)
@@ -84,7 +84,7 @@ except Exception as e:
 test_employees = [
     {
         "email_encrypted": "admin@cafeteria.test",
-        "role": "super_admin",
+        "role": "system",
         "name": "Administrador",
         "phone": "",
         "is_active": True,
@@ -206,7 +206,7 @@ cursor.execute(
     """
     SELECT id, email_encrypted, role, allow_scopes, is_active
     FROM pronto_employees
-    WHERE role IN ('super_admin', 'admin', 'waiter', 'chef', 'cashier')
+    WHERE role IN ('system', 'admin', 'waiter', 'chef', 'cashier')
     ORDER BY id
     """
 )

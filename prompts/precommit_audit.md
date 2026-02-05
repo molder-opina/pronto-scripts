@@ -17,7 +17,7 @@ PROYECTOS: ${PROYECTOS}
 
 REGLAS DE PRONTO (AGENTS.md):
 - NO flask.session en api/employees (usar JWT)
-- Roles canónicos: waiter, chef, cashier, admin, super_admin
+- Roles canónicos: waiter, chef, cashier, admin, system
 - No static local en employees/client (todo en pronto-static)
 - No duplicar lógica de pronto-libs
 - PostgreSQL 16 (no 13)

@@ -68,7 +68,7 @@ report_block_str = report_block_str.replace(
 
 # Marketing Block
 marketing_block = """
-{% if employee_role in ['super_admin', 'admin'] %}
+{% if employee_role in ['system', 'admin'] %}
 <section class="section" id="marketing" data-menu-title="Marketing" data-menu-group="📊 REPORTES">
   <header class="section__header">
     <h2>📈 Marketing</h2>
@@ -85,7 +85,7 @@ marketing_block = """
 # Placeholders faltantes
 placeholders = {
     "asignacion-roles": """
-{% if employee_role in ['super_admin'] %}
+{% if employee_role in ['system'] %}
 <section class="section" id="role-assignment" data-menu-title="Asignación de Roles" data-menu-group="🛡️ SEGURIDAD">
   <header class="section__header"><h2>🛡️ Asignación de Roles</h2><p>Asigna roles a empleados.</p></header>
   <div class="empty-state"><div class="empty-state__icon">🚧</div><h3>En construcción</h3></div>
@@ -93,7 +93,7 @@ placeholders = {
 {% endif %}
 """,
     "especiales": """
-{% if employee_role in ['super_admin', 'admin', 'waiter'] %}
+{% if employee_role in ['system', 'admin', 'waiter'] %}
 <section class="section" id="recommendations" data-menu-title="Recomendaciones" data-menu-group="Especiales">
   <header class="section__header"><h2>✨ Recomendaciones</h2></header>
   <div class="empty-state"><h3>Próximamente</h3></div>
@@ -109,7 +109,7 @@ placeholders = {
 {% endif %}
 """,
     "admin-extras": """
-{% if employee_role in ['super_admin', 'admin'] %}
+{% if employee_role in ['system', 'admin'] %}
 <section class="section" id="anonymous-sessions-ph" data-menu-title="Sesiones Anónimas" data-menu-group="Administración">
    <header class="section__header"><h2>🕵️ Sesiones Anónimas</h2></header><div class="empty-state"><h3>Próximamente</h3></div>
 </section>

@@ -101,14 +101,13 @@ echo "🔁 Sincronizando config/secrets con base de datos..."
 if python3 -c "import pronto_shared" 2>/dev/null; then
   python3 - <<'PY'
 from pronto_shared.config import load_config
-from pronto_shared.db import init_engine, init_db
-from pronto_shared.models import Base
+from pronto_shared.db import init_engine, validate_schema
 from pronto_shared.services.business_config_service import sync_env_config_to_db
 from pronto_shared.services.secret_service import sync_env_secrets_to_db
 
 config = load_config("pronto-init")
 init_engine(config)
-init_db(Base.metadata)
+validate_schema()
 
 sync_env_config_to_db()
 sync_env_secrets_to_db()

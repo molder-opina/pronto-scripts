@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DENY='(/api/realtime/events|realtime/events|sessions\.status_changed|/api/waiter-calls/|staff\.admin_call|staff\.waiter_call|/api/notifications/call-admin|/api/notifications/clear|/api/waiter-calls/admin/call)'
+rg -n "$DENY" \
+  --glob '!pronto-no-legacy' \
+  pronto-static pronto-client pronto-employees pronto-api pronto-libs pronto-docs pronto-scripts \
+  && exit 1 || exit 0

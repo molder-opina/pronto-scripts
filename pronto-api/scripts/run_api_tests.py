@@ -180,6 +180,13 @@ class AuthModeTester:
             resp = opener.open(req, timeout=30)
             duration = time.time() - start_time
             headers = dict(resp.headers.items())
+            # Preserve multiple Set-Cookie headers (Message.items() collapses to last occurrence).
+            try:
+                all_set_cookie = resp.headers.get_all("Set-Cookie")  # type: ignore[attr-defined]
+            except Exception:
+                all_set_cookie = None
+            if all_set_cookie:
+                headers["Set-Cookie"] = "\n".join(all_set_cookie)
             raw = resp.read().decode("utf-8", errors="replace")
             try:
                 data = json.loads(raw)
@@ -189,6 +196,12 @@ class AuthModeTester:
         except HTTPError as e:
             duration = time.time() - start_time
             headers = dict(getattr(e, "headers", {}).items()) if getattr(e, "headers", None) else {}
+            try:
+                all_set_cookie = e.headers.get_all("Set-Cookie")  # type: ignore[attr-defined]
+            except Exception:
+                all_set_cookie = None
+            if all_set_cookie:
+                headers["Set-Cookie"] = "\n".join(all_set_cookie)
             try:
                 raw = e.read().decode("utf-8", errors="replace")
                 data = json.loads(raw)
@@ -201,7 +214,13 @@ class AuthModeTester:
 
     @staticmethod
     def _extract_cookie_value(set_cookie: str, name: str) -> str | None:
-        parts = [p.strip() for p in set_cookie.split(",") if p.strip()]
+        # set_cookie may contain multiple headers joined by newline.
+        lines = [ln.strip() for ln in set_cookie.splitlines() if ln.strip()]
+        if not lines:
+            lines = [set_cookie.strip()] if set_cookie.strip() else []
+        parts: list[str] = []
+        for line in lines:
+            parts.extend([p.strip() for p in line.split(",") if p.strip()])
         for part in parts:
             if part.startswith(f"{name}="):
                 return part.split(";", 1)[0].split("=", 1)[1]

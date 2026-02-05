@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=""
+json="0"
+show_extra="0"
+fail_on_extra="0"
+write_snapshot="0"
+
+usage() {
+  echo "usage: pronto-api-parity-check <employees|clients> [--json] [--repo-root PATH] [--show-extra] [--fail-on-extra] [--write-snapshot] [--batch-pin PATH]" 1>&2
+}
+
+if [ "${1:-}" = "" ]; then
+  usage
+  exit 2
+fi
+
+target="$1"
+shift
+
+args=(parity-check "$target")
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json)
+      json="1"
+      shift
+      ;;
+    --repo-root)
+      repo_root="${2:-}"
+      shift 2
+      ;;
+    --show-extra)
+      show_extra="1"
+      shift
+      args+=(--show-extra)
+      ;;
+    --fail-on-extra)
+      fail_on_extra="1"
+      shift
+      args+=(--fail-on-extra)
+      ;;
+    --write-snapshot)
+      write_snapshot="1"
+      shift
+      args+=(--write-snapshot)
+      ;;
+    --batch-pin)
+      args+=(--batch-pin "${2:-}")
+      shift 2
+      ;;
+    -*)
+      echo "unknown flag: $1" 1>&2
+      usage
+      exit 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+default_root="$(cd "$script_dir/../.." && pwd -P)"
+
+if [ -z "$repo_root" ]; then
+  repo_root="$default_root"
+fi
+
+present=0
+test -f "$repo_root/AGENTS.md" && present=$((present+1))
+test -d "$repo_root/pronto-scripts" && present=$((present+1))
+test -d "$repo_root/pronto-static" && present=$((present+1))
+
+if [ "$present" -lt 2 ]; then
+  echo "{\"ok\":false,\"error\":\"repo_root invalido: $repo_root. Pasa --repo-root.\",\"stack\":\"\"}"
+  exit 1
+fi
+
+if [ "$json" = "1" ]; then
+  args+=(--json)
+fi
+
+args+=(--repo-root "$repo_root")
+
+python_bin="${PRONTO_PYTHON:-}"
+if [ -z "$python_bin" ] && [ -x "$repo_root/pronto-libs/.venv/bin/python3" ]; then
+  python_bin="$repo_root/pronto-libs/.venv/bin/python3"
+fi
+if [ -z "$python_bin" ]; then
+  python_bin="python3.11"
+fi
+
+exec "$python_bin" "$repo_root/pronto-scripts/lib/api_parity_check.py" "${args[@]}"

@@ -429,6 +429,10 @@ def _scan_frontend_source(
             if not (call_is_wrapper or call_is_fetch or call_is_axios):
                 method = "UNKNOWN"
 
+            # Infer GET for implicit fetch calls (reduce "unknown method" noise)
+            if method == "UNKNOWN" and call_is_fetch:
+                 method = "GET"
+
             # Extract string literals containing /api/
             literals: list[str] = []
             for rx in (
@@ -569,30 +573,78 @@ def get_backend_map(repo_root: Path, target: Target) -> dict[str, set[str]]:
     pythonpath_parts.append(str(repo_root / "pronto-libs" / "src"))
     if target == "employees":
         pythonpath_parts.append(str(repo_root / "pronto-employees" / "src"))
+        # Also add api_app since we check it now
+        pythonpath_parts.append(str(repo_root / "pronto-api" / "src"))
     elif target == "clients":
         pythonpath_parts.append(str(repo_root / "pronto-client" / "src"))
+        # Also add api_app
+        pythonpath_parts.append(str(repo_root / "pronto-api" / "src"))
     elif target == "api":
         pythonpath_parts.append(str(repo_root / "pronto-api" / "src"))
 
     env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
 
     code = ""
+    # For employees, we check both pronto_employees (frontend host) AND api_app (backend service)
+    # because the frontend might hit either (via proxy) or we want to count shared routes.
     if target == "employees":
-        code = "from pronto_employees.app import create_app\napp=create_app()\n"
+        code = (
+            "import os, sys, json\n"
+            "os.environ['PRONTO_ROUTES_ONLY'] = '1'\n"
+            "out = {}\n"
+            "try:\n"
+            "    from pronto_employees.app import create_app as create_emp\n"
+            "    app_emp = create_emp()\n"
+            "    for rule in app_emp.url_map.iter_rules():\n"
+            "        p = rule.rule\n"
+            "        if not p.startswith('/api/'): continue\n"
+            "        methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
+            "        out.setdefault(p, set()).update(methods)\n"
+            "except Exception as e: print(f'EMP_ERR: {e}', file=sys.stderr)\n"
+            "try:\n"
+            "    from api_app.app import create_app as create_api\n"
+            "    app_api = create_api()\n"
+            "    for rule in app_api.url_map.iter_rules():\n"
+            "        p = rule.rule\n"
+            "        if not p.startswith('/api/'): continue\n"
+            "        methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
+            "        out.setdefault(p, set()).update(methods)\n"
+            "except Exception as e: print(f'API_ERR: {e}', file=sys.stderr)\n"
+        )
     elif target == "clients":
-        code = "from pronto_clients.app import create_app\napp=create_app()\n"
+        code = (
+            "from pronto_clients.app import create_app as create_client\n"
+            "from api_app.app import create_app as create_api\n"
+            "app_client = create_client()\n"
+            "app_api = create_api()\n"
+            "out = {}\n"
+            # Client routes
+            "for rule in app_client.url_map.iter_rules():\n"
+            "    p = rule.rule\n"
+            "    if not p.startswith('/api/'): continue\n"
+            "    methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
+            "    out.setdefault(p, set()).update(methods)\n"
+            # API routes
+            "for rule in app_api.url_map.iter_rules():\n"
+            "    p = rule.rule\n"
+            "    if not p.startswith('/api/'): continue\n"
+            "    methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
+            "    out.setdefault(p, set()).update(methods)\n"
+        )
     else:
         code = "from api_app.app import create_app\napp=create_app()\n"
+        code += (
+            "out={}\n"
+            "for rule in app.url_map.iter_rules():\n"
+            "    p=rule.rule\n"
+            "    if not p.startswith('/api/'):\n"
+            "        continue\n"
+            "    methods=set(rule.methods or set())\n"
+            "    methods=methods - {'HEAD','OPTIONS'}\n"
+            "    out.setdefault(p, set()).update(methods)\n"
+        )
 
     code += (
-        "out={}\n"
-        "for rule in app.url_map.iter_rules():\n"
-        "    p=rule.rule\n"
-        "    if not p.startswith('/api/'):\n"
-        "        continue\n"
-        "    methods=set(rule.methods or set())\n"
-        "    methods=methods - {'HEAD','OPTIONS'}\n"
-        "    out.setdefault(p, set()).update(methods)\n"
         "out={k: sorted(v) for k,v in out.items()}\n"
         "import json\n"
         "print(json.dumps(out))\n"
@@ -614,7 +666,8 @@ def routes_only_check(repo_root: Path, target: Target) -> dict[str, Any]:
         sample = sorted(backend_map.keys())[:20]
         return {"ok": True, "count": len(backend_map), "sample": sample}
     except Exception as e:
-        return {"ok": False, "error": str(e), "stack": ""}
+        import traceback
+        return {"ok": False, "error": str(e), "stack": traceback.format_exc()}
 
 
 def parity_check(

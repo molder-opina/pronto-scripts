@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""
+Gate script to validate static host configuration.
+Checks that PRONTO_STATIC_PUBLIC_HOST is correctly configured and distinct from internal hosts in DEBUG mode.
+"""
+
+import os
+import sys
+from urllib.parse import urlparse
+
+# Add pronto-libs to path to use config loading if needed, 
+# but for a simple gate we can just read envs directly or rely on the script execution context.
+# Assuming this runs in an environment where .env is loaded or env vars are set.
+
+def check_static_hosts():
+    print("🔍 Checking Static Host Configuration...")
+    
+    # We read from os.environ. In a real CI/Pre-commit, these should be populated.
+    # If not, we might fail or warn. For now, we assume execution with loaded envs.
+    
+    public_host = os.getenv("PRONTO_STATIC_PUBLIC_HOST", "")
+    container_host = os.getenv("PRONTO_STATIC_CONTAINER_HOST", "")
+    debug_mode = os.getenv("DEBUG_MODE", "false").lower() in {"true", "1", "yes", "on"}
+    
+    print(f"  PRONTO_STATIC_PUBLIC_HOST:    {public_host}")
+    print(f"  PRONTO_STATIC_CONTAINER_HOST: {container_host}")
+    print(f"  DEBUG_MODE:                   {debug_mode}")
+
+    has_errors = False
+
+    if not public_host:
+        print("  ❌ PRONTO_STATIC_PUBLIC_HOST is missing or empty.")
+        has_errors = True
+    else:
+        parsed = urlparse(public_host)
+        if parsed.scheme not in ("http", "https"):
+            print(f"  ❌ PRONTO_STATIC_PUBLIC_HOST invalid scheme: {parsed.scheme}")
+            has_errors = True
+            
+        if debug_mode:
+            # Rule: In DEBUG, public host must NOT be the internal static container
+            if public_host == container_host:
+                print("  ❌ DEBUG violation: Public host equals Container host.")
+                has_errors = True
+            
+            # Rule: In DEBUG, public host must NOT contain 'static' hostname (heuristic for internal docker alias)
+            if "static" in parsed.hostname:
+                print(f"  ❌ DEBUG violation: Public hostname '{parsed.hostname}' appears to be internal.")
+                has_errors = True
+                
+            # Rule: In DEBUG, ideally it is localhost or a valid external IP
+            if parsed.hostname not in ("localhost", "127.0.0.1") and "192.168" not in parsed.hostname:
+                print(f"  ⚠️  Warning: Public host '{parsed.hostname}' is not localhost. Ensure this is accessible from browser.")
+
+    if not container_host:
+         print("  ❌ PRONTO_STATIC_CONTAINER_HOST is missing.")
+         has_errors = True
+
+    if has_errors:
+        print("\n⛔ Static Host Check FAILED.")
+        sys.exit(1)
+    else:
+        print("\n✅ Static Host Check PASSED.")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    check_static_hosts()

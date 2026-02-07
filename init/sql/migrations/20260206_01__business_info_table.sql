@@ -1,42 +1,36 @@
--- Migration: Create pronto_business_info table
--- Created: 2026-02-06
--- Purpose: Core business information singleton table
+-- Migration: 20260206_01__business_info_table.sql
+-- Purpose: Create business_info table for restaurant configuration
 
 CREATE TABLE IF NOT EXISTS pronto_business_info (
-    id INTEGER PRIMARY KEY,
-    business_name VARCHAR(200) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    restaurant_name VARCHAR(255) NOT NULL DEFAULT 'PRONTO',
+    restaurant_slug VARCHAR(100) UNIQUE NOT NULL,
+    currency_symbol VARCHAR(10) DEFAULT '$',
+    currency_code VARCHAR(10) DEFAULT 'MXN',
+    timezone VARCHAR(50) DEFAULT 'America/Mexico_City',
+    logo_path VARCHAR(500),
+    favicon_path VARCHAR(500),
+    primary_color VARCHAR(7) DEFAULT '#FF6B35',
+    secondary_color VARCHAR(7) DEFAULT '#2D3142',
+    accent_color VARCHAR(7) DEFAULT '#4ECDC4',
     address TEXT,
-    city VARCHAR(100),
-    state VARCHAR(100),
-    postal_code VARCHAR(20),
-    country VARCHAR(100),
-    phone VARCHAR(50),
-    email VARCHAR(200),
-    website VARCHAR(200),
-    logo_url VARCHAR(500),
-    description TEXT,
-    currency VARCHAR(10) NOT NULL DEFAULT 'MXN',
-    timezone VARCHAR(50) NOT NULL DEFAULT 'America/Mexico_City',
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_by INTEGER REFERENCES pronto_employees(id)
+    phone VARCHAR(20),
+    email VARCHAR(255),
+    website_url VARCHAR(500),
+    tax_rate DECIMAL(5,2) DEFAULT 16.00,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default business info (singleton)
-INSERT INTO pronto_business_info (
-    id, business_name, address, city, state, postal_code,
-    country, phone, email, website, description, currency, timezone
-) VALUES (
-    1,
-    'Cafetería de Prueba',
-    'Av. Principal 123',
-    'Ciudad de México',
-    'CDMX',
-    '01000',
-    'México',
-    '+52 55 1234 5678',
-    'info@cafeteria-prueba.com',
-    'https://cafeteria-prueba.com',
-    'Cafetería de Prueba - Sistema PRONTO',
-    'MXN',
-    'America/Mexico_City'
-) ON CONFLICT (id) DO NOTHING;
+-- Create index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_business_info_slug ON pronto_business_info(restaurant_slug);
+CREATE INDEX IF NOT EXISTS idx_business_info_active ON pronto_business_info(is_active);
+
+-- Insert default business info if not exists
+INSERT INTO pronto_business_info (restaurant_slug, restaurant_name)
+SELECT 'default', 'PRONTO Restaurant'
+WHERE NOT EXISTS (SELECT 1 FROM pronto_business_info WHERE restaurant_slug = 'default');
+
+COMMENT ON TABLE pronto_business_info IS 'Restaurant business configuration and branding settings';
+COMMENT ON COLUMN pronto_business_info.restaurant_slug IS 'URL-friendly identifier for the restaurant';

@@ -6,7 +6,8 @@ INSERT INTO pronto_employees (employee_code, first_name, last_name, email, pin, 
 ('EMP002', 'María', 'García', 'maria@pronto.com', '2345', 'waiter', 'Service', 'active'),
 ('EMP003', 'Carlos', 'López', 'carlos@pronto.com', '3456', 'chef', 'Kitchen', 'active'),
 ('EMP004', 'Ana', 'Martínez', 'ana@pronto.com', '4567', 'waiter', 'Service', 'active'),
-('EMP005', 'Pedro', 'Sánchez', 'pedro@pronto.com', '5678', 'cashier', 'Front', 'active');
+('EMP005', 'Pedro', 'Sánchez', 'pedro@pronto.com', '5678', 'cashier', 'Front', 'active')
+ON CONFLICT DO NOTHING;
 
 -- Insertar mesas
 INSERT INTO pronto_tables (table_number, area_id, capacity, status) VALUES
@@ -17,7 +18,8 @@ INSERT INTO pronto_tables (table_number, area_id, capacity, status) VALUES
 ('T5', (SELECT id FROM pronto_areas WHERE name = 'Patio'), 6, 'available'),
 ('T6', (SELECT id FROM pronto_areas WHERE name = 'Bar'), 2, 'available'),
 ('T7', (SELECT id FROM pronto_areas WHERE name = 'Bar'), 2, 'available'),
-('T8', (SELECT id FROM pronto_areas WHERE name = 'Private Room'), 10, 'available');
+('T8', (SELECT id FROM pronto_areas WHERE name = 'Private Room'), 10, 'available')
+ON CONFLICT DO NOTHING;
 
 -- Insertar items del menú
 INSERT INTO pronto_menu_items (name, description, price, category_id, preparation_time_minutes, is_available) VALUES
@@ -33,10 +35,12 @@ INSERT INTO pronto_menu_items (name, description, price, category_id, preparatio
 ('Ice Cream', 'Helado de vainilla o chocolate', 4.99, (SELECT id FROM pronto_menu_categories WHERE name = 'Desserts'), 3, true),
 ('Coffee', 'Café americano', 2.99, (SELECT id FROM pronto_menu_categories WHERE name = 'Beverages'), 2, true),
 ('Fresh Juice', 'Jugo natural de naranja', 3.99, (SELECT id FROM pronto_menu_categories WHERE name = 'Beverages'), 3, true),
-('Soft Drink', 'Refresco de cola', 2.49, (SELECT id FROM pronto_menu_categories WHERE name = 'Beverages'), 1, true);
+('Soft Drink', 'Refresco de cola', 2.49, (SELECT id FROM pronto_menu_categories WHERE name = 'Beverages'), 1, true)
+ON CONFLICT DO NOTHING;
 
 -- Insertar clientes de prueba
 INSERT INTO pronto_customers (first_name, last_name, email, phone, loyalty_points) VALUES
 ('Roberto', 'Gómez', 'roberto@email.com', '555-0101', 150),
 ('Laura', 'Díaz', 'laura@email.com', '555-0102', 320),
-('Miguel', 'Fernández', 'miguel@email.com', '555-0103', 75);
+('Miguel', 'Fernández', 'miguel@email.com', '555-0103', 75)
+ON CONFLICT DO NOTHING;

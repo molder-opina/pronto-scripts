@@ -13,7 +13,7 @@ EXIT_CODE=0
 
 # 2. Check for TODOs in Documentation
 echo "   - Buscando TODOs en documentación..."
-if grep -r "TODO" docs/ AGENTS.md README.md --include="*.md" > /dev/null 2>&1; then
+if grep -r "TODO" pronto-docs/ AGENTS.md README.md --include="*.md" > /dev/null 2>&1; then
     echo "   ⚠️  Advertencia: Hay 'TODO' pendientes en la documentación."
     # grep -r "TODO" docs/ AGENTS.md README.md --include="*.md" | head -n 3
 else

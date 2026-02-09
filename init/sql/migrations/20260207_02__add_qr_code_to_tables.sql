@@ -3,7 +3,7 @@
 -- Fecha: 2026-02-07
 
 -- 1. Agregar columna nullable primero (sin restricción UNIQUE)
-ALTER TABLE pronto_tables ADD COLUMN qr_code VARCHAR(100);
+ALTER TABLE pronto_tables ADD COLUMN IF NOT EXISTS qr_code VARCHAR(100);
 
 -- 2. Generar códigos QR temporales para mesas existentes
 UPDATE pronto_tables
@@ -12,7 +12,7 @@ WHERE qr_code IS NULL;
 
 -- 3. Crear índice único para qr_code (puede fallar si hay duplicados)
 -- Si hay duplicados, eliminar uno por uno manualmente o ejecutar seed.py
-CREATE UNIQUE INDEX ix_table_qr_code ON pronto_tables(qr_code);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_table_qr_code ON pronto_tables(qr_code);
 
 -- Comentario
 COMMENT ON COLUMN pronto_tables.qr_code IS 'Código QR único para la mesa';

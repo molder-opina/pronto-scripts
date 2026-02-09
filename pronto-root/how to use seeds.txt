@@ -1,0 +1,185 @@
+Reporte: Scripts y Archivos de Seeding/Datos de Prueba en Proyecto Pronto
+Resumen General
+Se encontraron múltiples scripts y archivos relacionados con seeding, datos de prueba, fixtures y población de base de datos distribuidos en varios módulos del proyecto.
+
+---
+
+1. Scripts Principales de Seeding
+A. Servicio Central de Seeding
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-libs/src/pronto_shared/services/seed.py
+Tipo de datos contenidos:
+- 12 Categorías de Menú: Combos, Hamburguesas, Pizzas, Tacos, Ensaladas, Bebidas, Postres, Desayunos, Botanas, Antojitos Mexicanos, Sopas, Especialidades
+- ~80+ Productos: Items completos con precios, descripciones, imágenes y tiempos de preparación
+- 18 Grupos de Modificadores: Queso Extra, Salsas, Proteínas Extra, Vegetales, Tamaños de Papas/Bebidas, Punto de Cocción, Bebidas para Combos, Guarniciones, Aderezos, Tipo de Pan, Nivel de Picante, Base de Pizza, Ingredientes Extra, Aderezos de Ensalada, Toppings de Postre
+- 8+ Empleados de prueba: Super Admin, Admin Roles, 3 Meseros (con rol adicional de cajero), 2 Chefs, 2 Cajeros
+- Configuración de rutas y permisos: EmployeeRouteAccess para todos los empleados
+Funciones principales:
+- load_seed_data(session) - Carga todos los datos de seed usando lógica UPSERT
+- ensure_seed_data(session) - Función principal llamada por la aplicación
+- _get_or_create_*() - Funciones auxiliares para crear/actualizar entidades
+- _assign_missing_employee_identity() - Asigna identidad a empleados incompletos
+Cómo se ejecuta: Se importa desde scripts o se llama automáticamente desde la aplicación al iniciar.
+---
+
+B. Script de Seeding Completo (pronto-scripts)
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/seed_test_data.py
+Tipo de datos:
+- Datos básicos (categorías, items, empleados) vía load_seed_data()
+- 8 Clientes adicionales: María García, Juan Pérez, Ana López, Carlos Rodríguez, Laura Martínez, Pedro Sánchez, Sofia Fernández, Miguel Torres
+- 8 Mesas con órdenes: Mesas 1, 2, 3, 4, 5, A, B, C con órdenes en diferentes estados (requested, waiter_accepted, kitchen_in_progress, ready_for_delivery)
+- Órdenes con items y modificadores completos
+Cómo se ejecuta:
+cd /Users/molder/projects/github-molder/pronto/pronto-scripts
+python scripts/seed_test_data.py [--reset]
+Opciones:
+- --reset - Borra todos los datos existentes antes de poblar (requiere confirmación escribiendo 'SI')
+---
+
+C. Script Interactivo de Seeding
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/seed_interactive.py
+Tipo de datos:
+- Empleados personalizables (rol, cantidad, prefijos de nombre/email)
+- Clientes personalizables (cantidad, prefijos)
+Cómo se ejecuta:
+cd /Users/molder/projects/github-molder/pronto/pronto-scripts
+python scripts/seed_interactive.py
+Interactivo: Pregunta cantidad de empleados/clientes, roles, contraseñas, etc.
+---
+D. Validación y Seeding Automático
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/bin/python/validate_and_seed.py
+Tipo de datos validados/creados:
+- Empleados (Super Admin, Admin, Meseros, Chefs, Cajeros)
+- 12 Categorías de menú
+- 5 Productos básicos (Combo Familiar, Hamburguesas, Limonada, Coca Cola)
+- 3 Áreas (Terraza, Salón Principal, VIP)
+- 8 Mesas (T1-T3, M1-M4, V1)
+- 9 Configuraciones de negocio (tax_rate, currency, etc.)
+- 3 Períodos del día (Desayuno, Comida, Cena)
+Cómo se ejecuta:
+cd /Users/molder/projects/github-molder/pronto/pronto-scripts
+python bin/python/validate_and_seed.py
+---
+2. Scripts de Inicialización (Legacy/Archived)
+A. Init Seed Completo
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/bin/archived/init-seed.py
+Tipo de datos:
+- 4 Áreas (Interior, Terraza, Bar, VIP)
+- Mesas con códigos QR (distribución: Interior 15, Terraza 8, Bar 4, VIP 3)
+- Configuraciones del sistema
+- Datos completos via ensure_seed_data()
+Cómo se ejecuta:
+python bin/archived/init-seed.py
+# o con variables de entorno:
+POSTGRES_HOST=localhost python bin/archived/init-seed.py
+---
+B. Init PostgreSQL Config
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/bin/archived/init-postgres-config.py
+Tipo de datos:
+- Tabla pronto_business_config
+- 18 configuraciones por defecto (restaurant_name, tax_rate, currency, timezone, session_timeout, etc.)
+Cómo se ejecuta:
+python bin/archived/init-postgres-config.py
+---
+C. Init PostgreSQL Tables
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/bin/archived/init-postgres-tables.py
+Tipo de datos:
+- 13 tablas: customers, employees, dining_sessions, menu_categories, menu_items, orders, order_items, business_config, business_info
+- Índices optimizados
+- Categoría "Bebidas" con 6 items de menú
+- 18 configuraciones de negocio
+Cómo se ejecuta:
+python bin/archived/init-postgres-tables.py
+---
+D. Create Test Data
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/bin/python/create-test-data.py
+Tipo de datos:
+- 13 tablas creadas
+- Categoría "Bebidas" con 6 items (Café Americano, Espresso, Cappuccino, etc.)
+- 4 Empleados: Admin, Carlos Chef, Juan Mesero, Laura Cajera
+- 1 Cliente de prueba
+- 18 Configuraciones de negocio
+Cómo se ejecuta:
+python bin/python/create-test-data.py
+---
+3. Scripts de Mantenimiento y QA
+A. Ensure Users
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/maintenance/ensure_users.py
+Tipo de datos:
+- 3 usuarios QA: waiter@cafeteria.test, chef@cafeteria.test, cashier@cafeteria.test
+Cómo se ejecuta:
+python scripts/maintenance/ensure_users.py
+---
+B. Reset All Passwords
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/maintenance/reset_all_passwords.py
+Tipo de datos: Actualiza contraseñas de empleados a "ChangeMe!123"
+---
+C. Populate Assets
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/populate_assets.py
+Tipo de datos: Copia imágenes de menú desde artifacts a pronto-static/src/static_content/assets/pronto/menu/
+Cómo se ejecuta:
+python scripts/populate_assets.py
+---
+4. Scripts de QA (Tests)
+Ubicación: /Users/molder/projects/github-molder/pronto/pronto-scripts/scripts/qa/
+| Archivo | Propósito |
+|---------|-----------|
+| qa_create_order.py | Crea órdenes de prueba vía API |
+| qa_process_order.py | Procesa órdenes existentes |
+| qa_pay_order.py | Simula pagos de órdenes |
+| qa_full_cycle.py | Ciclo completo de prueba |
+| qa_complete_cycle.py | Prueba completa E2E |
+| qa_automation.py | Automatización de QA |
+| qa_test_suite.py | Suite de pruebas |
+| run_tests.py | Runner principal de tests |
+| test_pronto_full_flow.py | Flujo completo de prueba |
+| qa_api_6082.py | Tests específicos API puerto 6082 |
+Cómo se ejecuta:
+cd /Users/molder/projects/github-molder/pronto/pronto-scripts
+python scripts/qa/run_tests.py --all      # Todos los tests
+python scripts/qa/run_tests.py --login    # Solo login
+python scripts/qa/run_tests.py --order    # Solo flujo de órdenes
+python scripts/qa/run_tests.py --menu     # Solo menú
+---
+5. Datos de Prueba JSON
+Menu Response
+Archivo: /Users/molder/projects/github-molder/pronto/pronto-tests/menu_response.json
+Tipo de datos: Respuesta completa de API de menú con categorías, items, modificadores y grupos de modificadores (ejemplo para tests).
+---
+6. Resumen de Datos de Prueba Disponibles
+| Categoría | Cantidad | Archivo Principal |
+|-----------|----------|-------------------|
+| Categorías de Menú | 12 | seed.py |
+| Productos/Items | ~80+ | seed.py |
+| Grupos de Modificadores | 18 | seed.py |
+| Modificadores Individuales | ~100+ | seed.py |
+| Empleados de Prueba | 8 | seed.py |
+| Clientes de Prueba | 8+ | seed_test_data.py |
+| Mesas | 30+ | init-seed.py |
+| Áreas | 4 | seed.py |
+| Órdenes de Prueba | 8 mesas con múltiples órdenes | seed_test_data.py |
+---
+7. Usuarios de Prueba Predeterminados
+| Rol | Email | Contraseña |
+|-----|-------|------------|
+| Super Admin | admin@cafeteria.test | ChangeMe!123 |
+| Admin Roles | admin.roles@cafeteria.test | ChangeMe!123 |
+| Mesero 1 | juan.mesero@cafeteria.test | ChangeMe!123 |
+| Mesero 2 | maria.mesera@cafeteria.test | ChangeMe!123 |
+| Mesero 3 | pedro.mesero@cafeteria.test | ChangeMe!123 |
+| Chef 1 | carlos.chef@cafeteria.test | ChangeMe!123 |
+| Chef 2 | ana.chef@cafeteria.test | ChangeMe!123 |
+| Cajero 1 | laura.cajera@cafeteria.test | ChangeMe!123 |
+| Cajero 2 | roberto.cajero@cafeteria.test | ChangeMe!123 |
+---
+8. Instrucciones de Ejecución Rápida
+Setup completo inicial:
+# 1. Crear tablas y configuración básica
+python pronto-scripts/bin/archived/init-postgres-tables.py
+# 2. Poblar datos de seed completos
+python pronto-scripts/scripts/seed_test_data.py
+# O en un solo paso (con reset):
+python pronto-scripts/scripts/seed_test_data.py --reset
+Validar y completar datos faltantes:
+python pronto-scripts/bin/python/validate_and_seed.py
+Ejecutar pruebas QA:
+python pronto-scripts/scripts/qa/run_tests.py --all

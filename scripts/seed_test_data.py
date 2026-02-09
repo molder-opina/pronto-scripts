@@ -60,7 +60,8 @@ from pronto_shared.models import (  # noqa: E402
     OrderItem,
     OrderItemModifier,
 )
-from pronto_shared.services.seed import load_seed_data  # noqa: E402
+# NOTE: Basic seed data (categories, menu items, areas, tables) is now in SQL
+# See: pronto-scripts/init/sql/40_seeds/*.sql
 
 
 def reset_database():
@@ -89,13 +90,21 @@ def reset_database():
     print("✅ Base de datos limpia")
 
 
-def seed_basic_data():
-    """Ejecuta el seed básico del sistema"""
-    print("📦 Poblando datos básicos (categorías, items, empleados)...")
+def verify_basic_data():
+    """Verifica que los datos básicos existan (deben estar en SQL seeds)"""
+    print("🔍 Verificando datos básicos de SQL seeds...")
     with get_session() as session:
-        load_seed_data(session)
-        session.commit()
-    print("✅ Datos básicos poblados")
+        categories_count = session.execute(select(func.count(MenuCategory.id))).scalar()
+        items_count = session.execute(select(func.count(MenuItem.id))).scalar()
+        
+        if categories_count == 0 or items_count == 0:
+            print("❌ ERROR: No hay datos básicos en la BD")
+            print("   Los datos básicos deben cargarse desde SQL seeds:")
+            print("   - pronto-scripts/init/sql/40_seeds/*.sql")
+            print("   Ejecuta: docker-compose down && docker-compose up -d")
+            sys.exit(1)
+        
+        print(f"✅ Datos básicos encontrados: {categories_count} categorías, {items_count} items")
 
 
 def seed_additional_customers():
@@ -361,8 +370,10 @@ def main():
             print("❌ Operación cancelada")
             return
 
-    # Poblar datos
-    seed_basic_data()
+    # Verify basic data exists (from SQL seeds)
+    verify_basic_data()
+    
+    # Poblar datos de prueba adicionales
     seed_additional_customers()
     seed_test_orders()
 

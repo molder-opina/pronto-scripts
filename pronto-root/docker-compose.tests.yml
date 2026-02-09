@@ -1,0 +1,36 @@
+name: pronto-tests
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pronto
+      POSTGRES_PASSWORD: pronto123
+      POSTGRES_DB: pronto_test
+    ports:
+      - "5432:5432"
+    networks:
+      - pronto_test_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pronto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - pronto_test_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  pronto_test_net:
+    driver: bridge

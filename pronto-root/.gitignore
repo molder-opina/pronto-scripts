@@ -1,0 +1,47 @@
+pronto-backups/changes/
+pronto-backups/*.tar.gz
+.aider*
+.env
+
+# Local folders
+.agents/
+build/
+
+docs/change-logs/
+
+# Root workspace: exclude child project repos (tracked as gitlinks/submodules)
+pronto-api/
+pronto-client/
+pronto-docs/
+pronto-employees/
+pronto-libs/
+pronto-postgresql/
+pronto-redis/
+pronto-scripts/
+pronto-static/
+pronto-tests/
+
+# Misc local/experimental
+openclaw-features/
+molder/
+
+# Python caches/artifacts
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node/Playwright artifacts
+**/node_modules/
+**/dist/
+**/.vite/
+**/.turbo/
+playwright-report/
+test-results/
+
+# Logs and OS
+**/*.log
+.DS_Store

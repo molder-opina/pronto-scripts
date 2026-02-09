@@ -85,7 +85,9 @@ def _choose_role() -> str:
 
 
 def _seed_employees(session) -> None:
-    from pronto_shared.services.seed import _get_or_create_employee
+    # Import from local helper module instead of seed.py
+    sys.path.insert(0, os.path.dirname(__file__))
+    from employee_seed_helpers import get_or_create_employee
 
     if not _prompt_bool("Crear/actualizar empleados?", default=True):
         return
@@ -103,7 +105,7 @@ def _seed_employees(session) -> None:
     for idx in range(start_index, start_index + count):
         name = f"{name_prefix} {idx}"
         email = f"{email_prefix}{idx}@{domain}"
-        employee = _get_or_create_employee(
+        employee = get_or_create_employee(
             session,
             email,
             name,
@@ -175,14 +177,16 @@ def main() -> None:
 
     from pronto_shared.config import load_config
     from pronto_shared.db import get_session, init_engine
-    from pronto_shared.services.seed import _assign_missing_employee_identity
+    # Import from local helper module instead of seed.py
+    sys.path.insert(0, os.path.dirname(__file__))
+    from employee_seed_helpers import assign_missing_employee_identity
 
     config = load_config("seed-interactive")
     init_engine(config)
 
     with get_session() as session:
         if _prompt_bool("Completar empleados sin nombre/email?", default=True):
-            updated = _assign_missing_employee_identity(session)
+            updated = assign_missing_employee_identity(session)
             print(f"OK Empleados actualizados: {updated}")
 
         _seed_employees(session)

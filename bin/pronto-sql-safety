@@ -3,7 +3,14 @@ set -euo pipefail
 
 command -v rg >/dev/null || { echo "pronto-sql-safety: requiere rg" >&2; exit 1; }
 
-ROOT="pronto-scripts/init/sql"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -d "/opt/pronto/pronto-scripts/init/sql" ]]; then
+    ROOT="/opt/pronto/pronto-scripts/init/sql"
+elif [[ -d "$SCRIPT_DIR/../init/sql" ]]; then
+    ROOT="$SCRIPT_DIR/../init/sql"
+else
+    ROOT="pronto-scripts/init/sql"
+fi
 [[ -d "$ROOT" ]] || { echo "pronto-sql-safety: missing $ROOT" >&2; exit 1; }
 
 # Global deny in init/sql/**

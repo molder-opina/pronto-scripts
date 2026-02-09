@@ -1,0 +1,33 @@
+name: pronto-employees
+
+services:
+  employees:
+    build:
+      context: .
+      dockerfile: pronto-employees/src/pronto_employees/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      static:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "6081:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    develop:
+      watch:
+        - path: ./pronto-employees/src
+          action: sync
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+
+networks:
+  pronto_net:
+    external: true

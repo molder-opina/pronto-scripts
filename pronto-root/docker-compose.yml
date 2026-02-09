@@ -1,0 +1,150 @@
+name: pronto
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pronto
+      POSTGRES_PASSWORD: pronto123
+      POSTGRES_DB: pronto
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pronto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  static:
+    build:
+      context: .
+      dockerfile: pronto-static/src/static_content/Dockerfile
+    ports:
+      - "9088:80"
+    volumes:
+      - ./pronto-static/src/static_content/assets:/usr/share/nginx/html/assets
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - apps
+
+  api:
+    build:
+      context: .
+      dockerfile: pronto-api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      PRONTO_STATIC_CONTAINER_HOST: http://static:80
+    ports:
+      - "6082:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - apps
+    volumes:
+      - ./pronto-api/src/api_app:/opt/pronto/api_app
+      - ./pronto-libs/src/pronto_shared:/usr/local/lib/python3.11/site-packages/pronto_shared
+
+  client:
+    build:
+      context: .
+      dockerfile: pronto-client/src/pronto_clients/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      static:
+        condition: service_started
+    env_file:
+      - .env
+    ports:
+      - "6080:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - apps
+    volumes:
+      - ./pronto-client/src/pronto_clients:/opt/pronto/pronto_clients
+      - ./pronto-libs/src/pronto_shared:/usr/local/lib/python3.11/site-packages/pronto_shared
+
+  employees:
+    build:
+      context: .
+      dockerfile: pronto-employees/src/pronto_employees/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      static:
+        condition: service_started
+    env_file:
+      - .env
+    ports:
+      - "6081:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - apps
+    volumes:
+      - ./pronto-employees/src/pronto_employees:/opt/pronto/pronto_employees
+      - ./pronto-libs/src/pronto_shared:/usr/local/lib/python3.11/site-packages/pronto_shared
+
+networks:
+  pronto_net:
+    name: pronto_net
+    driver: bridge
+
+volumes:
+  postgres_data:

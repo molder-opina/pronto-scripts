@@ -5,7 +5,7 @@ BASE_REF="${BASE_REF:-origin/main}"
 CHANGED_FILES="$(git diff --name-only "$BASE_REF"...HEAD 2>/dev/null || true)"
 
 TS="$(date +%Y%m%d-%H%M%S)"
-OUT_DIR="docs/change-logs/CHG-${TS}"
+OUT_DIR="pronto-docs/change-logs/CHG-${TS}"
 mkdir -p "$OUT_DIR"
 
 PROMPT_FILE="pronto-scripts/prompts/inconsistency_check.md"

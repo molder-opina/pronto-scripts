@@ -30,7 +30,28 @@ ON CONFLICT DO NOTHING;
 -- Taco Modifiers
 INSERT INTO pronto_modifier_groups (id, name, description, menu_item_id, min_selections, max_selections, is_required, created_at) VALUES
 ('56116a65-7bd2-5eb2-976a-a255fce63674', 'Salsa', 'Choose salsa level', '50428772-2803-49f1-9e07-59614437f529', 0, 2, false, now()),
-('6b4beb78-719b-5ffb-bad2-d31ebd549a33', 'Extras', 'Additional toppings', '50428772-2803-49f1-9e07-59614437f529', 0, 3, false, now())
+    ('6b4beb78-719b-5ffb-bad2-d31ebd549a33', 'Extras', 'Additional toppings', '50428772-2803-49f1-9e07-59614437f529', 0, 3, false, now()),
+    -- Pizza Modifiers
+    ('p1d4839d-e5e3-58dc-96fa-94de4a2568ea', 'Crust Type', 'Choose crust style', 'e5253e7f-d758-487f-bdcb-464880eb7765', 1, 1, true, now()),
+    ('p207f845-d896-51ad-b184-217f270ada6b', 'Extra Toppings', 'Add more toppings', 'e5253e7f-d758-487f-bdcb-464880eb7765', 0, 5, false, now()),
+    -- Drink Modifiers
+    ('b1d4839d-e5e3-58dc-96fa-94de4a2568ec', 'Ice Level', 'Amount of ice', 'f6253e7f-d758-487f-bdcb-464880eb7766', 1, 1, true, now()),
+    ('b207f845-d896-51ad-b184-217f270ada6d', 'Sweetness', 'Sugar level', 'f6253e7f-d758-487f-bdcb-464880eb7766', 1, 1, true, now()),
+    -- Coffee Modifiers
+    ('c1d4839d-e5e3-58dc-96fa-94de4a2568ee', 'Milk Type', 'Choose milk', 'a7253e7f-d758-487f-bdcb-464880eb7767', 1, 1, true, now()),
+    ('c207f845-d896-51ad-b184-217f270ada6f', 'Syrup', 'Add flavor syrup', 'a7253e7f-d758-487f-bdcb-464880eb7767', 0, 2, false, now()),
+    -- Breakfast Modifiers
+    ('e1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'Egg Style', 'How do you want your eggs?', 'b8253e7f-d758-487f-bdcb-464880eb7768', 1, 1, true, now()),
+    ('e207f845-d896-51ad-b184-217f270ada61', 'Toast Type', 'Choose toast', 'b8253e7f-d758-487f-bdcb-464880eb7768', 1, 1, true, now()),
+    -- Dessert Modifiers
+    ('s1d4839d-e5e3-58dc-96fa-94de4a2568e2', 'Topping', 'Add simplified topping', 'c9253e7f-d758-487f-bdcb-464880eb7769', 0, 2, false, now()),
+    ('s207f845-d896-51ad-b184-217f270ada63', 'Served With', 'Add ice cream or cream', 'c9253e7f-d758-487f-bdcb-464880eb7769', 0, 1, false, now()),
+    -- Sandwich Modifiers
+    ('w1d4839d-e5e3-58dc-96fa-94de4a2568e4', 'Bread Type', 'Choose bread', 'd0253e7f-d758-487f-bdcb-464880eb7760', 1, 1, true, now()),
+    ('w207f845-d896-51ad-b184-217f270ada65', 'Condiments', 'Add sauces', 'd0253e7f-d758-487f-bdcb-464880eb7760', 0, 3, false, now()),
+    -- Soup Modifiers
+    ('u1d4839d-e5e3-58dc-96fa-94de4a2568e6', 'Size', 'Bowl or Cup', 'e1253e7f-d758-487f-bdcb-464880eb7761', 1, 1, true, now()),
+    ('u207f845-d896-51ad-b184-217f270ada67', 'Side Bread', 'Include bread', 'e1253e7f-d758-487f-bdcb-464880eb7761', 0, 1, false, now())
 ON CONFLICT DO NOTHING;
 
 -- Modifiers for Burger Size
@@ -117,4 +138,39 @@ INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available
 ('6b4beb79-719b-5ffb-bad2-d31ebd549a33', '6b4beb78-719b-5ffb-bad2-d31ebd549a33', 'Guacamole', 1.00, true, now()),
 ('6b4beb80-719b-5ffb-bad2-d31ebd549a33', '6b4beb78-719b-5ffb-bad2-d31ebd549a33', 'Cilantro', 0, true, now()),
 ('6b4beb81-719b-5ffb-bad2-d31ebd549a33', '6b4beb78-719b-5ffb-bad2-d31ebd549a33', 'Lime Wedges', 0, true, now())
+ON CONFLICT DO NOTHING;
+
+-- Pizza Crust Modifiers
+INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available, created_at) VALUES
+('p1d4839d-e5e3-58dc-96fa-94de4a2568e1', 'p1d4839d-e5e3-58dc-96fa-94de4a2568ea', 'Thin Crust', 0, true, now()),
+('p1d4839d-e5e3-58dc-96fa-94de4a2568e2', 'p1d4839d-e5e3-58dc-96fa-94de4a2568ea', 'Regular Crust', 0, true, now()),
+('p1d4839d-e5e3-58dc-96fa-94de4a2568e3', 'p1d4839d-e5e3-58dc-96fa-94de4a2568ea', 'Stuffed Crust', 2.00, true, now())
+ON CONFLICT DO NOTHING;
+
+-- Pizza Extra Toppings
+INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available, created_at) VALUES
+('p207f845-d896-51ad-b184-217f270ada60', 'p207f845-d896-51ad-b184-217f270ada6b', 'Pepperoni', 1.50, true, now()),
+('p207f845-d896-51ad-b184-217f270ada61', 'p207f845-d896-51ad-b184-217f270ada6b', 'Mushrooms', 1.00, true, now()),
+('p207f845-d896-51ad-b184-217f270ada62', 'p207f845-d896-51ad-b184-217f270ada6b', 'Onions', 0.50, true, now())
+ON CONFLICT DO NOTHING;
+
+-- Drink Ice Level
+INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available, created_at) VALUES
+('b1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'b1d4839d-e5e3-58dc-96fa-94de4a2568ec', 'No Ice', 0, true, now()),
+('b1d4839d-e5e3-58dc-96fa-94de4a2568e1', 'b1d4839d-e5e3-58dc-96fa-94de4a2568ec', 'Less Ice', 0, true, now()),
+('b1d4839d-e5e3-58dc-96fa-94de4a2568e2', 'b1d4839d-e5e3-58dc-96fa-94de4a2568ec', 'Regular Ice', 0, true, now())
+ON CONFLICT DO NOTHING;
+
+-- Coffee Milk Type
+INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available, created_at) VALUES
+('c1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'c1d4839d-e5e3-58dc-96fa-94de4a2568ee', 'Whole Milk', 0, true, now()),
+('c1d4839d-e5e3-58dc-96fa-94de4a2568e1', 'c1d4839d-e5e3-58dc-96fa-94de4a2568ee', 'Skim Milk', 0, true, now()),
+('c1d4839d-e5e3-58dc-96fa-94de4a2568e2', 'c1d4839d-e5e3-58dc-96fa-94de4a2568ee', 'Almond Milk', 0.50, true, now())
+ON CONFLICT DO NOTHING;
+
+-- Breakfast Egg Style
+INSERT INTO pronto_modifiers (id, group_id, name, price_adjustment, is_available, created_at) VALUES
+('e1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'e1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'Scrambled', 0, true, now()),
+('e1d4839d-e5e3-58dc-96fa-94de4a2568e1', 'e1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'Fried', 0, true, now()),
+('e1d4839d-e5e3-58dc-96fa-94de4a2568e2', 'e1d4839d-e5e3-58dc-96fa-94de4a2568e0', 'Poached', 0, true, now())
 ON CONFLICT DO NOTHING;

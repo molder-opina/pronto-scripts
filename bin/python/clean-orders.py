@@ -89,11 +89,11 @@ def get_order_stats(cursor, older_than_days=None):
 
 
 def clean_completed_orders(cursor, conn, dry_run=False, older_than_days=None):
-    """Limpiar órdenes completadas (entregadas o canceladas)."""
+    """Limpiar órdenes completadas (entregadas, pagadas o canceladas)."""
     query = """
         SELECT id, workflow_status, total_amount
         FROM pronto_orders
-        WHERE workflow_status IN ('delivered', 'cancelled')
+        WHERE workflow_status IN ('delivered', 'paid', 'cancelled')
     """
     params = []
 

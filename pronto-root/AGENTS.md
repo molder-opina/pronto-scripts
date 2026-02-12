@@ -39,7 +39,10 @@ Violación a cualquiera ⇒ **REJECTED**.
 19. Herramienta estándar de búsqueda: `rg`.
 20. Python deps: cada servicio `pronto-*` debe tener una sola fuente de verdad en `requirements.txt` en la raíz del proyecto del servicio (sin duplicados bajo `src/`).
 21. PostgreSQL canónico: **16-alpine**
-22. Root PRONTO es workspace aggregator local. **No se pushea**. Se pushean repos hijos `pronto-*`.
+22. Root PRONTO es workspace aggregator local. **No se pushea**.
+- Versión versionada en: `pronto-scripts/pronto-root/`
+- Ver sección 0.5.5 para flujo de versionado.
+- Se pushean repos hijos `pronto-*`.
 
 ---
 
@@ -68,10 +71,16 @@ Usar:
 - `./pronto-scripts/bin/pronto-git-all.sh sync -m "..."`
 - `./pronto-scripts/bin/pronto-git-all.sh pull --rebase`
 
-## 0.5.4 Root No Se Pushea (Repos Hijos Sí) (P0)
-- Cambios se comitean/pushean en cada repo `pronto-*`.
-- Si pre-commit del root bloquea por “contrato modificado”, solo continuar con aprobación explícita:
-  - `PRONTO_ALLOW_CONTRACT_CHANGES=1`
+## 0.5.5 Versionado del Root (P0)
+- Root es workspace aggregator local **no se pushea**.
+- Copia de seguridad versionada en: `pronto-scripts/pronto-root/`
+- Cada vez que se modifique un archivo en la carpeta `pronto/` del root, copiar a `pronto-scripts/pronto-root/`:
+  - `.env`, `.env.example`, `.gitignore`, `.agents/`
+  - `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `DOCKER_COMPOSE.md`, `CHANGELOG.md`
+  - `docker-compose.yml`, `docker-compose.api.yml`, `docker-compose.client.yml`, `docker-compose.employees.yml`, `docker-compose.infra.yml`, `docker-compose.tests.yml`
+  - `pronto-apps.sh`, `pronto-dev.sh`, `start-api.sh`
+- Esta copia es la única fuente versionada del contenido del root.
+
 
 ---
 
@@ -339,12 +348,12 @@ Objetivo:
 Forzar que TODO bug quede documentado y solo pase a resuelto con corrección verificada.
 Ubicaciones:
 
-pronto-pronto-docs/errors/
-pronto-pronto-docs/resolved/
-pronto-pronto-docs/resueltos.txt
+pronto-docs/errors/
+pronto-docs/resolved/
+pronto-docs/resueltos.txt
 18.1 Regla: No hay fix sin error documentado (P0)
 Ante cualquier bug:
-crear pronto-pronto-docs/errors/<YYYYMMDD>_<slug_error>.md ANTES del fix.
+crear pronto-docs/errors/<YYYYMMDD>_<slug_error>.md ANTES del fix.
 Formato EXACTO del archivo:
 ID:
 FECHA:
@@ -368,16 +377,16 @@ SOLUCION:
 COMMIT:
 FECHA_RESOLUCION:
 Mover:
-pronto-pronto-docs/errors/... → pronto-pronto-docs/resolved/...
-Append a pronto-pronto-docs/resueltos.txt:
+pronto-docs/errors/... → pronto-docs/resolved/...
+Append a pronto-docs/resueltos.txt:
 YYYY-MM-DD | ID | TITULO | COMMIT | PROYECTO
 18.3 Reapertura (P0)
 Si reaparece:
-crear NUEVO archivo en pronto-pronto-docs/errors/ y referenciar ID anterior en DESCRIPCION.
+crear NUEVO archivo en pronto-docs/errors/ y referenciar ID anterior en DESCRIPCION.
 18.4 Validaciones duras (P0)
-No existe fix sin archivo en pronto-pronto-docs/errors/.
-No existe archivo en pronto-pronto-docs/resolved/ con ESTADO != RESUELTO.
-No existe entrada en pronto-pronto-docs/resueltos.txt sin archivo correspondiente.
+No existe fix sin archivo en pronto-docs/errors/.
+No existe archivo en pronto-docs/resolved/ con ESTADO != RESUELTO.
+No existe entrada en pronto-docs/resueltos.txt sin archivo correspondiente.
 19) REGLAS OPERATIVAS PARA CAMBIOS SENSIBLES (P0)
 Si una acción puede afectar:
 Datos

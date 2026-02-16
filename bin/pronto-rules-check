@@ -143,7 +143,7 @@ def check_contracts(mod, mode):
 
 
 def check_postgres_version():
-    res = run(["rg", "-n", "PostgreSQL 13", "pronto-docs", "pronto-postgresql"], cwd=REPO_ROOT)
+    res = run(["rg", "-n", "PostgreSQL 13", "pronto-docs", "pronto-postgresql", "-g", "!pronto-docs/resolved/**", "-g", "!pronto-docs/errors/**"], cwd=REPO_ROOT)
     if res.returncode == 0:
         fail("Found PostgreSQL 13 in docs")
 
@@ -151,7 +151,7 @@ def check_postgres_version():
 def check_session_rules():
     # forbid session in api/employees
     for path in ["pronto-api", "pronto-employees"]:
-        res = run(["rg", "-n", "flask\\.session|session\\[", path], cwd=REPO_ROOT)
+        res = run(["rg", "-n", "flask\\.session|\\bsession\\[", path], cwd=REPO_ROOT)
         if res.returncode == 0:
             fail(f"flask.session usage forbidden in {path}")
     # client allowlist

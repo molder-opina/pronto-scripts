@@ -1,9 +1,44 @@
 -- Align pronto_dining_sessions schema with DiningSession model
 
--- Rename columns to match model
-ALTER TABLE pronto_dining_sessions RENAME COLUMN start_time TO opened_at;
-ALTER TABLE pronto_dining_sessions RENAME COLUMN end_time TO closed_at;
-ALTER TABLE pronto_dining_sessions RENAME COLUMN total TO total_amount;
+-- Rename legacy columns only when present and target does not already exist.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'start_time'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'opened_at'
+  ) THEN
+    EXECUTE 'ALTER TABLE pronto_dining_sessions RENAME COLUMN start_time TO opened_at';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'end_time'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'closed_at'
+  ) THEN
+    EXECUTE 'ALTER TABLE pronto_dining_sessions RENAME COLUMN end_time TO closed_at';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'total'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pronto_dining_sessions' AND column_name = 'total_amount'
+  ) THEN
+    EXECUTE 'ALTER TABLE pronto_dining_sessions RENAME COLUMN total TO total_amount';
+  END IF;
+END $$;
 
 -- Add missing columns
 ALTER TABLE pronto_dining_sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+#
+# List employees from the database.
+#
+# Usage:
+#   ./pronto-scripts/bin/pronto-list-employees
+#
+# Requires: PRONTO_ENV=dev|test
+#
+
+set -euo pipefail
+
+# ── Guard: PRONTO_ENV ──────────────────────────────────────────────
+PRONTO_ENV="${PRONTO_ENV:-}"
+if [[ -z "$PRONTO_ENV" ]]; then
+  echo "ERROR: PRONTO_ENV no está definido. Abortando." >&2
+  exit 1
+fi
+if [[ "$PRONTO_ENV" != "dev" && "$PRONTO_ENV" != "test" ]]; then
+  echo "ERROR: PRONTO_ENV=$PRONTO_ENV no permitido. Solo dev|test." >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# ── Verify containers running ─────────────────────────────────────
+if ! docker compose -f "$REPO_ROOT/docker-compose.yml" ps --status running 2>/dev/null | grep -q "api"; then
+  echo "ERROR: El contenedor 'api' no está corriendo." >&2
+  echo "       Ejecuta primero los contenedores." >&2
+  exit 1
+fi
+
+# ── Build inline Python script ────────────────────────────────────
+read -r -d '' PY_SCRIPT << 'PYEOF' || true
+import sys, logging
+
+logging.basicConfig(level=logging.ERROR)
+
+sys.path.insert(0, "/opt/pronto/pronto_api")
+sys.path.insert(0, "/opt/pronto/pronto_shared")
+sys.path.insert(0, "/opt/pronto/build")
+
+from pronto_shared.config import load_config
+from pronto_shared.db import get_session, init_engine
+from pronto_shared.models import Employee
+
+config = load_config("pronto-api")
+init_engine(config)
+
+with get_session() as session:
+    employees = session.query(Employee).all()
+    print(f"{'ID':<38} {'Name':<20} {'Email':<30} {'Role':<10} {'Active':<8}")
+    print("-" * 110)
+
+    for emp in employees:
+        try:
+            email = emp.email
+            print(f"{str(emp.id):<38} {emp.name:<20} {email:<30} {emp.role:<10} {str(emp.is_active):<8}")
+        except Exception as e:
+            print(f"{str(emp.id):<38} ERROR: {e}")
+PYEOF
+
+# ── Execute inside container ─────────────────────────────────────
+echo "======================================================"
+echo "  PRONTO — Listar Empleados (PRONTO_ENV=$PRONTO_ENV)"
+echo "======================================================"
+echo ""
+
+docker compose -f "$REPO_ROOT/docker-compose.yml" exec -T \
+  api python3 -c "$PY_SCRIPT"

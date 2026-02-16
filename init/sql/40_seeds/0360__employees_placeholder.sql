@@ -1,26 +1,2 @@
--- ============================================================================
--- PRONTO SEED: Employees (Placeholder)
--- ============================================================================
--- NOTE: Employees require encrypted data and password hashing
--- This cannot be done in pure SQL without the encryption functions
--- 
--- SOLUTION: Employees will be created by a Python script that runs
--- after the database is initialized:
---   pronto-scripts/init/scripts/seed_employees.py
---
--- This file is a placeholder to document the decision
--- ============================================================================
-
--- Employees to be created by Python script:
--- 1. admin@cafeteria.test (Admin General, role: system)
--- 2. admin.roles@cafeteria.test (Admin Roles, role: admin)
--- 3. juan.mesero@cafeteria.test (Juan, role: waiter)
--- 4. maria.mesera@cafeteria.test (Maria, role: waiter)
--- 5. pedro.mesero@cafeteria.test (Pedro, role: waiter)
--- 6. carlos.chef@cafeteria.test (Carlos, role: chef)
--- 7. ana.chef@cafeteria.test (Ana, role: chef)
--- 8. luis.cajero@cafeteria.test (Luis, role: cashier)
--- 9. sofia.cajera@cafeteria.test (Sofia, role: cashier)
--- 10. test.waiter@cafeteria.test (Test Waiter, role: waiter)
-
--- Default password (from env): SEED_EMPLOYEE_PASSWORD or "ChangeMe!123"
+-- Seed placeholder kept idempotent for canonical init.
+SELECT 1;

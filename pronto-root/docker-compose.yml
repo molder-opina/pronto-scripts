@@ -22,16 +22,26 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - .env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    expose:
+      - "6379"
     networks:
       - pronto_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    profiles:
+      - apps
+      - dev
+    ports:
+      - "6379:6379"
 
   static:
     build:
@@ -67,8 +77,8 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       PRONTO_STATIC_CONTAINER_HOST: http://static:80
-    ports:
-      - "6082:5000"
+    expose:
+      - "5000"
     networks:
       - pronto_net
     restart: unless-stopped
@@ -79,6 +89,9 @@ services:
       retries: 3
     profiles:
       - apps
+      - dev  # Exponer puerto solo en perfil dev
+    ports:
+      - "6082:5000"
     volumes:
       - ./pronto-api/src/api_app:/opt/pronto/api_app
       - ./pronto-libs/src/pronto_shared:/usr/local/lib/python3.11/site-packages/pronto_shared

@@ -28,6 +28,13 @@ Violación a cualquiera ⇒ **REJECTED**.
 14. Fuente única DDL: `pronto-scripts/init/**`
     - `DROP INDEX IF EXISTS` permitido solo en `pronto-scripts/init/sql/migrations/`
     - todo lo demás `DROP*` prohibido.
+15. Prohibido código legacy y patrones anticuados:
+    - Prohibido `flask.session` para autenticación de empleados (usar JWT).
+    - Prohibido directorio `legacy_mysql` en `pronto-scripts/init/`.
+    - Prohibido funciones de hash legacy (SHA256+pepper) - usar PBKDF2.
+    - Prohibido `callbacks` en SQLAlchemy (usar eventos si es necesario).
+    - Prohibido patrones deprecated de Flask/Werkzeug.
+16. No se permite código que dependa de funcionalidad deprecated o sin mantenimiento.
 15. Init/Migrations canónicos pre-boot (OBLIGATORIO):
     - `./pronto-scripts/bin/pronto-migrate --apply`
     - `./pronto-scripts/bin/pronto-init --check`
@@ -37,12 +44,72 @@ Violación a cualquiera ⇒ **REJECTED**.
 17. Reutilización: Antes de crear funcionalidad nueva, revisar `pronto-libs (pronto_shared)` y reutilizar ahí.
 18. No cambios silenciosos en `docker-compose*` ni en `pronto-scripts/bin`.
 19. Herramienta estándar de búsqueda: `rg`.
-20. Python deps: cada servicio `pronto-*` debe tener una sola fuente de verdad en `requirements.txt` en la raíz del proyecto del servicio (sin duplicados bajo `src/`).
+20. Python deps: cada servicio `pronto-*` debe tener una sola fuente de verdad en `requirements.txt` en la raíz del proyecto del servicio (sin duplicados bajo `src/`). Excepción: `pronto-audit` usa `pyproject.toml` (poetry) y mantiene su propio ambiente virtual (`.venv`) interno.
 21. PostgreSQL canónico: **16-alpine**
 22. Root PRONTO es workspace aggregator local. **No se pushea**.
 - Versión versionada en: `pronto-scripts/pronto-root/`
 - Ver sección 0.5.5 para flujo de versionado.
 - Se pushean repos hijos `pronto-*`.
+23. Autoridad Única de Transiciones de Estado (Orden + Pago) (P0)
+- Constantes canónicas: `pronto-libs/src/pronto_shared/constants.py`
+- Servicio canónico: `pronto-libs/src/pronto_shared/services/order_state_machine.py`
+- Prohibido `workflow_status = ...` fuera del servicio canónico
+- Prohibido `payment_status = ...` fuera del servicio canónico
+- Estados: solo en constants.py (`OrderStatus`, `PaymentStatus`)
+
+---
+
+# 0.6) TRAZABILIDAD Y OBSERVABILIDAD (P0)
+
+## 0.6.1 Correlation ID (OBLIGATORIO)
+- Todo request debe generar un correlation ID único
+- Header canónico: `X-Correlation-ID`
+- El correlation ID debe propagarse a todos los servicios y logs
+
+## 0.6.2 Logging Estructurado (OBLIGATORIO)
+- Usar `pronto_shared/trazabilidad.py` - StructuredLogger
+- Formato JSON con campos obligatorios:
+  - `timestamp`: ISO8601
+  - `level`: DEBUG|INFO|WARNING|ERROR
+  - `correlation_id`: ID del request
+  - `service`: nombre del servicio
+  - `action`: operación
+  - `user_id`: ID del usuario
+  - `user_type`: employee|customer|anonymous
+  - `duration_ms`: tiempo de ejecución
+  - `message`: mensaje legible
+  - `error`: detalles del error (si aplica)
+
+## 0.6.3 Mensajes de Usuario (OBLIGATORIO)
+- NO exponer errores técnicos al usuario
+- Usar códigos de error amigables (`USER_MESSAGES` en trazabilidad.py)
+- Idiomas soportados: `es` (default), `en`
+
+## 0.6.4 Errores y Excepciones
+- Capturar contexto completo (stack trace, variables relevantes)
+- No exponer PII en logs
+- Registrar correlation ID en todo error
+
+## 0.6.5 Monitoreo
+- Endpoint de health: `/health` con estado y versión
+- Métricas básicas: requests totales, errores, duración promedio
+- Usar `ProcessMonitor` de trazabilidad.py
+
+## 0.6.6 Auditoría de Acciones de Negocio
+- Registrar quién hizo qué y cuándo (audit_action)
+- Formato: `USER|ACTION|TYPE|CODE|RETVAL|SESSION|TIME`
+
+## 0.6.7 Logs de Trazabilidad (OBLIGATORIO)
+- Todos los logs aplicativo deben vivir en `pronto-logs/`
+- Directorio raíz: `pronto-logs/`
+- Subdirectorios por servicio:
+  - `pronto-logs/api/` - Logs de pronto-api
+  - `pronto-logs/employees/` - Logs de pronto-employees
+  - `pronto-logs/client/` - Logs de pronto-client
+  - `pronto-logs/nginx/` - Logs de nginx (pronto-static)
+- Usar `pronto_shared/logging_config.py` para configuración
+- Formato: JSON estructurado (ver 0.6.2)
+- Rotación: diaria, retención 7 días
 
 ---
 
@@ -80,6 +147,26 @@ Usar:
   - `docker-compose.yml`, `docker-compose.api.yml`, `docker-compose.client.yml`, `docker-compose.employees.yml`, `docker-compose.infra.yml`, `docker-compose.tests.yml`
   - `pronto-apps.sh`, `pronto-dev.sh`, `start-api.sh`
 - Esta copia es la única fuente versionada del contenido del root.
+
+## 0.5.6 Control de versión del sistema (P0)
+- Variable canónica de versión: `PRONTO_SYSTEM_VERSION` (en `.env` y `.env.example`).
+- Formato obligatorio: `1.0000` (1 entero + 4 dígitos decimales).
+- Valor inicial base: `1.0000`.
+- Cada modificación aplicada por un agente AI debe incrementar `+1` en los 4 dígitos decimales.
+  - Ejemplo: `1.0000` → `1.0001` → `1.0002`.
+- Al modificar versión en root, replicar el cambio en `pronto-scripts/pronto-root/.env` y `pronto-scripts/pronto-root/.env.example`.
+- Los aplicativos `pronto-api`, `pronto-client` y `pronto-employees` deben exponer/mostrar la versión vigente.
+
+## 0.5.7 Bitácora de versión AI (P0)
+- Cada cambio aplicado por AI debe registrar evidencia en `pronto-docs/versioning/AI_VERSION_LOG.md`.
+- Formato obligatorio por entrada:
+  - `FECHA (YYYY-MM-DD)`
+  - `VERSION_ANTERIOR`
+  - `VERSION_NUEVA`
+  - `AGENTE`
+  - `MODULOS`
+  - `RESUMEN`
+- Si no hay incremento de `PRONTO_SYSTEM_VERSION` y entrada de bitácora, el cambio queda **REJECTED**.
 
 
 ---
@@ -132,6 +219,46 @@ No se modifican sin orden explícita:
 - Roles / segmentación / vistas↔roles
 - Diseño visual
 - Vistas (general)
+
+---
+
+# 3.1) WORKFLOW DE ÓRDENES (P0)
+
+## Estados de Orden (workflow_status)
+
+| Estado | Descripción | Transiciones válidas |
+|--------|-------------|---------------------|
+| `new` | Orden creada por cliente | → `queued` (mesero acepta) |
+| `queued` | Mesero aceptó orden | → `preparing` (chef inicia), → `ready` (quick-serve) |
+| `preparing` | Chef preparando orden | → `ready` (chef termina) |
+| `ready` | Orden lista para entregar | → `delivered` (mesero entrega) |
+| `delivered` | Orden entregada al cliente | → `paid` (pago completado) |
+| `cancelled` | Orden cancelada | Estado terminal |
+
+## Estados de Pago (payment_status)
+
+| Estado | Descripción |
+|--------|-------------|
+| `unpaid` | Sin pagar |
+| `paid` | Pagado |
+
+## Sesión/Dining Session (status)
+
+| Estado | Descripción |
+|--------|-------------|
+| `open` | Sesión abierta (cliente ordenando) |
+| `active` | Sesión activa con órdenes |
+| `awaiting_tip` | Propina solicitada |
+| `awaiting_payment` | Cliente pidió la cuenta (check) |
+| `paid` | Sesión pagada y cerrada |
+
+## Reglas de Workflow
+
+1. **Orden automática a `queued`**: Si la mesa tiene mesero asignado, al crear orden se acepta automáticamente
+2. **Quick-serve**: Si todos los items son `is_quick_serve=true`, la orden pasa directamente a `ready`
+3. **Pago directo**: El pago puede completarse en cualquier momento (no requiere `awaiting_payment`)
+4. **Check solicitado**: Se registra `check_requested_at` cuando el cliente pide la cuenta desde la app, pero no es requisito para pagar
+5. **Roles para pago**: Mesero, Cajero, Admin, System pueden iniciar y confirmar pagos
 
 ---
 
@@ -194,6 +321,16 @@ Reglas:
 Si existe script en bin, debe usarse.
 Si no existe, crearlo en bin.
 Si existe pero no soporta caso, extender con flags (idempotente).
+
+Scripts Críticos:
+- `pronto-full-audit.sh`: Ejecuta auditorías LLM integrales por proyecto enfocadas en:
+    1. **Integridad de Negocio:** Validación de flujos (orden, pago, entrega).
+    2. **Pureza Arquitectónica:** Prohibición absoluta de estáticos locales fuera de `pronto-static`.
+    3. **Calidad de Código:** Detección de imports rotos, código legacy, deduplicación y fallbacks peligrosos.
+    4. **Seguridad:** Aislamiento de sesiones y protección de PII.
+    5. **Integridad de Estructuras:** Consistencia DDL (SQL) vs Modelos (Python) vs Interfaces (TypeScript).
+- `pronto-inconsistency-check`: Verifica invariantes locales y roles.
+- `pronto-api-parity-check`: Valida consistencia frontend/backend.
 9) PRONTO-TESTS (P1)
 Centraliza:
 UI/E2E (Playwright)
@@ -225,7 +362,9 @@ Resolución por host:
 employees.<dominio>/api/* → pronto-employees
 clients.<dominio>/api/* → pronto-client
 Prohibido implementar/documentar/depender de "/{scope}/api/*".
+
 12.2 Frontend employees (pronto-static) — wrapper obligatorio (P0)
+
 Toda llamada a "/api/*" debe ser relativa (sin host hardcode).
 Prohibido mutar "/api/*" fuera de:
 pronto-static/src/vue/employees/core/http.ts
@@ -237,7 +376,32 @@ Fuente token: <meta name="csrf-token" ...>
 Header: X-CSRFToken
 Toda mutación a "/api/*" incluye X-CSRFToken (incluye FormData).
 Si falta meta tag y se intenta mutar ⇒ wrapper falla loud (throw).
+
+12.4 Autenticación clientes (P0)
+12.4.1 Header canónico
+pronto-client → pronto-api debe usar header: X-PRONTO-CUSTOMER-REF
+
+12.5 Tipos de parámetros en rutas (P0)
+- Entidades principales (Customer, Employee, DiningSession, Order, Table, MenuItem, Modifier, etc.) deben usar UUID.
+- Solo entidades de lookup/técnicas usan Integer: Area, Role, DiscountCode, Promotion, ProductSchedule, WaiterCall, Notification.
+- Flask route converters: usar `<uuid:id>` para entidades UUID, `<int:id>` solo para Integer.
+- No usar `<str:id>` para IDs; usar converters explícitos.
+- Validar contra el modelo: si el modelo usa `UUID(as_uuid=True)`, la ruta debe usar `<uuid:id>`.
+- Servicios permitidos de Integer IDs:
+  - pronto-employees: Area, Role, DiscountCode, Promotion, ProductSchedule, WaiterCall, AdminShortcut
+  - others: revisar schema antes de decidir.
+
+12.6 Gate de validación de tipos (P0)
+Ejecutar para validar:
+```bash
+# Verificar que no haya <int:> para entidades UUID
+rg -n --hidden "/<int:[a-z_]+_id>" pronto-employees/src/pronto_employees/routes/api/
+rg -n --hidden "/<int:[a-z_]+_id>" pronto-client/src/pronto_clients/routes/api/
+```
+Si produce output ⇒ REJECTED
+
 13) TOOLING CONFIABLE: PRONTO_ROUTES_ONLY (P1)
+
 pronto-employees y pronto-client deben soportar PRONTO_ROUTES_ONLY=1.
 En PRONTO_ROUTES_ONLY=1, create_app():
 Solo registra rutas/blueprints
@@ -265,8 +429,7 @@ cookies.md / csrf.md (si aplica)
 15) ROUTER SEMÁNTICO (P0)
 Fuente de verdad:
 pronto-ai/router.yml
-Router-Hash:
-662348eb4422032402a7e7fe8fa09aabed72c579b2031bbf20d9db58678fdf72
+Router-Hash: `b461a7f3412424bd8308f60366f3d3fc3daa83d2fcca70af8a25f976f66c3fb1`
 Regla:
 Si cambia router.yml, actualizar hash y registrar evidencia en docs.
 16) AGENTES (DEFINICIÓN + PRIORIDAD)
@@ -289,6 +452,13 @@ Scripts fuera de pronto-scripts/bin
 Salida:
 STATUS: APPROVED|REJECTED
 VIOLATIONS:
+Pronto-Audit-Agent (P1)
+- Sistema autónomo de auditoría integral (CrewAI).
+- Escanea: AGENTS.md compliance, API parity, Seguridad, TypeScript/Vue quality, Deduplicación.
+- Ubicación: `pronto-audit/`
+- Entorno: Virtualenv propio (`pronto-audit/.venv`), gestionado por Poetry (Python 3.12 obligatorio).
+- Salida: Reportes en `pronto-audit/reports/` y GitHub Issues.
+
 Pronto-Precommit-Agent (P0)
 Analiza archivos cambiados
 Hook: .git/hooks/pre-commit -> pronto-scripts/bin/pre-commit-ai
@@ -323,6 +493,48 @@ Prohibido en prod
 Pronto-Logging-Agent (P2)
 current_app.logger o get_logger
 No swallow exceptions
+Pronto-Business-Order-Auditor-Agent (P0)
+Valida negocio + enforcement:
+- Grafo (ORDER_TRANSITIONS) y reglas (validate_transition)
+- Uso obligatorio de OrderStateMachine
+- Quick-serve / parciales / pagos (cash/card)
+- Inventario de flujo en pronto-prompts/business/order_request_flow_files.md
+- Tests del flujo
+Salida:
+STATUS: APPROVED|REJECTED
+BUSINESS_RULES:
+- Workflow Graph: OK|FAIL
+- Quick Serve: OK|FAIL
+- Partial Orders: OK|FAIL
+- Payment Cash: OK|FAIL
+- Payment Card: OK|FAIL
+- Auto Accept: OK|FAIL
+CODE_INTEGRITY:
+- Single Authority: OK|FAIL
+- No Magic Strings: OK|FAIL
+INVENTORY:
+- Complete: OK|FAIL
+TESTS:
+- Coverage: OK|FAIL
+VIOLATIONS:
+Pronto-Guardrails-Order-State-Authority (P0)
+Enforcement estructural:
+- Bloquea escrituras directas de estados
+- Bloquea strings mágicos fuera de archivos permitidos
+Ejecutar:
+rg -n --hidden "workflow_status\s*=" pronto-api/src | rg -v "order_state_machine\.py"
+rg -n --hidden "payment_status\s*="  pronto-api/src | rg -v "order_state_machine\.py"
+rg -n --hidden "['\"](new|queued|preparing|ready|delivered|paid|cancelled)['\"]" pronto-api/src \
+  | rg -v "constants\.py|order_state_machine\.py"
+Salida:
+STATUS: APPROVED|REJECTED
+VIOLATIONS:
+
+## 16.3 Herramientas de Auditoría (Ejecución Manual/CI)
+- `pronto-full-audit.sh`: Orquestador de auditoría LLM integral. Utiliza prompts especializados por proyecto para detectar inconsistencias de negocio, estáticos prohibidos y deuda técnica.
+- `pronto-inconsistency-check`: Script de validación rápida de invariantes locales (roles, versiones, sesiones).
+- `pronto-audit/bin/run-audit.sh`: Interfaz de ejecución para el agente basado en CrewAI (requiere `.venv` interno con Python 3.12).
+
 17) GATES (ORDEN CANÓNICO) — EJECUCIÓN OBLIGATORIA
 Gate A: Arquitectura (P0)
 docker-compose* tocado sin orden explícita ⇒ REJECTED
@@ -343,6 +555,11 @@ Gate G: API Parity (P1)
 ejecutar:
 ./pronto-scripts/bin/pronto-api-parity-check employees
 ./pronto-scripts/bin/pronto-api-parity-check clients
+Gate H: Order State Authority (P0)
+Ejecutar:
+rg -n --hidden "workflow_status\s*=" pronto-api/src | rg -v "order_state_machine\.py"
+rg -n --hidden "payment_status\s*="  pronto-api/src | rg -v "order_state_machine\.py"
+Si produce output ⇒ REJECTED
 18) ERROR TRACKING OBLIGATORIO — Pronto-Error-Tracker-Agent (P0)
 Objetivo:
 Forzar que TODO bug quede documentado y solo pase a resuelto con corrección verificada.
@@ -387,7 +604,19 @@ crear NUEVO archivo en pronto-docs/errors/ y referenciar ID anterior en DESCRIPC
 No existe fix sin archivo en pronto-docs/errors/.
 No existe archivo en pronto-docs/resolved/ con ESTADO != RESUELTO.
 No existe entrada en pronto-docs/resueltos.txt sin archivo correspondiente.
-19) REGLAS OPERATIVAS PARA CAMBIOS SENSIBLES (P0)
+
+---
+
+# 19) MANDATO DE ACCESO Y LOGIN (P0)
+
+1. La aplicación solo funciona con login y registro previo.
+2. Prohibido realizar órdenes sin un usuario autenticado y una sesión activa.
+3. El flujo de invitados (anonymous) es transicional hacia un registro o login obligatorio para finalizar el checkout.
+4. **Caso Kiosko:** Se utilizará un usuario especial de tipo `kiosko`. Por ahora, su comportamiento y capacidades son idénticas a las de un usuario normal.
+
+---
+
+# 20) REGLAS OPERATIVAS PARA CAMBIOS SENSIBLES (P0)
 Si una acción puede afectar:
 Datos
 Arquitectura

@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS ix_day_period_display_order ON pronto_day_periods (di
 CREATE TABLE IF NOT EXISTS pronto_menu_item_day_periods (
     id SERIAL PRIMARY KEY,
     menu_item_id UUID NOT NULL REFERENCES pronto_menu_items(id) ON DELETE CASCADE,
-    period_id UUID NOT NULL REFERENCES pronto_day_periods(id) ON DELETE CASCADE,
+    period_id INTEGER NOT NULL REFERENCES pronto_day_periods(id) ON DELETE CASCADE,
     tag_type VARCHAR(32) NOT NULL DEFAULT 'recommendation',
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() AT TIME ZONE 'utc') NOT NULL,
     CONSTRAINT uq_menu_item_period_tag UNIQUE (menu_item_id, period_id, tag_type)

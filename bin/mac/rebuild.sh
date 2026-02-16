@@ -22,6 +22,54 @@ set +a
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-pronto}"
 COMPOSE_CMD=(docker compose -f "${PROJECT_ROOT}/docker-compose.yml" -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}")
 
+release_port_containers() {
+  local host_port="$1"
+  [[ -z "${host_port}" ]] && return 0
+
+  echo "   - Verificando puerto ${host_port}..."
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    local container_id
+    local container_name
+    container_id=$(awk '{print $1}' <<< "${line}")
+    container_name=$(awk '{print $2}' <<< "${line}")
+    if [[ -n "${container_id}" ]]; then
+      echo "     - Liberando puerto ${host_port} deteniendo ${container_id} (${container_name})..."
+      docker stop "${container_id}" 2>/dev/null || true
+      docker rm -f "${container_id}" 2>/dev/null || true
+    fi
+  done < <(docker ps -a --filter "publish=${host_port}" --format "{{.ID}} {{.Names}}" 2>/dev/null || true)
+}
+
+wait_for_service_health() {
+  local service_name="$1"
+  local container_id
+  container_id=$("${COMPOSE_CMD[@]}" ps -q "${service_name}" 2>/dev/null || true)
+  if [[ -z "${container_id}" ]]; then
+    echo "   ⚠️  No se encontró contenedor para ${service_name}"
+    return 1
+  fi
+
+  local status=""
+  for _ in {1..30}; do
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || echo "unknown")
+    if [[ "${status}" == "healthy" || "${status}" == "running" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "   ⚠️  ${service_name} no alcanzó estado healthy/running (estado=${status})"
+  return 1
+}
+
+ensure_infra_ready() {
+  echo ">> Asegurando infraestructura (postgres y redis) antes del redeploy de apps..."
+  "${COMPOSE_CMD[@]}" up -d --force-recreate postgres redis
+  wait_for_service_health postgres || true
+  wait_for_service_health redis || true
+}
+
 KEEP_SESSIONS=false
 SERVICES=()
 
@@ -41,6 +89,7 @@ while [[ $# -gt 0 ]]; do
       echo "  api        - API REST Unificada"
       echo "  static     - Servidor de archivos estáticos (nginx)"
       echo "  redis      - Base de datos Redis"
+      echo "  postgres   - Base de datos PostgreSQL"
       echo "  all        - Todos los servicios (por defecto)"
       echo ""
       echo "Ejemplos:"
@@ -57,7 +106,7 @@ while [[ $# -gt 0 ]]; do
       SERVICES=()
       shift
       ;;
-    client|employee|api|static|redis)
+    client|employee|api|static|redis|postgres)
       SERVICES+=("$1")
       shift
       ;;
@@ -74,12 +123,18 @@ if [[ ${#SERVICES[@]} -eq 0 ]]; then
 fi
 
 NEEDS_REDIS=false
+NEEDS_INFRA=false
 for s in "${SERVICES[@]}"; do
   if [[ "$s" == "employee" || "$s" == "client" || "$s" == "api" ]]; then
     NEEDS_REDIS=true
+    NEEDS_INFRA=true
     break
   fi
 done
+
+if [[ "${NEEDS_INFRA}" == "true" ]]; then
+  ensure_infra_ready
+fi
 
 # Cleanup old sessions before rebuild (only for client/employee services, unless --keep-sessions)
 if [[ "$KEEP_SESSIONS" == "false" ]]; then
@@ -121,26 +176,12 @@ for service in "${SERVICES[@]}"; do
 
   # Handle Redis and PostgreSQL specially - don't recreate, just ensure running
   if [[ "$service" == "redis" || "$service" == "postgres" ]]; then
-    CONTAINER_NAME=""
-    if [[ "$service" == "redis" ]]; then
-      CONTAINER_NAME="${REDIS_CONTAINER_NAME}"
-    else
-      CONTAINER_NAME="${POSTGRES_CONTAINER_NAME}"
-    fi
-
-    EXISTING_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$" && docker ps --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' || echo "")
-
-    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-      if docker ps --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-        echo "   - ${service} ya está corriendo"
-        echo "   ✅ ${service} mantenido como está"
-      else
-        echo "   - ${service} existe pero está detenido, iniciando..."
-        docker start "${CONTAINER_NAME}"
-        echo "   ✅ ${service} iniciado"
-      fi
-      continue
-    fi
+    echo "   - Recreando ${service} para asegurar alias de red y estado saludable..."
+    "${COMPOSE_CMD[@]}" up -d --force-recreate "${service}"
+    wait_for_service_health "${service}" || true
+    echo "   ✅ ${service} recreado"
+    echo ""
+    continue
   fi
 
   # Stop and remove containers using the old image
@@ -151,26 +192,14 @@ for service in "${SERVICES[@]}"; do
   # Ensure the host port is free before starting a new container.
   HOST_PORT=""
   case "$service" in
-    client) HOST_PORT="${CLIENT_APP_HOST_PORT:-}" ;;
-    employee) HOST_PORT="${EMPLOYEE_APP_HOST_PORT:-}" ;;
+    client) HOST_PORT="${CLIENT_APP_HOST_PORT:-6080}" ;;
+    employee) HOST_PORT="${EMPLOYEE_APP_HOST_PORT:-6081}" ;;
     api) HOST_PORT="${API_APP_HOST_PORT:-6082}" ;;
-    static) HOST_PORT="${STATIC_APP_HOST_PORT:-}" ;;
+    static) HOST_PORT="${STATIC_APP_HOST_PORT:-9088}" ;;
     redis) HOST_PORT="${REDIS_HOST_PORT:-6379}" ;;
   esac
 
-  if [[ -n "${HOST_PORT}" ]]; then
-    echo "   - Verificando puerto ${HOST_PORT}..."
-    while IFS= read -r line; do
-      [[ -z "${line}" ]] && continue
-      container_id=$(awk '{print $1}' <<< "${line}")
-      container_name=$(awk '{print $2}' <<< "${line}")
-      if [[ -n "${container_id}" ]]; then
-        echo "     - Liberando puerto ${HOST_PORT} deteniendo ${container_id} (${container_name})..."
-        docker stop "${container_id}" 2>/dev/null || true
-        docker rm -f "${container_id}" 2>/dev/null || true
-      fi
-    done < <(docker ps -a --filter "publish=${HOST_PORT}" --format "{{.ID}} {{.Names}}" 2>/dev/null || true)
-  fi
+  release_port_containers "${HOST_PORT}"
 
   # Build new image
   echo "   - Construyendo nueva imagen..."
@@ -178,7 +207,17 @@ for service in "${SERVICES[@]}"; do
 
   # Start new container (--no-deps to avoid starting redis/postgres dependencies)
   echo "   - Iniciando nuevo contenedor..."
-  "${COMPOSE_CMD[@]}" up -d --no-deps "${compose_service}"
+  up_output=""
+  if ! up_output=$("${COMPOSE_CMD[@]}" up -d --no-deps "${compose_service}" 2>&1); then
+    if [[ -n "${HOST_PORT}" ]] && grep -qi "port is already allocated" <<< "${up_output}"; then
+      echo "   - Detectado conflicto de puerto en ${HOST_PORT}; intentando liberar contenedores activos y reintentar..."
+      release_port_containers "${HOST_PORT}"
+      "${COMPOSE_CMD[@]}" up -d --no-deps "${compose_service}"
+    else
+      echo "${up_output}" >&2
+      exit 1
+    fi
+  fi
 
   echo "   ✅ ${service} reconstruido y reiniciado"
   echo ""

@@ -16,6 +16,45 @@ slugify() {
   echo "${input}"
 }
 
+resolve_static_container_name() {
+  local project_prefix="${1:-pronto}"
+
+  if ! command -v docker &> /dev/null; then
+    return 1
+  fi
+
+  local candidates=(
+    "${project_prefix}-static"
+    "${project_prefix}-static-1"
+    "${project_prefix}-app-static"
+    "${project_prefix}-app-static-1"
+    "pronto-static"
+    "pronto-static-1"
+    "pronto-app-static"
+    "pronto-app-static-1"
+  )
+
+  local running_names
+  running_names="$(docker ps --format '{{.Names}}' 2>/dev/null || true)"
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if grep -qx "${candidate}" <<< "${running_names}"; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  local detected
+  detected="$(grep -E "^(${project_prefix}(-app)?-static|pronto(-app)?-static)(-[0-9]+)?$" <<< "${running_names}" | head -n1 || true)"
+  if [[ -n "${detected}" ]]; then
+    echo "${detected}"
+    return 0
+  fi
+
+  return 1
+}
+
 ensure_static_placeholder() {
     local static_root="/var/www/pronto-static"
   local restaurant_name="${RESTAURANT_NAME:-cafeteria-test}"
@@ -67,6 +106,11 @@ validate_static_pod() {
   case "$os_type" in
     Darwin)
       echo ">> Sistema: macOS (desarrollo)"
+      local resolved_container=""
+      resolved_container="$(resolve_static_container_name "${project_prefix}" || true)"
+      if [[ -n "${resolved_container}" ]]; then
+        static_container="${resolved_container}"
+      fi
       echo ">> Verificando pod static: ${static_container}"
       
       # Verificar si el contenedor existe y está ejecutándose
@@ -153,7 +197,7 @@ sync_static_content() {
 
     for service in "${services[@]}"; do
         case "$service" in
-            client|employee|static) sync_static=1 ;;
+            client|employees|static) sync_static=1 ;;
         esac
     done
 
@@ -166,6 +210,7 @@ sync_static_content() {
     os_type="$(uname -s)"
     local project_prefix="${PROJECT_PREFIX:-pronto}"
     local static_container="${project_prefix}-static"
+    local resolved_container=""
 
     # Cargar variables de configuración del servidor de contenido estático
     local nginx_host="${NGINX_HOST:-localhost}"
@@ -175,6 +220,10 @@ sync_static_content() {
 
     case "$os_type" in
         Darwin)
+            resolved_container="$(resolve_static_container_name "${project_prefix}" || true)"
+            if [[ -n "${resolved_container}" ]]; then
+                static_container="${resolved_container}"
+            fi
             echo ">> Sincronizando contenido estático al pod '${static_container}' (macOS)..."
 
             # Verificar si el contenedor existe
@@ -186,14 +235,20 @@ sync_static_content() {
 
             # Crear directorios en el contenedor
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/js 2>/dev/null || true
+            docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/js/clients 2>/dev/null || true
+            docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/js/employees 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/css 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/branding 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/menu 2>/dev/null || true
 
             # Copiar JS bundles
             echo "   - Copiando JS bundles..."
-            docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/clients/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
-            docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/employees/"*.js "$static_container:/usr/share/nginx/html/assets/js/" 2>/dev/null || true
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js/clients" ]]; then
+                docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/clients/." "$static_container:/usr/share/nginx/html/assets/js/clients/" 2>/dev/null || true
+            fi
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js/employees" ]]; then
+                docker cp "${PRONTO_STATIC_ASSETS_DIR}/js/employees/." "$static_container:/usr/share/nginx/html/assets/js/employees/" 2>/dev/null || true
+            fi
 
             # Copiar CSS
             echo "   - Copiando CSS..."

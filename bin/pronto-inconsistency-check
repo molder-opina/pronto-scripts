@@ -32,12 +32,12 @@ if rg -n "flask\.session" pronto-api pronto-employees 2>/dev/null; then
   LOCAL_BLOCKER=1
 fi
 
-if rg -n "admin_roles" . 2>/dev/null; then
+if rg -n "admin_roles" pronto-api pronto-client pronto-employees pronto-libs pronto-static pronto-tests 2>/dev/null; then
   echo "- BLOCKER: rol no canónico admin_roles" | tee -a "$OUT_DIR/inconsistencies.local.md"
   LOCAL_BLOCKER=1
 fi
 
-if rg -n "PostgreSQL 13|postgres:13|13-alpine" pronto-docs 2>/dev/null; then
+if rg -n "PostgreSQL 13|postgres:13|13-alpine" pronto-docs -g '!pronto-docs/resolved/**' 2>/dev/null; then
   echo "- BLOCKER: referencia a Postgres 13" | tee -a "$OUT_DIR/inconsistencies.local.md"
   LOCAL_BLOCKER=1
 fi

@@ -2,16 +2,40 @@
 # Validate and seed database
 # Verifica que la base de datos tenga todos los datos necesarios y los crea si faltan
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SEED_SCRIPT="${SCRIPT_DIR}/python/validate_and_seed.py"
+
+detect_container() {
+  if docker ps --format '{{.Names}}' | rg -x 'pronto-employees-1' >/dev/null; then
+    echo "pronto-employees-1"
+    return 0
+  fi
+  if docker ps --format '{{.Names}}' | rg -x 'pronto-employee' >/dev/null; then
+    echo "pronto-employee"
+    return 0
+  fi
+  return 1
+}
+
+if [[ ! -f "${SEED_SCRIPT}" ]]; then
+  echo "❌ Script de seed no encontrado: ${SEED_SCRIPT}" >&2
+  exit 1
+fi
+
+if ! CONTAINER_NAME="$(detect_container)"; then
+  echo "❌ No se encontró contenedor de employees activo (esperado: pronto-employees-1 o pronto-employee)." >&2
+  exit 1
+fi
 
 echo "🔍 Validando y creando seed data en la base de datos..."
+echo "📦 Contenedor detectado: ${CONTAINER_NAME}"
 echo ""
 
 # Execute inside the employee container
-docker exec pronto-employee python3 -c "
+if ! docker exec "${CONTAINER_NAME}" python3 -c "
 import sys
 sys.path.insert(0, '/opt/pronto')
 
@@ -69,7 +93,20 @@ with get_session() as db:
         sys.exit(0)
 
 # If we need to seed, run the full script
-" && docker cp bin/python/validate_and_seed.py pronto-employee:/tmp/validate_and_seed.py && docker exec pronto-employee python3 /tmp/validate_and_seed.py
+"; then
+  echo "❌ Falló la validación preliminar de seed." >&2
+  exit 1
+fi
+
+if ! docker cp "${SEED_SCRIPT}" "${CONTAINER_NAME}:/tmp/validate_and_seed.py"; then
+  echo "❌ No se pudo copiar validate_and_seed.py al contenedor." >&2
+  exit 1
+fi
+
+if ! docker exec "${CONTAINER_NAME}" python3 /tmp/validate_and_seed.py; then
+  echo "❌ Falló la ejecución de validate_and_seed.py." >&2
+  exit 1
+fi
 
 echo ""
 echo "✅ Validación completada"

@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# pronto-audit-no-residue
+# Comprehensive audit script to detect drift, orphaned tables, inconsistencies
+# Usage: ./bin/pronto-audit-no-residue
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+ERRORS=0
+WARNINGS=0
+
+error() {
+    echo -e "${RED}✗ ERROR: $1${NC}"
+    ERRORS=$((ERRORS+1))
+}
+
+warn() {
+    echo -e "${YELLOW}⚠ WARNING: $1${NC}"
+    WARNINGS=$((WARNINGS+1))
+}
+
+ok() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+section() {
+    echo ""
+    echo "========================================="
+    echo "$1"
+    echo "========================================="
+}
+
+## 1. UUID End-to-End
+section "1. UUID Consistency (Routes, ORM, DB)"
+
+# Check that known UUID entities use <uuid:*> not <int:*>
+echo "Checking that core UUID entities use correct route parameters..."
+UUID_VIOLATIONS=""
+
+# Check for employee_id, customer_id, order_id, table_id using <int:>
+for entity in "employee_id" "customer_id" "order_id"; do
+    VIOLATIONS=$(grep -r "<int:$entity>" "$PROJECT_ROOT/pronto-api/src" "$PROJECT_ROOT/pronto-employees/src" --exclude-dir=__pycache__ --exclude=*.pyc 2>/dev/null || true)
+    if [ -n "$VIOLATIONS" ]; then
+        UUID_VIOLATIONS="$UUID_VIOLATIONS\n$VIOLATIONS"
+    fi
+done
+
+if [ -n "$UUID_VIOLATIONS" ]; then
+    error "Found UUID entities using <int:> (should be <uuid:>)"
+    echo -e "$UUID_VIOLATIONS"
+else
+    ok "All core UUID entities (employee, customer, order) use correct <uuid:> parameters"
+fi
+
+# Check DB column types for core entities
+echo "Checking database UUID column types..."
+docker exec pronto-postgres-1 psql -U pronto -d pronto -t -c "
+SELECT 
+    table_name, 
+    column_name, 
+    data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+    AND column_name LIKE '%_id'
+    AND table_name LIKE 'pronto_%'
+    AND column_name NOT IN ('total_paid', 'run_id')
+    AND data_type NOT IN ('uuid', 'integer')
+ORDER BY table_name, column_name;
+" | grep -v '^$' || ok "All *_id columns are uuid or integer"
+
+## 2. Indices and FKs
+section "2. Indices and Foreign Keys"
+
+echo "Checking for FK columns without indices..."
+while read -r line; do
+    warn "FK without index: $line"
+done < <(docker exec pronto-postgres-1 psql -U pronto -d pronto -t -c "
+SELECT DISTINCT
+    tc.table_name,
+    kcu.column_name
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name
+WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'public'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+            AND tablename = tc.table_name
+            AND indexdef LIKE '%' || kcu.column_name || '%'
+    )
+ORDER BY tc.table_name, kcu.column_name;
+" | grep -v '^$')
+
+if [ $WARNINGS -eq 0 ]; then
+    ok "All FK columns have indices"
+fi
+
+## 3. Schema Cleanup
+section "3. Schema Cleanup (Orphaned Tables)"
+
+echo "Listing all pronto_* tables..."
+TABLES=$(docker exec pronto-postgres-1 psql -U pronto -d pronto -t -c "
+SELECT tablename FROM pg_tables 
+WHERE schemaname='public' AND tablename LIKE 'pronto_%'
+ORDER BY tablename;
+")
+
+echo "$TABLES"
+
+# Check for known legacy tables
+LEGACY_TABLES=("pronto_business_config" "schema_migrations" "branding_config")
+for table in "${LEGACY_TABLES[@]}"; do
+    if echo "$TABLES" | grep -q "^[[:space:]]*$table[[:space:]]*$"; then
+        error "Legacy table still exists: $table"
+    fi
+done
+
+## 4. PII Encryption
+section "4. PII Encryption Verification"
+
+echo "Checking for plaintext PII columns..."
+while read -r col; do
+    warn "Plaintext PII column exists: pronto_customers.$col"
+done < <(docker exec pronto-postgres-1 psql -U pronto -d pronto -t -c "
+SELECT column_name 
+FROM information_schema.columns
+WHERE table_name = 'pronto_customers'
+    AND column_name IN ('email', 'phone', 'name')
+    AND column_name NOT LIKE '%_encrypted'
+    AND column_name NOT LIKE '%_hash';
+" | grep -v '^$')
+
+## 5. Structured Logging
+section "5. Structured Logging (No current_app.logger)"
+
+echo "Checking for current_app.logger usage..."
+LOGGER_USAGE=$(grep -r "current_app.logger" \
+    "$PROJECT_ROOT/pronto-api/src" \
+    "$PROJECT_ROOT/pronto-employees/src" \
+    "$PROJECT_ROOT/pronto-client/src" \
+    2>/dev/null | grep -v ".pyc" || true)
+
+if [ -n "$LOGGER_USAGE" ]; then
+    error "Found current_app.logger usage (should use StructuredLogger)"
+    echo "$LOGGER_USAGE" | head -10
+    echo "... (showing first 10 matches)"
+else
+    ok "No current_app.logger usage found"
+fi
+
+## 6. Config Unification
+section "6. Config Unification (No BusinessConfig)"
+
+echo "Checking for BusinessConfig references..."
+BUSINESS_CONFIG=$(grep -r "BusinessConfig" \
+    "$PROJECT_ROOT/pronto-libs/src/pronto_shared" \
+    2>/dev/null | grep -v ".bak" | grep -v ".pyc" | grep -v "models.py" || true)
+
+if [ -n "$BUSINESS_CONFIG" ]; then
+    error "Found BusinessConfig references (should be SystemSetting)"
+    echo "$BUSINESS_CONFIG"
+else
+    ok "No BusinessConfig references found"
+fi
+
+## 7. Migration Table
+section "7. Migration Table Verification"
+
+echo "Checking migration table..."
+MIGRATION_TABLES=$(docker exec pronto-postgres-1 psql -U pronto -d pronto -t -c "
+SELECT tablename FROM pg_tables 
+WHERE schemaname='public' AND tablename LIKE '%migration%'
+ORDER BY tablename;
+")
+
+echo "$MIGRATION_TABLES"
+
+if echo "$MIGRATION_TABLES" | grep -q "^[[:space:]]*schema_migrations[[:space:]]*$"; then
+    error "Legacy schema_migrations table exists (should only be pronto_schema_migrations)"
+fi
+
+## Summary
+section "AUDIT SUMMARY"
+
+echo ""
+if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
+    echo -e "${GREEN}✓ NO RESIDUE DETECTED - System is clean!${NC}"
+    exit 0
+elif [ $ERRORS -eq 0 ]; then
+    echo -e "${YELLOW}⚠ $WARNINGS warnings found (non-critical)${NC}"
+    exit 0
+else
+    echo -e "${RED}✗ $ERRORS errors and $WARNINGS warnings found${NC}"
+    echo "Please fix errors before proceeding."
+    exit 1
+fi

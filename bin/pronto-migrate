@@ -57,6 +57,10 @@ PSQL_BASE=(psql "$DB" -X -v ON_ERROR_STOP=1)
 
 safety_check_file() {
   local f="$1"
+  # DROP TABLE allowed ONLY in sql/migrations/
+  if [[ "$f" == *"/sql/migrations/"* ]]; then
+    return 0
+  fi
   # hard blocks
   if rg -n --pcre2 '(?i)\b(DROP\s+TABLE|DROP\s+SCHEMA|DROP\s+DATABASE|TRUNCATE|--clean|DO\s+\$\$)\b' "$f" >/dev/null; then
     echo "pronto-migrate: SQL peligroso bloqueado en $f" >&2

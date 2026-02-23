@@ -13,6 +13,7 @@ NC='\033[0m'
 CLIENT_API="http://localhost:6080/api"
 EMPLOYEE_API="http://localhost:6081/api"
 SESSION_COOKIE="/tmp/pronto_test_anonymous.txt"
+AUTH_HEADER="X-Pronto-Internal-Auth: 120d88e0cea0c97975e99901650132968f1b554c76d16814eeef2c4ce905aa89"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║                                               ║${NC}"
@@ -32,6 +33,7 @@ echo ""
 echo -e "${YELLOW}[1/7]${NC} Creando orden anónima (sin datos de contacto)..."
 ORDER_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
     -H "Content-Type: application/json" \
+    -H "$AUTH_HEADER" \
     -d '{
         "customer": {},
         "items": [
@@ -42,8 +44,8 @@ ORDER_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
 
 echo "$ORDER_RESPONSE" | jq '.'
 
-ORDER_ID=$(echo "$ORDER_RESPONSE" | jq -r '.order_id')
-SESSION_ID=$(echo "$ORDER_RESPONSE" | jq -r '.session_id')
+ORDER_ID=$(echo "$ORDER_RESPONSE" | jq -r '.data.order_id')
+SESSION_ID=$(echo "$ORDER_RESPONSE" | jq -r '.data.session_id')
 
 if [[ "$ORDER_ID" == "null" || -z "$ORDER_ID" ]]; then
     echo -e "${RED}✗ Error: No se pudo crear la orden anónima${NC}"
@@ -128,6 +130,7 @@ echo ""
 echo -e "${YELLOW}[1/3]${NC} Creando orden solo con teléfono..."
 ORDER2_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
     -H "Content-Type: application/json" \
+    -H "$AUTH_HEADER" \
     -d '{
         "customer": {
             "phone": "+34666789012"
@@ -137,8 +140,8 @@ ORDER2_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
         ]
     }')
 
-ORDER2_ID=$(echo "$ORDER2_RESPONSE" | jq -r '.order_id')
-SESSION2_ID=$(echo "$ORDER2_RESPONSE" | jq -r '.session_id')
+ORDER2_ID=$(echo "$ORDER2_RESPONSE" | jq -r '.data.order_id')
+SESSION2_ID=$(echo "$ORDER2_RESPONSE" | jq -r '.data.session_id')
 echo "$ORDER2_RESPONSE" | jq '.'
 echo -e "${GREEN}✓${NC} Orden creada solo con teléfono: ID=$ORDER2_ID"
 echo ""
@@ -198,6 +201,7 @@ echo ""
 echo -e "${YELLOW}[1/4]${NC} Cliente crea orden sin datos..."
 ORDER3_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
     -H "Content-Type: application/json" \
+    -H "$AUTH_HEADER" \
     -d '{
         "customer": {},
         "items": [
@@ -205,8 +209,8 @@ ORDER3_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
         ]
     }')
 
-ORDER3_ID=$(echo "$ORDER3_RESPONSE" | jq -r '.order_id')
-SESSION3_ID=$(echo "$ORDER3_RESPONSE" | jq -r '.session_id')
+ORDER3_ID=$(echo "$ORDER3_RESPONSE" | jq -r '.data.order_id')
+SESSION3_ID=$(echo "$ORDER3_RESPONSE" | jq -r '.data.session_id')
 echo -e "${GREEN}✓${NC} Orden $ORDER3_ID creada anónimamente"
 
 # Procesar orden

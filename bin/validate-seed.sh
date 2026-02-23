@@ -43,7 +43,7 @@ from pronto_shared.db import init_engine, get_session
 from pronto_shared.config import load_config
 from pronto_shared.models import (
     Employee, MenuCategory, MenuItem, Area, Table,
-    BusinessConfig, DayPeriod
+    SystemSetting, DayPeriod
 )
 from pronto_shared.security import hash_credentials, hash_identifier
 
@@ -61,7 +61,7 @@ with get_session() as db:
     products_count = db.query(MenuItem).count()
     areas_count = db.query(Area).count()
     tables_count = db.query(Table).count()
-    config_count = db.query(BusinessConfig).count()
+    config_count = db.query(SystemSetting).count()
     periods_count = db.query(DayPeriod).count()
 
     print(f'✅ Empleados: {employees_count}')
@@ -69,7 +69,7 @@ with get_session() as db:
     print(f'✅ Productos: {products_count}')
     print(f'✅ Áreas: {areas_count}')
     print(f'✅ Mesas: {tables_count}')
-    print(f'✅ Configuración: {config_count}')
+    print(f'✅ Configuración (SystemSetting): {config_count}')
     print(f'✅ Períodos del día: {periods_count}')
 
     needs_seed = (
@@ -78,7 +78,7 @@ with get_session() as db:
         products_count == 0 or
         areas_count == 0 or
         tables_count == 0 or
-        config_count == 0 or
+        config_count < 9 or
         periods_count == 0
     )
 

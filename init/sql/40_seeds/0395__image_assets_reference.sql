@@ -1,0 +1,9 @@
+-- Image assets reference for reproducible menu seed visuals.
+-- This file intentionally contains no DML.
+--
+-- Canonical references:
+--   pronto-scripts/init/assets/menu-images/menu-image-catalog.csv
+--   pronto-scripts/init/assets/menu-images/business-image-catalog.csv
+--
+-- Runtime asset location (static host):
+--   pronto-static/src/static_content/assets/pronto/menu/*.png

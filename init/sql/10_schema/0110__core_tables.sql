@@ -100,11 +100,12 @@ CREATE TABLE IF NOT EXISTS pronto_modifiers (
 );
 
 CREATE TABLE IF NOT EXISTS pronto_areas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id SERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL UNIQUE,
   description TEXT,
-  prefix VARCHAR(16),
-  color VARCHAR(32),
+  prefix VARCHAR(16) UNIQUE,
+  color VARCHAR(32) DEFAULT '#ff6b35',
+  background_image TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -113,10 +114,14 @@ CREATE TABLE IF NOT EXISTS pronto_areas (
 CREATE TABLE IF NOT EXISTS pronto_tables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_number VARCHAR(32) NOT NULL UNIQUE,
-  area_id UUID REFERENCES pronto_areas(id),
+  area_id INTEGER NOT NULL REFERENCES pronto_areas(id),
   capacity INTEGER DEFAULT 4,
   qr_code VARCHAR(100),
   status VARCHAR(20) DEFAULT 'available',
+  position_x INTEGER,
+  position_y INTEGER,
+  shape VARCHAR(32) DEFAULT 'square',
+  notes TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()

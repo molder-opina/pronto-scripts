@@ -723,6 +723,48 @@ def parity_check(
     violations.extend(_scan_scoped_api_rewrite(repo_root))
     violations.extend(_scan_credentials_same_origin(repo_root))
 
+    # Backend introspection
+    ro = routes_only_check(repo_root, target)
+    if not ro.get("ok"):
+        return {"ok": False, "error": "routes-only-check failed", "details": ro}, 1
+
+    backend_map = get_backend_map(repo_root, target)
+    backend_paths = set(backend_map.keys())
+
+    def _is_backend_covered(path: str) -> bool:
+        if path in backend_paths:
+            return True
+        path_slash = f"{path.rstrip('/')}/"
+        for bp in backend_paths:
+            if bp.startswith(path_slash):
+                return True
+        return False
+
+    # Suppress unknown-method noise when route path exists in backend.
+    # Keep template-host unknowns, because they are environment-dependent.
+    filtered_unknown: list[dict[str, Any]] = []
+    for item in unknown_methods:
+        path_raw = item.get("path")
+        if not isinstance(path_raw, str):
+            filtered_unknown.append(item)
+            continue
+        if item.get("reason") == "TEMPLATE_HOST":
+            filtered_unknown.append(item)
+            continue
+
+        normalized = normalize_path(path_raw)
+        if _is_backend_covered(normalized):
+            continue
+
+        if normalized != path_raw:
+            cloned = dict(item)
+            cloned["path"] = normalized
+            filtered_unknown.append(cloned)
+            continue
+
+        filtered_unknown.append(item)
+    unknown_methods = filtered_unknown
+
     # Unknown-methods warning thresholds by source (non-blocking)
     unknown_by_source: dict[str, int] = defaultdict(int)
     for u in unknown_methods:
@@ -741,13 +783,6 @@ def parity_check(
                 }
             )
 
-    # Backend introspection
-    ro = routes_only_check(repo_root, target)
-    if not ro.get("ok"):
-        return {"ok": False, "error": "routes-only-check failed", "details": ro}, 1
-
-    backend_map = get_backend_map(repo_root, target)
-
     # Apply backend denylist for EXTRA reporting only (does not affect MISSING).
     def is_denied_backend(path: str) -> bool:
         return any(path.startswith(prefix) for prefix in deny_prefixes)
@@ -763,7 +798,7 @@ def parity_check(
 
         for method, entry in sorted(by_method.items()):
             if method == "UNKNOWN":
-                if not backend_methods:
+                if not _is_backend_covered(path):
                     missing_unknown.append(
                         {
                             "path": path,

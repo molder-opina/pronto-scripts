@@ -12,7 +12,7 @@ Tipo de datos contenidos:
 - ~80+ Productos: Items completos con precios, descripciones, imágenes y tiempos de preparación
 - 18 Grupos de Modificadores: Queso Extra, Salsas, Proteínas Extra, Vegetales, Tamaños de Papas/Bebidas, Punto de Cocción, Bebidas para Combos, Guarniciones, Aderezos, Tipo de Pan, Nivel de Picante, Base de Pizza, Ingredientes Extra, Aderezos de Ensalada, Toppings de Postre
 - 8+ Empleados de prueba: Super Admin, Admin Roles, 3 Meseros (con rol adicional de cajero), 2 Chefs, 2 Cajeros
-- Configuración de rutas y permisos: EmployeeRouteAccess para todos los empleados
+- Configuración de roles y permisos: Sistema RBAC unificado para todos los empleados
 Funciones principales:
 - load_seed_data(session) - Carga todos los datos de seed usando lógica UPSERT
 - ensure_seed_data(session) - Función principal llamada por la aplicación

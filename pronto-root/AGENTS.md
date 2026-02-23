@@ -28,6 +28,15 @@ Violación a cualquiera ⇒ **REJECTED**.
 14. Fuente única DDL: `pronto-scripts/init/**`
     - `DROP INDEX IF EXISTS` permitido solo en `pronto-scripts/init/sql/migrations/`
     - todo lo demás `DROP*` prohibido.
+15. **Todo flujo sin autenticación es prohibited**:
+    - No debe existir ningún endpoint, ruta o página accesible sin autenticación válida.
+    - Excepciones: `/health`, `/api/sessions/open` (solo con table_id válido), login/register pages.
+    - Todo endpoint de mutación (POST/PUT/DELETE) requiere autenticación.
+    - Tests deben usar autenticación real, no flujos anónimos.
+16. **Prohibido @csrf.exempt para "hacer funcionar" código** (P0):
+    - CSRF es protección obligatoria, no debe deshabilitarse para arreglar problemas.
+    - Si un endpoint falla por CSRF, la solución correcta es asegurar que el cliente envíe el token CSRF.
+    - Excepción única: `/api/sessions/open` (solo con table_id válido para abrir sesión de mesa).
 15. Prohibido código legacy y patrones anticuados:
     - Prohibido `flask.session` para autenticación de empleados (usar JWT).
     - Prohibido directorio `legacy_mysql` en `pronto-scripts/init/`.
@@ -110,6 +119,43 @@ Violación a cualquiera ⇒ **REJECTED**.
 - Usar `pronto_shared/logging_config.py` para configuración
 - Formato: JSON estructurado (ver 0.6.2)
 - Rotación: diaria, retención 7 días
+
+---
+
+# 0.7) CANON DE NOMENCLATURA (P0)
+
+Reglas obligatorias para todo el monorepo. Violación ⇒ **REJECTED**.
+
+1. **Directorios**: Siempre `kebab-case` (ej: `pronto-static`, `shared-utils`).
+2. **Python**:
+   - Archivos y paquetes: `snake_case.py` (PEP8).
+   - Clases: `PascalCase`.
+   - Funciones/Variables: `snake_case`.
+3. **Vue (Frontend)**:
+   - Componentes (SFC): `PascalCase.vue` (ej: `RoleCard.vue`).
+   - Directorios de componentes: `kebab-case` (ej: `components/roles/`).
+4. **TypeScript / JavaScript**:
+   - Módulos de lógica y Composables: `kebab-case.ts` (ej: `use-rbac.ts`, `session-manager.ts`).
+   - Interfaces/Tipos: `PascalCase` (dentro del archivo).
+5. **Shell Scripts**: Siempre `kebab-case.sh` (con extensión `.sh` obligatoria).
+6. **SQL/Backups**: `YYYYMMDD_descripción.sql` (dentro de `pronto-backups/` o `init/sql/`).
+7. **Prohibiciones**:
+   - Prohibido espacios o caracteres especiales en nombres.
+   - Prohibido archivos de datos (`.txt`, `.cookies`, `.sql`, `.log`) en el root del proyecto.
+   - Prohibido archivos sin extensión en `pronto-scripts/bin/`.
+   - Todo contexto que sea público por definición debe ubicarse en `/public`.
+   - Excepción única: todo lo relacionado con autenticación debe ubicarse en `/auth`, incluso si es público.
+
+---
+
+# 0.8) JERARQUÍA DE DOCUMENTACIÓN (P0)
+
+Para evitar desincronización y "deriva documental", se establece la siguiente jerarquía de autoridad:
+
+1. **AGENTS.md**: Autoridad suprema (P0). Define la arquitectura, guardrails y reglas de nomenclatura. En caso de conflicto, la regla en este archivo invalida cualquier otra.
+2. **.env.example**: Fuente de verdad para la configuración. Define las llaves válidas y sus valores por defecto.
+3. **pronto-docs/contracts/**: Fuente de verdad para integraciones entre servicios.
+4. **README.md locales**: Contexto operativo específico del servicio. **Prohibido duplicar** contenido de los niveles 1 y 2. Deben usar links relativos a la fuente de verdad global.
 
 ---
 
@@ -266,6 +312,16 @@ No se modifican sin orden explícita:
 
 Roles canónicos:
 - `waiter`, `chef`, `cashier`, `admin`, `system`
+
+## 4.1) SISTEMA UNIFICADO DE PERMISOS (RBAC) (P0)
+
+1. **Canon Establecido**: El Sistema 2 (RBAC basado en `SystemRole` y `SystemPermission`) es el único estándar del proyecto.
+2. **Prohibición de Legacy**: Queda terminantemente prohibido el uso de `RoutePermission`, `EmployeeRouteAccess`, `CustomRole` o `RolePermission` (legacies eliminados).
+3. **Servicio Consolidado**: Toda gestión de roles y bindings de permisos debe realizarse exclusivamente a través de `RBACService` en `pronto-libs`.
+4. **Seguridad Alineada**: El endpoint `/auth/me` y el frontend deben utilizar exclusivamente los códigos de permiso definidos en el Enum `Permission` de `pronto_shared`. Backend y Frontend deben hablar el mismo lenguaje para evitar inconsistencias de UI vs Autorización.
+5. **Idempotencia de Semillas**: Los scripts de inicialización (`seed.py`, `validate_and_seed.py`) deben ser limpios e idempotentes, poblando únicamente el sistema RBAC unificado.
+
+---
 
 Jerarquía (SSR):
 - `/system` → `system`

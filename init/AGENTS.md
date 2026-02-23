@@ -71,7 +71,7 @@ from pronto_shared.jwt_middleware import jwt_required
 
 #### Utility Entities (Integer)
 - `Area.id` → Integer (serial)
-- `CustomRole.id` → Integer
+- `SystemRole.id` → Integer
 - `WaiterCall.id` → Integer
 - `ProductSchedule.id` → Integer
 - `KeyboardShortcut.id` → Integer

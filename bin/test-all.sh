@@ -21,7 +21,7 @@ echo ""
 
 # Verificar que los servicios estén corriendo
 echo -e "${YELLOW}[1/4]${NC} Verificando servicios..."
-if ! curl -sf http://localhost:6081/api/health > /dev/null 2>&1; then
+if ! curl -sf http://localhost:6081/health > /dev/null 2>&1; then
     echo -e "${RED}❌ Employee API no está disponible${NC}"
     echo ""
     echo "Por favor inicia los servicios primero:"
@@ -29,7 +29,7 @@ if ! curl -sf http://localhost:6081/api/health > /dev/null 2>&1; then
     exit 1
 fi
 
-if ! curl -sf http://localhost:6080/api/health > /dev/null 2>&1; then
+if ! curl -sf http://localhost:6080/health > /dev/null 2>&1; then
     echo -e "${RED}❌ Client API no está disponible${NC}"
     echo ""
     echo "Por favor inicia los servicios primero:"

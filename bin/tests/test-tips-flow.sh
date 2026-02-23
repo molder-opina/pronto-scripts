@@ -19,6 +19,8 @@ CLIENT_API="${CLIENT_API_BASE%/}/api"
 COOKIE_ADMIN="/tmp/pronto_test_admin.txt"
 COOKIE_WAITER="/tmp/pronto_test_waiter.txt"
 COOKIE_CHEF="/tmp/pronto_test_chef.txt"
+AUTH_HEADER="X-Pronto-Internal-Auth: 120d88e0cea0c97975e99901650132968f1b554c76d16814eeef2c4ce905aa89"
+CLIENT_COOKIE="/tmp/pronto_client_cookie.txt"
 
 echo -e "${BLUE}============================================${NC}"
 echo -e "${BLUE}  PRUEBA DE FLUJO COMPLETO DE PROPINAS${NC}"
@@ -32,20 +34,22 @@ rm -f "$COOKIE_ADMIN" "$COOKIE_WAITER" "$COOKIE_CHEF"
 # 1. Obtener tablas disponibles
 echo -e "${YELLOW}[1/13]${NC} Obteniendo tablas disponibles..."
 TABLES_JSON=$(curl -s "$CLIENT_API/tables")
-TABLE_ID=$(echo "$TABLES_JSON" | jq '.tables[0].id')
-TABLE_NUMBER=$(echo "$TABLES_JSON" | jq '.tables[0].table_number' -r)
+TABLE_ID=$(echo "$TABLES_JSON" | jq '.data.tables[0].id')
+TABLE_NUMBER=$(echo "$TABLES_JSON" | jq '.data.tables[0].table_number' -r)
 echo -e "${GREEN}✓${NC} Usando tabla: $TABLE_NUMBER (ID: $TABLE_ID)"
 echo ""
 
 # 2. Abrir sesión
 echo -e "${YELLOW}[2/13]${NC} Abriendo sesión de mesa..."
 SESSION_RESPONSE=$(curl -s -X POST "$CLIENT_API/sessions/open" \
+    -c "$CLIENT_COOKIE" \
     -H "Content-Type: application/json" \
+    -H "$AUTH_HEADER" \
     -d "{
         \"table_id\": $TABLE_ID
     }")
 
-SESSION_ID=$(echo "$SESSION_RESPONSE" | jq -r '.data.session_id')
+SESSION_ID=$(echo "$SESSION_RESPONSE" | jq -r '.session.id')
 
 if [ "$SESSION_ID" = "null" ] || [ -z "$SESSION_ID" ]; then
     echo -e "${RED}❌ No se pudo obtener session_id${NC}"
@@ -88,7 +92,9 @@ echo ""
 # 6. Crear orden
 echo -e "${YELLOW}[6/13]${NC} Creando orden con items (sin modificadores)..."
 ORDER_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
+    -b "$CLIENT_COOKIE" \
     -H "Content-Type: application/json" \
+    -H "$AUTH_HEADER" \
     -d "{
         \"customer\": {
             \"name\": \"Cliente Test Propinas\",
@@ -103,10 +109,11 @@ ORDER_RESPONSE=$(curl -s -X POST "$CLIENT_API/orders" \
         \"notes\": \"Orden de prueba para propinas\"
     }")
 
-ORDER_ID=$(echo "$ORDER_RESPONSE" | jq -r '.order_id // .id')
+ORDER_ID=$(echo "$ORDER_RESPONSE" | jq -r '.data.order_id // .data.id')
 
 if [ "$ORDER_ID" = "null" ] || [ -z "$ORDER_ID" ]; then
     echo -e "${RED}❌ No se pudo obtener order_id${NC}"
+    echo "Response: $ORDER_RESPONSE"
     exit 1
 fi
 

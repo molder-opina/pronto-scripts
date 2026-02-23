@@ -21,6 +21,6 @@ CREATE INDEX IF NOT EXISTS idx_customer_sessions_customer_id ON customer_session
 CREATE INDEX IF NOT EXISTS idx_customer_sessions_last_seen_at ON customer_sessions(last_seen_at);
 
 -- Add migration record
-INSERT INTO schema_migrations (version, description, applied_at)
-VALUES ('20260215_08', 'create_customer_sessions_redis_fallback', NOW())
-ON CONFLICT (version) DO NOTHING;
+INSERT INTO pronto_schema_migrations (file_name, sha256, sql_norm_sha, status)
+VALUES ('20260215_08__create_customer_sessions_redis_fallback.sql', '', '', 'applied')
+ON CONFLICT (file_name) DO NOTHING;

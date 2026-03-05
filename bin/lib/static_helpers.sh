@@ -240,6 +240,7 @@ sync_static_content() {
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/css 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/branding 2>/dev/null || true
             docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/menu 2>/dev/null || true
+            docker exec "$static_container" mkdir -p /usr/share/nginx/html/assets/pronto/config 2>/dev/null || true
 
             # Copiar JS bundles
             echo "   - Copiando JS bundles..."
@@ -261,6 +262,12 @@ sync_static_content() {
             # Copiar imágenes de menú
             echo "   - Copiando imágenes de menú..."
             docker cp "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu/"* "$static_container:/usr/share/nginx/html/assets/pronto/menu/" 2>/dev/null || true
+
+            # Copiar config estatico
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/pronto/config" ]]; then
+                echo "   - Copiando config estático..."
+                docker cp "${PRONTO_STATIC_ASSETS_DIR}/pronto/config/"* "$static_container:/usr/share/nginx/html/assets/pronto/config/" 2>/dev/null || true
+            fi
 
             # Recargar nginx
             docker exec "$static_container" nginx -s reload 2>/dev/null || true
@@ -288,6 +295,7 @@ sync_static_content() {
             sudo install -d "${static_content_root}/assets/css/employees" || true
             sudo install -d "${static_content_root}/assets/pronto/branding" || true
             sudo install -d "${static_content_root}/assets/pronto/menu" || true
+            sudo install -d "${static_content_root}/assets/pronto/config" || true
 
             # JS compilado clientes
             if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/js/clients" ]]; then
@@ -312,6 +320,11 @@ sync_static_content() {
             # Imágenes de menú
             if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu" ]]; then
                 sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/pronto/menu/" "${static_content_root}/assets/pronto/menu/"
+            fi
+
+            # Config estatico
+            if [[ -d "${PRONTO_STATIC_ASSETS_DIR}/pronto/config" ]]; then
+                sudo rsync -a "${PRONTO_STATIC_ASSETS_DIR}/pronto/config/" "${static_content_root}/assets/pronto/config/"
             fi
 
             # JS vanilla compartido

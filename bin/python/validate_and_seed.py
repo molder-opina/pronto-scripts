@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
 """
-Validate and Seed Database Script (BLINDADO - RBAC Unified)
-Verifica que la base de datos tenga todos los datos necesarios (seed data).
-Usa el canon SystemSetting y SystemRole para una autorización robusta.
+Validate and Seed Database Script (V6 Blindado - Contract Driven)
+Verifica la integridad total de la base de datos basándose en el CONFIG_CONTRACT.
+Implementa política de Cero Tolerancia a llaves legacy y UPPERCASE.
 """
 
 import os
 import sys
-import json
-from decimal import Decimal
+import re
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+log = logging.getLogger(__name__)
 
 # Add parent directory to path to ensure pronto_shared is importable
 try:
     import pronto_shared
 except ImportError:
     # Look for it in common locations
-    sys.path.insert(0, '/opt/pronto')
+    sys.path.insert(0, '/opt/pronto/build')
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../pronto-libs/src')))
     try:
         import pronto_shared
     except ImportError:
-        raise ImportError("pronto_shared package not found.")
+        raise ImportError("pronto_shared package not found. Path: " + str(sys.path))
 
-from sqlalchemy import func, select
+from sqlalchemy import text
 from pronto_shared.db import get_session
 from pronto_shared.models import (
     Area,
@@ -35,102 +40,124 @@ from pronto_shared.models import (
     SystemPermission,
     RolePermissionBinding
 )
-from pronto_shared.security import hash_credentials, hash_identifier
+from pronto_shared.config_contract import (
+    CONFIG_CONTRACT, is_valid_key, expected_category, is_system_key
+)
 from pronto_shared.permissions import Permission, ROLE_PERMISSIONS
 
-# Mandatory configuration keys required by the system
-MANDATORY_CONFIG_KEYS = [
-    "restaurant_name",
-    "currency_code",
-    "currency_symbol",
-    "tax_rate",
-    "service_charge_rate",
-    "table_base_prefix",
-    "items_per_page",
-    "paid_orders_window_minutes",
-    "checkout_prompt_duration_seconds",
-]
-
 class DatabaseValidator:
-    """Validates and seeds database with required data using SystemSetting and RBAC canon"""
+    """Validates and seeds database with strict contract enforcement"""
 
     def __init__(self):
-        self.missing_data = []
         self.created_data = []
         self.updated_data = []
-        self.errors = []
+        self.deleted_data = []
 
     def print_header(self, text: str):
         print(f"\n{'=' * 80}")
         print(f"  {text}")
         print(f"{'=' * 80}")
 
-    def print_status(self, item: str, exists: bool, count: int = 0):
-        if exists:
-            print(f"✅ {item}: {count} registros encontrados")
-        else:
-            print(f"❌ {item}: INCOMPLETO o FALTANTE - Se procesará")
-            self.missing_data.append(item)
+    def validate_integrity(self, db) -> bool:
+        """
+        Hard-Gate: Verifica que no existan llaves legacy o fuera de contrato.
+        Retorna False si debe abortar el proceso.
+        """
+        print("\n🔍 Auditando llaves de configuración...")
+        settings = db.query(SystemSetting).all()
+        valid = True
 
-    def validate_business_config(self, db) -> bool:
-        """Validate all mandatory keys exist in pronto_system_settings"""
-        existing_keys = {
-            s.config_key for s in db.query(SystemSetting.config_key).filter(SystemSetting.config_key.in_(MANDATORY_CONFIG_KEYS)).all()
-        }
-        missing = [k for k in MANDATORY_CONFIG_KEYS if k not in existing_keys]
-        exists = len(missing) == 0
-        self.print_status("Configuración (SystemSetting)", exists, len(existing_keys))
-        return exists
+        for s in settings:
+            key = s.config_key
+            
+            # 1. Check for UPPERCASE (Hard Fail)
+            if re.search(r"[A-Z]", key):
+                log.error(f"❌ LLAVE LEGACY DETECTADA: '{key}' contiene mayúsculas. V6 exige lowercase.")
+                valid = False
+            
+            # 2. Check for Contract Compliance (Hard Fail)
+            if not is_valid_key(key):
+                log.error(f"❌ LLAVE NO RECONOCIDA: '{key}' no existe en CONFIG_CONTRACT.")
+                valid = False
+            
+            # 3. Check for correct category (Auto-fixable)
+            target_cat = expected_category(key)
+            if s.category != target_cat:
+                log.warning(f"⚠️ Categoría incorrecta para '{key}': '{s.category}' -> '{target_cat}' (Corrigiendo...)")
+                s.category = target_cat
+                self.updated_data.append(f"Category: {key}")
 
-    def validate_roles(self, db) -> bool:
-        """Validate system roles exist"""
-        count = db.query(SystemRole).count()
-        exists = count >= 5 # admin, cashier, chef, waiter, system
-        self.print_status("Roles de Sistema", exists, count)
-        return exists
+        return valid
 
-    def validate_permissions(self, db) -> bool:
-        """Validate system permissions exist"""
-        count = db.query(SystemPermission).count()
-        exists = count >= len(Permission)
-        self.print_status("Permisos de Sistema", exists, count)
-        return exists
+    def migrate_legacy_keys(self, db):
+        """Migración determinista de llaves UPPERCASE conocidas a sus canónicas."""
+        print("\n🧹 Migrando datos legacy...")
+        
+        # Mover RESTAURANT_NAME a restaurant_name
+        legacy_name = db.query(SystemSetting).filter(SystemSetting.config_key == 'RESTAURANT_NAME').first()
+        if legacy_name:
+            # Solo copiar si no existe la nueva o si queremos sobrescribir con el valor viejo
+            canonical = db.query(SystemSetting).filter(SystemSetting.config_key == 'restaurant_name').first()
+            if not canonical:
+                log.info(f"Copiando 'RESTAURANT_NAME' -> 'restaurant_name'")
+                new_setting = SystemSetting(
+                    config_key='restaurant_name',
+                    config_value=legacy_name.config_value,
+                    value_type='string',
+                    category='business'
+                )
+                db.add(new_setting)
+                self.created_data.append("restaurant_name (migrated)")
+            
+            # Borrar la vieja
+            db.delete(legacy_name)
+            self.deleted_data.append("RESTAURANT_NAME (deleted)")
+            db.flush()
 
     def seed_business_config(self, db):
-        """Idempotent UPSERT for business configuration"""
-        print("\n🌱 Sincronizando configuración de negocio...")
-        config_data = [
-            {"key": "restaurant_name", "value": "Cafetería de Prueba", "type": "string"},
-            {"key": "currency_code", "value": "MXN", "type": "string"},
-            {"key": "currency_symbol", "value": "$", "type": "string"},
-            {"key": "tax_rate", "value": "0.16", "type": "float"},
-            {"key": "service_charge_rate", "value": "0.10", "type": "float"},
-            {"key": "table_base_prefix", "value": "M", "type": "string"},
-            {"key": "items_per_page", "value": "10", "type": "integer"},
-            {"key": "paid_orders_window_minutes", "value": "30", "type": "integer"},
-            {"key": "checkout_prompt_duration_seconds", "value": "5", "type": "integer"},
-        ]
-        for item in config_data:
-            key = item["key"]
-            value = str(item["value"])
-            v_type = item["type"]
+        """Idempotent UPSERT for business configuration based on CONTRACT"""
+        print("\n🌱 Sincronizando configuración desde el Contrato...")
+        
+        for key, spec in CONFIG_CONTRACT.items():
             existing = db.query(SystemSetting).filter(SystemSetting.config_key == key).first()
-            if existing:
-                if existing.config_value != value or existing.value_type != v_type:
-                    existing.config_value = value
-                    existing.value_type = v_type
-                    self.updated_data.append(f"Config: {key}")
-            else:
-                setting = SystemSetting(config_key=key, config_value=value, value_type=v_type, category="general")
+            
+            val = str(spec["default"])
+            if spec["type"] == "bool":
+                val = "true" if spec["default"] else "false"
+            
+            if not existing:
+                log.info(f"Creando setting faltante: {key}")
+                setting = SystemSetting(
+                    config_key=key,
+                    config_value=val,
+                    value_type=spec["type"],
+                    category=expected_category(key),
+                    display_name=key.replace(".", " ").replace("_", " ").title(),
+                    description=spec.get("description", "")
+                )
                 db.add(setting)
                 self.created_data.append(f"Config: {key}")
+            else:
+                # Asegurar integridad de metadatos (tipo y categoría)
+                changed = False
+                if existing.value_type != spec["type"]:
+                    existing.value_type = spec["type"]
+                    changed = True
+                
+                target_cat = expected_category(key)
+                if existing.category != target_cat:
+                    existing.category = target_cat
+                    changed = True
+                
+                if changed:
+                    self.updated_data.append(f"Metadata: {key}")
+
         db.commit()
 
     def seed_rbac(self, db):
         """Idempotent UPSERT for RBAC system"""
         print("\n🌱 Sincronizando Roles y Permisos (RBAC)...")
         
-        # 1. Seed Permissions from Enum
         for perm in Permission:
             code = perm.value
             category = code.split(":")[0] if ":" in code else "general"
@@ -140,7 +167,6 @@ class DatabaseValidator:
                 self.created_data.append(f"Permission: {code}")
         db.flush()
 
-        # 2. Seed Roles and Bindings from ROLE_PERMISSIONS map
         for role_name, perms in ROLE_PERMISSIONS.items():
             role = db.query(SystemRole).filter(SystemRole.name == role_name).first()
             if not role:
@@ -149,11 +175,9 @@ class DatabaseValidator:
                 db.flush()
                 self.created_data.append(f"Role: {role_name}")
             
-            # Sync bindings
             current_bindings = {b.permission.code for b in role.permissions if b.permission}
             target_codes = {p.value for p in perms}
             
-            # Add missing
             for code in target_codes:
                 if code not in current_bindings:
                     perm = db.query(SystemPermission).filter(SystemPermission.code == code).first()
@@ -163,16 +187,8 @@ class DatabaseValidator:
         
         db.commit()
 
-    # Stubs for other validations
-    def validate_employees(self, db): return db.query(Employee).count() > 0
-    def validate_categories(self, db): return db.query(MenuCategory).count() > 0
-    def validate_products(self, db): return db.query(MenuItem).count() > 0
-    def validate_areas(self, db): return db.query(Area).count() > 0
-    def validate_tables(self, db): return db.query(Table).count() > 0
-    def validate_day_periods(self, db): return db.query(DayPeriod).count() > 0
-
     def run_validation(self):
-        self.print_header("VALIDACIÓN Y SEED DE BASE DE DATOS (RBAC UNIFICADO)")
+        self.print_header("VALIDACIÓN Y SEED DE BASE DE DATOS (V6 ZERO LEGACY)")
         try:
             from pronto_shared.config import load_config
             from pronto_shared.db import init_engine
@@ -180,15 +196,17 @@ class DatabaseValidator:
             init_engine(config)
 
             with get_session() as db:
-                self.print_header("1. VALIDANDO DATOS")
-                self.validate_employees(db)
-                self.validate_roles(db)
-                self.validate_permissions(db)
-                self.validate_categories(db)
-                self.validate_products(db)
-                has_config = self.validate_business_config(db)
-                self.validate_day_periods(db)
+                # 1. Migrar lo conocido antes de validar
+                self.migrate_legacy_keys(db)
+                
+                # 2. Hard-Gate de integridad
+                if not self.validate_integrity(db):
+                    self.print_header("❌ FALLO DE INTEGRIDAD CRÍTICO")
+                    log.error("El proceso se detuvo porque se detectaron llaves legacy o inválidas.")
+                    log.error("Limpia la base de datos o corrige las llaves manualmente antes de continuar.")
+                    return 1
 
+                # 3. Procesar Seeds
                 self.print_header("2. PROCESANDO CAMBIOS")
                 self.seed_business_config(db)
                 self.seed_rbac(db)
@@ -196,6 +214,7 @@ class DatabaseValidator:
                 self.print_header("RESUMEN")
                 print(f"✅ Creados: {len(self.created_data)}")
                 print(f"🔄 Actualizados: {len(self.updated_data)}")
+                print(f"🗑️ Eliminados: {len(self.deleted_data)}")
                 return 0
         except Exception as e:
             print(f"\n❌ ERROR CRÍTICO: {e}")

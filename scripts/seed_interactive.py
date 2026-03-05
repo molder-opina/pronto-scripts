@@ -166,8 +166,10 @@ def main() -> None:
     _load_env_file(os.path.join(repo_root, "config", "general.env"))
     _load_env_file(os.path.join(repo_root, "scripts", "init", "seed.env"))
 
-    os.environ.setdefault("SECRET_KEY", "change-me-please")
-    os.environ.setdefault("PASSWORD_HASH_SALT", "default-salt")
+    if not os.getenv("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY is required for interactive seed")
+    if not os.getenv("PASSWORD_HASH_SALT"):
+        raise RuntimeError("PASSWORD_HASH_SALT is required for interactive seed")
     os.environ.setdefault("POSTGRES_HOST", "localhost")
     os.environ.setdefault("POSTGRES_PORT", "5432")
     os.environ.setdefault("POSTGRES_USER", "pronto")

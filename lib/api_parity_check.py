@@ -263,22 +263,31 @@ def _iter_source_files(repo_root: Path, source: Source) -> list[Path]:
 
 def _ensure_wrapper_present(repo_root: Path, target: Target) -> dict[str, list[str]]:
     wrappers: dict[str, list[str]] = {}
+    
+    # Check multiple possible locations due to modularization
     if target == "employees":
         wrappers["employees_vue"] = [
             str(repo_root / "pronto-static" / "src" / "vue" / "employees" / "core" / "http.ts"),
+            str(repo_root / "pronto-static" / "src" / "vue" / "employees" / "shared" / "core" / "http.ts"),
+            str(repo_root / "pronto-libs" / "src" / "pronto_shared" / "static" / "js" / "src" / "core" / "http.ts")
         ]
     elif target == "clients":
         wrappers["clients_vue"] = [
             str(repo_root / "pronto-static" / "src" / "vue" / "clients" / "core" / "http.ts"),
+            str(repo_root / "pronto-libs" / "src" / "pronto_shared" / "static" / "js" / "src" / "core" / "http.ts")
         ]
     else:
         return wrappers
 
     missing: list[str] = []
     for src, paths in wrappers.items():
+        found = False
         for p in paths:
-            if not Path(p).exists():
-                missing.append(p)
+            if Path(p).exists():
+                found = True
+                break
+        if not found:
+            missing.extend(paths)
 
     if missing:
         raise RuntimeError(

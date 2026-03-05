@@ -1,7 +1,7 @@
 -- Migration to add encrypted columns for Employee table
 -- Required for pronto-api ORM compatibility
 
-ALTER TABLE pronto_employees ADD COLUMN IF NOT EXISTS auth_hash VARCHAR(128);
+ALTER TABLE pronto_employees ADD COLUMN IF NOT EXISTS auth_hash VARCHAR(255);
 ALTER TABLE pronto_employees ADD COLUMN IF NOT EXISTS email_hash VARCHAR(128);
 ALTER TABLE pronto_employees ADD COLUMN IF NOT EXISTS email_encrypted TEXT;
 ALTER TABLE pronto_employees ADD COLUMN IF NOT EXISTS name_encrypted TEXT;

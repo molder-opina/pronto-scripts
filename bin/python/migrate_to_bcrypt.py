@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Migrate existing password hashes from SHA256 to bcrypt.
+Harden authentication hashes to the modern configured algorithm.
 
 This script:
-1. Updates password hashes for all test users to bcrypt
-2. Generates new bcrypt hashes for known test accounts
-3. Logs the migration process
+1. Resets known test accounts to fresh modern hashes
+2. Replaces non-modern employee hashes with a secure default password hash
+3. Verifies credentials with the shared verifier
 
 Usage:
     python3 migrate_to_bcrypt.py
@@ -48,11 +48,11 @@ TEST_ACCOUNTS = [
 
 
 def migrate_passwords():
-    """Migrate all employee passwords to bcrypt."""
-    logger.info("Starting password migration to bcrypt...")
+    """Migrate employee passwords to modern hash format."""
+    logger.info("Starting password hardening migration...")
 
     # Initialize database engine
-    config = load_config("migrate_to_bcrypt")
+    config = load_config("auth-hardening-migration")
     init_engine(config)
 
     with get_session() as db:
@@ -65,7 +65,7 @@ def migrate_passwords():
 
             email_hash = hash_identifier(email)
 
-            # Generate new bcrypt hash
+            # Generate modern hash
             new_auth_hash = hash_credentials(email, password)
 
             # Update database
@@ -84,21 +84,15 @@ def migrate_passwords():
             else:
                 logger.warning(f"✗ Not found: {email}")
 
-        # Update all remaining accounts with default password
+        # Update all remaining non-modern hashes with default password
         default_password = "ChangeMe!123"
         result = db.execute(
             text("""
                 UPDATE pronto_employees
-                SET auth_hash = (
-                    CASE
-                        WHEN auth_hash = '' THEN NULL
-                        WHEN LENGTH(auth_hash) = 64 THEN
-                            -- SHA256 hash, replace with bcrypt default
-                            :new_hash
-                        ELSE auth_hash
-                    END
-                )
-                WHERE auth_hash = '' OR LENGTH(auth_hash) = 64
+                SET auth_hash = :new_hash
+                WHERE auth_hash IS NOT NULL
+                  AND auth_hash <> ''
+                  AND auth_hash !~ '^(pbkdf2:|scrypt:)'
                 """),
             {"new_hash": hash_credentials("default@cafeteria.test", default_password)},
         )
@@ -112,7 +106,7 @@ def verify_migration():
     logger.info("\nVerifying migration...")
 
     # Initialize database engine
-    config = load_config("migrate_to_bcrypt")
+    config = load_config("auth-hardening-migration")
     init_engine(config)
 
     with get_session() as db:
@@ -137,7 +131,7 @@ def verify_migration():
 
             emp_id, stored_hash = employee
 
-            # Verify password with new bcrypt function
+            # Verify password with shared modern verifier
             is_valid = verify_credentials(email, password, stored_hash)
 
             if is_valid:

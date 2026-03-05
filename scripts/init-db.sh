@@ -29,8 +29,14 @@ if [[ "${LOAD_SEED_DATA:-false}" == "true" ]]; then
   # Run the seed initialization script
   if [[ -f /scripts/init-seed.py ]]; then
     cd /build
-    export SECRET_KEY="${SECRET_KEY:-change-me-please}"
-    export PASSWORD_HASH_SALT="${PASSWORD_HASH_SALT:-default-salt}"
+    if [[ -z "${SECRET_KEY:-}" ]]; then
+      echo "❌ SECRET_KEY is required to run seed initialization"
+      exit 1
+    fi
+    if [[ -z "${PASSWORD_HASH_SALT:-}" ]]; then
+      echo "❌ PASSWORD_HASH_SALT is required to run seed initialization"
+      exit 1
+    fi
     export POSTGRES_HOST=localhost
     export POSTGRES_PORT=5432
     export POSTGRES_USER=pronto

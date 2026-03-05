@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS pronto_notifications (
     id SERIAL PRIMARY KEY,
     notification_type VARCHAR(64) NOT NULL,
     recipient_type VARCHAR(32) NOT NULL,
-    recipient_id INTEGER,
+    recipient_id UUID,
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
     data JSONB,

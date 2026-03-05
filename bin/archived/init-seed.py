@@ -43,9 +43,11 @@ def _load_env_file(path: str) -> None:
 
 _load_env_file(os.path.join(os.path.dirname(__file__), "..", "scripts", "init", "seed.env"))
 
-# Set required environment variables
-os.environ["SECRET_KEY"] = os.getenv("SECRET_KEY", "change-me-please")
-os.environ["PASSWORD_HASH_SALT"] = os.getenv("PASSWORD_HASH_SALT", "default-salt")
+# Validate required environment variables
+if not os.getenv("SECRET_KEY"):
+    raise RuntimeError("SECRET_KEY is required")
+if not os.getenv("PASSWORD_HASH_SALT"):
+    raise RuntimeError("PASSWORD_HASH_SALT is required")
 
 
 def init_seed_data():

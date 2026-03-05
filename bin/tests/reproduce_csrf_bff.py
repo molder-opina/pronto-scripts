@@ -4,7 +4,8 @@ import os
 # Configuration
 API_URL = "http://localhost:6082"
 # Endpoint that requires CSRF (POST)
-TARGET_URL = f"{API_URL}/api/orders" 
+TARGET_URL = f"{API_URL}/api/orders"
+
 
 def test_csrf_rejection():
     print(f"Testing POST to {TARGET_URL} without CSRF token...")
@@ -13,12 +14,12 @@ def test_csrf_rejection():
         response = requests.post(
             TARGET_URL,
             json={"items": [], "total": 0},
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
-        
+
         print(f"Status Code: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code == 400 and "CSRF" in response.text:
             print("SUCCESS: CSRF rejection verified.")
         elif response.status_code == 404:
@@ -29,8 +30,12 @@ def test_csrf_rejection():
     except Exception as e:
         print(f"ERROR: {e}")
 
+
 def test_csrf_bypass():
-    secret = os.getenv("PRONTO_INTERNAL_SECRET", "120d88e0cea0c97975e99901650132968f1b554c76d16814eeef2c4ce905aa89")
+    secret = os.getenv("PRONTO_INTERNAL_SECRET", "")
+    if not secret:
+        print("ERROR: PRONTO_INTERNAL_SECRET is required for bypass test")
+        return
     print(f"\nTesting POST to {TARGET_URL} WITH X-Pronto-Internal-Auth={secret[:6]}...")
     try:
         response = requests.post(
@@ -38,10 +43,10 @@ def test_csrf_bypass():
             json={"items": [], "total": 0},
             headers={
                 "Content-Type": "application/json",
-                "X-Pronto-Internal-Auth": secret
-            }
+                "X-Pronto-Internal-Auth": secret,
+            },
         )
-        
+
         print(f"Status Code: {response.status_code}")
         print(f"Response: {response.text}")
 
@@ -54,6 +59,7 @@ def test_csrf_bypass():
 
     except Exception as e:
         print(f"ERROR: {e}")
+
 
 if __name__ == "__main__":
     test_csrf_rejection()

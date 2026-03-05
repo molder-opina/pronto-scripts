@@ -1,0 +1,2 @@
+ALTER TABLE pronto_modifiers
+ADD COLUMN IF NOT EXISTS image_path VARCHAR(500);

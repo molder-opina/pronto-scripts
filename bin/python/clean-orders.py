@@ -21,7 +21,7 @@ Opciones:
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     import psycopg2
@@ -50,7 +50,7 @@ def get_order_stats(cursor, older_than_days=None):
     params = []
 
     if older_than_days:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         query += " WHERE created_at < %s"
         params.append(cutoff_date)
 
@@ -63,7 +63,7 @@ def get_order_stats(cursor, older_than_days=None):
     total_query = "SELECT COUNT(*) FROM pronto_orders"
     total_params = []
     if older_than_days:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         total_query += " WHERE created_at < %s"
         total_params.append(cutoff_date)
 
@@ -78,14 +78,18 @@ def get_order_stats(cursor, older_than_days=None):
     """
     items_params = []
     if older_than_days:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         items_query += " WHERE o.created_at < %s"
         items_params.append(cutoff_date)
 
     cursor.execute(items_query, items_params)
     orders_with_items = cursor.fetchone()[0]
 
-    return {"total": total_orders, "by_status": status_counts, "with_items": orders_with_items}
+    return {
+        "total": total_orders,
+        "by_status": status_counts,
+        "with_items": orders_with_items,
+    }
 
 
 def clean_completed_orders(cursor, conn, dry_run=False, older_than_days=None):
@@ -98,7 +102,7 @@ def clean_completed_orders(cursor, conn, dry_run=False, older_than_days=None):
     params = []
 
     if older_than_days:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         query += " AND created_at < %s"
         params.append(cutoff_date)
 
@@ -119,8 +123,12 @@ def clean_completed_orders(cursor, conn, dry_run=False, older_than_days=None):
     deleted_count = 0
     for order_id, status, total_amount in orders_to_delete:
         # Eliminar datos relacionados en orden correcto
-        cursor.execute("DELETE FROM pronto_order_status_history WHERE order_id = %s", (order_id,))
-        cursor.execute("DELETE FROM pronto_order_modifications WHERE order_id = %s", (order_id,))
+        cursor.execute(
+            "DELETE FROM pronto_order_status_history WHERE order_id = %s", (order_id,)
+        )
+        cursor.execute(
+            "DELETE FROM pronto_order_modifications WHERE order_id = %s", (order_id,)
+        )
         cursor.execute(
             """
             DELETE FROM pronto_order_item_modifiers
@@ -130,7 +138,9 @@ def clean_completed_orders(cursor, conn, dry_run=False, older_than_days=None):
         """,
             (order_id,),
         )
-        cursor.execute("DELETE FROM pronto_order_items WHERE order_id = %s", (order_id,))
+        cursor.execute(
+            "DELETE FROM pronto_order_items WHERE order_id = %s", (order_id,)
+        )
         cursor.execute("DELETE FROM pronto_orders WHERE id = %s", (order_id,))
 
         deleted_count += 1
@@ -146,7 +156,7 @@ def clean_all_orders(cursor, conn, dry_run=False, older_than_days=None):
     params = []
 
     if older_than_days:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         query += " WHERE created_at < %s"
         params.append(cutoff_date)
 
@@ -167,8 +177,12 @@ def clean_all_orders(cursor, conn, dry_run=False, older_than_days=None):
     deleted_count = 0
     for order_id, status, total_amount in all_orders:
         # Eliminar datos relacionados en orden correcto
-        cursor.execute("DELETE FROM pronto_order_status_history WHERE order_id = %s", (order_id,))
-        cursor.execute("DELETE FROM pronto_order_modifications WHERE order_id = %s", (order_id,))
+        cursor.execute(
+            "DELETE FROM pronto_order_status_history WHERE order_id = %s", (order_id,)
+        )
+        cursor.execute(
+            "DELETE FROM pronto_order_modifications WHERE order_id = %s", (order_id,)
+        )
         cursor.execute(
             """
             DELETE FROM pronto_order_item_modifiers
@@ -178,7 +192,9 @@ def clean_all_orders(cursor, conn, dry_run=False, older_than_days=None):
         """,
             (order_id,),
         )
-        cursor.execute("DELETE FROM pronto_order_items WHERE order_id = %s", (order_id,))
+        cursor.execute(
+            "DELETE FROM pronto_order_items WHERE order_id = %s", (order_id,)
+        )
         cursor.execute("DELETE FROM pronto_orders WHERE id = %s", (order_id,))
 
         deleted_count += 1
@@ -191,8 +207,12 @@ def clean_all_orders(cursor, conn, dry_run=False, older_than_days=None):
 def main():
     parser = argparse.ArgumentParser(description="Limpiar órdenes de la base de datos")
     parser.add_argument("--all", action="store_true", help="Limpiar TODAS las órdenes")
-    parser.add_argument("--dry-run", action="store_true", help="Solo mostrar qué se limpiaría")
-    parser.add_argument("--yes", action="store_true", help="Responder sí automáticamente")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Solo mostrar qué se limpiaría"
+    )
+    parser.add_argument(
+        "--yes", action="store_true", help="Responder sí automáticamente"
+    )
     parser.add_argument(
         "--older-than",
         type=int,
@@ -235,7 +255,9 @@ def main():
             print(f"   {status}: {count}")
         print(f"   Órdenes con items: {stats['with_items']}")
         if args.older_than:
-            print(f"   Filtro aplicado: órdenes más antiguas que {args.older_than} días")
+            print(
+                f"   Filtro aplicado: órdenes más antiguas que {args.older_than} días"
+            )
         print()
 
         if args.all:
@@ -251,7 +273,9 @@ def main():
             print(f"✅ {deleted} órdenes {action}")
         else:
             print("🧹 Limpiando órdenes completadas...")
-            deleted = clean_completed_orders(cursor, conn, args.dry_run, args.older_than)
+            deleted = clean_completed_orders(
+                cursor, conn, args.dry_run, args.older_than
+            )
             action = "mostradas" if args.dry_run else "eliminadas"
             print(f"✅ {deleted} órdenes {action}")
 

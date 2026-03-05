@@ -16,6 +16,7 @@ Args:
 
 import argparse
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -58,9 +59,7 @@ def transition_order(order_id: int, new_status: str):
             )
 
         order.workflow_status = new_status
-        from datetime import datetime
-
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
         session.commit()
 
         return True, f"Orden {order_id}: {current_status} -> {new_status}"

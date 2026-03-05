@@ -5,7 +5,7 @@ Tests JWT authentication, session management, and logout across all employee con
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 from playwright.async_api import Page, async_playwright, expect
 
@@ -75,8 +75,13 @@ class EmployeeAuthTests:
 
             # Check for employee name (not "Usuario")
             page_content = await page.content()
-            if "Usuario" in page_content and "admin@cafeteria.test" not in page_content.lower():
-                self.log_warning("Employee name shows as 'Usuario' instead of real name")
+            if (
+                "Usuario" in page_content
+                and "admin@cafeteria.test" not in page_content.lower()
+            ):
+                self.log_warning(
+                    "Employee name shows as 'Usuario' instead of real name"
+                )
 
             # Logout
             await page.click(".header-user-btn, [data-action='user-menu']")
@@ -109,7 +114,9 @@ class EmployeeAuthTests:
 
             # Check for JWT cookie
             cookies = await page.context.cookies()
-            access_token = next((c for c in cookies if c["name"] == "access_token"), None)
+            access_token = next(
+                (c for c in cookies if c["name"] == "access_token"), None
+            )
             if not access_token:
                 self.log_warning("access_token cookie not found after login")
 
@@ -237,11 +244,16 @@ class EmployeeAuthTests:
             await page.wait_for_timeout(2000)
             current_url = page.url
             if "login" not in current_url:
-                raise Exception(f"Expected to stay on login page, but got: {current_url}")
+                raise Exception(
+                    f"Expected to stay on login page, but got: {current_url}"
+                )
 
             # Check for error message
             page_content = await page.content()
-            if "inválid" not in page_content.lower() and "error" not in page_content.lower():
+            if (
+                "inválid" not in page_content.lower()
+                and "error" not in page_content.lower()
+            ):
                 self.log_warning("No error message shown for invalid credentials")
 
             self.log_pass(test_name)
@@ -267,7 +279,9 @@ class EmployeeAuthTests:
             # Should still be on dashboard (not redirected to login)
             current_url = page.url
             if "dashboard" not in current_url:
-                raise Exception(f"Session not persisted after reload. URL: {current_url}")
+                raise Exception(
+                    f"Session not persisted after reload. URL: {current_url}"
+                )
 
             # Cleanup - logout
             await page.goto(f"{self.base_url}/waiter/logout")
@@ -335,7 +349,9 @@ class EmployeeAuthTests:
 
             # Check cookie properties
             cookies = await page.context.cookies()
-            access_token = next((c for c in cookies if c["name"] == "access_token"), None)
+            access_token = next(
+                (c for c in cookies if c["name"] == "access_token"), None
+            )
 
             if not access_token:
                 raise Exception("access_token cookie not found")
@@ -345,7 +361,9 @@ class EmployeeAuthTests:
                 self.log_warning("access_token cookie is not httpOnly")
 
             if access_token.get("path") != "/":
-                self.log_warning(f"access_token path is {access_token.get('path')}, expected /")
+                self.log_warning(
+                    f"access_token path is {access_token.get('path')}, expected /"
+                )
 
             # Cleanup
             await page.goto(f"{self.base_url}/waiter/logout")
@@ -377,7 +395,9 @@ class EmployeeAuthTests:
             # Should redirect to login
             current_url = page.url
             if "dashboard" in current_url and "login" not in current_url:
-                raise Exception(f"Can still access dashboard after logout: {current_url}")
+                raise Exception(
+                    f"Can still access dashboard after logout: {current_url}"
+                )
 
             self.log_pass(test_name)
 
@@ -389,7 +409,7 @@ class EmployeeAuthTests:
         print("=" * 80)
         print("EMPLOYEE AUTHENTICATION E2E TESTS")
         print("=" * 80)
-        print(f"Start Time: {datetime.utcnow().isoformat()}")
+        print(f"Start Time: {datetime.now(timezone.utc).isoformat()}")
         print(f"Headless: {headless}")
         print("")
 
@@ -428,7 +448,9 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Employee Authentication E2E Tests")
-    parser.add_argument("--no-headless", action="store_true", help="Run with browser UI visible")
+    parser.add_argument(
+        "--no-headless", action="store_true", help="Run with browser UI visible"
+    )
     args = parser.parse_args()
 
     tests = EmployeeAuthTests()

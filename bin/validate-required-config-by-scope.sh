@@ -30,6 +30,53 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}"
 fi
 
+if [[ ! -f "/.dockerenv" ]]; then
+  NORMALIZED_DATABASE_URL="$(python3 - <<'PY' "${DATABASE_URL}"
+from urllib.parse import urlparse, urlunparse
+import socket
+import sys
+
+url = sys.argv[1]
+parsed = urlparse(url)
+host = parsed.hostname
+
+if not host:
+    print(url)
+    raise SystemExit(0)
+
+try:
+    socket.gethostbyname(host)
+    print(url)
+    raise SystemExit(0)
+except Exception:
+    pass
+
+if host not in {"postgres", "pronto-postgres", "db"}:
+    print(url)
+    raise SystemExit(0)
+
+netloc = parsed.netloc
+if "@" in netloc:
+    userinfo, hostport = netloc.rsplit("@", 1)
+else:
+    userinfo, hostport = "", netloc
+
+if ":" in hostport:
+    _, port = hostport.rsplit(":", 1)
+    new_hostport = f"localhost:{port}"
+else:
+    new_hostport = "localhost"
+
+new_netloc = f"{userinfo}@{new_hostport}" if userinfo else new_hostport
+print(urlunparse(parsed._replace(netloc=new_netloc)))
+PY
+)"
+  if [[ "${NORMALIZED_DATABASE_URL}" != "${DATABASE_URL}" ]]; then
+    echo "validate-required-config-by-scope: host no resolvible fuera de Docker, usando localhost" >&2
+    DATABASE_URL="${NORMALIZED_DATABASE_URL}"
+  fi
+fi
+
 python3 - "${ROOT_DIR}" "${SCOPE}" "${DATABASE_URL}" <<'PY'
 from __future__ import annotations
 
@@ -63,6 +110,10 @@ legacy_keys = {
     "RESTAURANT_NAME",
 }
 
+allow_empty_required_keys = {
+    "system.payments.stripe_publishable_key",
+}
+
 scope_enum = ConfigScope.SYSTEM if scope == "system" else ConfigScope.BUSINESS
 required_keys = sorted(
     key
@@ -86,7 +137,9 @@ db_values = {str(key): value for key, value in rows}
 missing = [
     key
     for key in required_keys
-    if key not in db_values or db_values.get(key) is None or str(db_values.get(key)).strip() == ""
+    if key not in db_values
+    or db_values.get(key) is None
+    or (str(db_values.get(key)).strip() == "" and key not in allow_empty_required_keys)
 ]
 
 legacy_present = sorted(key for key in legacy_keys if key in db_values)

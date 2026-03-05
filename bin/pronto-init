@@ -10,6 +10,67 @@ SQL_ROOT="$REPO_ROOT/pronto-scripts/init/sql"
 LOADER="$REPO_ROOT/pronto-scripts/init/python/manifest_loader.py"
 DB="${DATABASE_URL:-}"
 
+normalize_db_for_host() {
+  if [[ -z "${DB}" ]]; then
+    return 0
+  fi
+
+  if [[ -f "/.dockerenv" ]]; then
+    return 0
+  fi
+
+  local normalized
+  normalized="$(python3 - <<'PY' "$DB"
+from urllib.parse import urlparse, urlunparse
+import socket
+import sys
+
+url = sys.argv[1]
+parsed = urlparse(url)
+host = parsed.hostname
+
+if not host:
+    print(url)
+    raise SystemExit(0)
+
+try:
+    socket.gethostbyname(host)
+    print(url)
+    raise SystemExit(0)
+except Exception:
+    pass
+
+if host not in {"postgres", "pronto-postgres", "db"}:
+    print(url)
+    raise SystemExit(0)
+
+netloc = parsed.netloc
+if "@" in netloc:
+    userinfo, hostport = netloc.rsplit("@", 1)
+else:
+    userinfo, hostport = "", netloc
+
+if ":" in hostport:
+    _, port = hostport.rsplit(":", 1)
+    new_hostport = f"localhost:{port}"
+else:
+    new_hostport = "localhost"
+
+new_netloc = f"{userinfo}@{new_hostport}" if userinfo else new_hostport
+print(urlunparse(parsed._replace(netloc=new_netloc)))
+PY
+)"
+
+  if [[ "${normalized}" != "${DB}" ]]; then
+    echo "pronto-init: host '${DB}' no resolvible fuera de Docker, usando localhost" >&2
+    DB="${normalized}"
+  fi
+}
+
+refresh_psql_base() {
+  PSQL_BASE=(psql "$DB" -X -v ON_ERROR_STOP=1)
+}
+
 PHASES=(00_bootstrap 10_schema 20_constraints 30_indexes 40_seeds)
 
 sha256_file() {
@@ -45,9 +106,12 @@ require_db() {
     echo "pronto-init: DATABASE_URL requerido" >&2
     exit 1
   fi
+  normalize_db_for_host
+  export DATABASE_URL="${DB}"
+  refresh_psql_base
 }
 
-PSQL_BASE=(psql "$DB" -X -v ON_ERROR_STOP=1)
+PSQL_BASE=()
 
 list_phase_files() {
   local phase="$1"

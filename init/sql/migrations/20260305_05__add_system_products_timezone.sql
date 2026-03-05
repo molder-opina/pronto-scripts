@@ -1,0 +1,45 @@
+-- Migration: Add configurable timezone for product schedule evaluation
+-- Date: 2026-03-05
+
+BEGIN;
+
+DO $$
+DECLARE
+    key_col text;
+    val_col text;
+BEGIN
+    SELECT
+        CASE
+            WHEN EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='pronto_system_settings' AND column_name='config_key'
+            ) THEN 'config_key'
+            ELSE 'key'
+        END,
+        CASE
+            WHEN EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='pronto_system_settings' AND column_name='config_value'
+            ) THEN 'config_value'
+            ELSE 'value'
+        END
+    INTO key_col, val_col;
+
+    EXECUTE format(
+        'INSERT INTO pronto_system_settings (%I, %I, value_type, category, display_name, description)
+         SELECT %L, %L, %L, %L, %L, %L
+         WHERE NOT EXISTS (SELECT 1 FROM pronto_system_settings WHERE %I = %L)',
+        key_col,
+        val_col,
+        'system.products.timezone',
+        'America/Mexico_City',
+        'string',
+        'system',
+        'Products Timezone',
+        'IANA timezone used for product availability and day period evaluation.',
+        key_col,
+        'system.products.timezone'
+    );
+END $$;
+
+COMMIT;

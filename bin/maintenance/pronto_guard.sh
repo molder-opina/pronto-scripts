@@ -5,11 +5,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_FILE="${PROJECT_ROOT}/.env"
-LOG_DIR="${PROJECT_ROOT}/logs/systemd"
-RUNTIME_LIB="${PROJECT_ROOT}/bin/lib/docker_runtime.sh"
-STACK_HELPERS_LIB="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"
+SCRIPTS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+ENV_FILE="${REPO_ROOT}/.env"
+LOG_DIR="${REPO_ROOT}/logs/systemd"
+RUNTIME_LIB="${SCRIPTS_ROOT}/lib/docker_runtime.sh"
+STACK_HELPERS_LIB="${SCRIPTS_ROOT}/lib/stack_helpers.sh"
 
 # Crear directorio de logs si no existe
 mkdir -p "${LOG_DIR}"
@@ -35,7 +36,7 @@ fi
 APP_NAME_VALUE="${APP_NAME:-pronto}"
 CLIENT_CONTAINER="${APP_NAME_VALUE}-client"
 EMPLOYEE_CONTAINER="${APP_NAME_VALUE}-employee"
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
+COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 
 if declare -F detect_compose_command >/dev/null 2>&1; then
     detect_compose_command "${COMPOSE_FILE}" >/dev/null
@@ -72,16 +73,16 @@ container_exists() {
 start_all_services() {
     log "Iniciando servicios de Pronto..."
 
-    cd "${PROJECT_ROOT}"
+    cd "${REPO_ROOT}"
 
     # Usar el script up.sh para levantar los servicios
-    if [[ -f "bin/up.sh" ]]; then
-        bash bin/up.sh || {
+    if [[ -f "${SCRIPTS_ROOT}/up.sh" ]]; then
+        bash "${SCRIPTS_ROOT}/up.sh" || {
             log "ERROR: No se pudieron iniciar los servicios"
             return 1
         }
     else
-        log "ERROR: No se encontró bin/up.sh"
+        log "ERROR: No se encontró ${SCRIPTS_ROOT}/up.sh"
         return 1
     fi
 

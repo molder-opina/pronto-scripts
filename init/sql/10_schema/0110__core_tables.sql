@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS pronto_customers (
   anon_id VARCHAR(36) UNIQUE,
   email_hash VARCHAR(128) UNIQUE,
   contact_hash VARCHAR(128),
-  auth_hash VARCHAR(128),
+  auth_hash VARCHAR(255),
   password_hash VARCHAR(255),
   name_encrypted TEXT,
   email_encrypted TEXT,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS pronto_employees (
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   email_hash VARCHAR(128) UNIQUE,
-  auth_hash VARCHAR(128),
+  auth_hash VARCHAR(255),
   email_encrypted TEXT,
   name_encrypted TEXT,
   phone_encrypted TEXT,
@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS pronto_modifiers (
   group_id UUID REFERENCES pronto_modifier_groups(id),
   name VARCHAR(255) NOT NULL,
   price_adjustment NUMERIC(10, 2) DEFAULT 0,
+  image_path VARCHAR(500),
   is_available BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -127,8 +128,18 @@ CREATE TABLE IF NOT EXISTS pronto_tables (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE SEQUENCE IF NOT EXISTS pronto_orders_order_number_seq
+  AS BIGINT
+  START WITH 1
+  INCREMENT BY 1
+  MINVALUE 1
+  MAXVALUE 9999999999
+  CACHE 1;
+
 CREATE TABLE IF NOT EXISTS pronto_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_number BIGINT NOT NULL DEFAULT nextval('pronto_orders_order_number_seq')
+    CHECK (order_number BETWEEN 1 AND 9999999999),
   customer_id UUID REFERENCES pronto_customers(id),
   session_id UUID REFERENCES pronto_dining_sessions(id),
   anonymous_client_id VARCHAR(36),
@@ -191,5 +202,6 @@ CREATE INDEX IF NOT EXISTS ix_employee_email_hash ON pronto_employees(email_hash
 CREATE INDEX IF NOT EXISTS ix_employee_role_active ON pronto_employees(role, status);
 CREATE INDEX IF NOT EXISTS ix_orders_session_id ON pronto_orders(session_id);
 CREATE INDEX IF NOT EXISTS ix_orders_workflow_status ON pronto_orders(workflow_status);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON pronto_orders(order_number);
 CREATE INDEX IF NOT EXISTS ix_order_items_order_id ON pronto_order_items(order_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ix_table_qr_code ON pronto_tables(qr_code);

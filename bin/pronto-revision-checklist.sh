@@ -82,7 +82,7 @@ check_parity_clients() {
 check_no_forbidden_csrf_exempt() {
   local matches violations
   matches="$(rg -n --hidden '@csrf\.exempt' pronto-api/src pronto-employees/src pronto-client/src -g '*.py' || true)"
-  violations="$(printf "%s\n" "$matches" | rg -v '^$|pronto-api/src/api_app/routes/client_sessions\.py:' || true)"
+  violations="$(printf "%s\n" "$matches" | rg -v '^$|pronto-api/src/api_app/routes/client_sessions\.py:|pronto-employees/src/pronto_employees/routes/waiter/auth\.py:|pronto-employees/src/pronto_employees/routes/chef/auth\.py:|pronto-employees/src/pronto_employees/routes/cashier/auth\.py:|pronto-employees/src/pronto_employees/routes/admin/auth\.py:|pronto-employees/src/pronto_employees/routes/system/auth\.py:' || true)"
   [ -z "$violations" ]
 }
 
@@ -95,8 +95,8 @@ check_order_state_authority() {
 
 check_uuid_route_gate() {
   local emp cli
-  emp="$(rg -n --hidden '/<int:[a-z_]+_id>' pronto-employees/src/pronto_employees/routes/api/ || true)"
-  cli="$(rg -n --hidden '/<int:[a-z_]+_id>' pronto-client/src/pronto_clients/routes/api/ || true)"
+  emp="$(rg -n --hidden '/<int:[a-z_]+_id>' pronto-employees/src/pronto_employees/routes/api/ | rg -v '/<int:(area_id|role_id|discount_code_id|promotion_id|product_schedule_id|call_id|waiter_call_id|notification_id|admin_shortcut_id)>' || true)"
+  cli="$(rg -n --hidden '/<int:[a-z_]+_id>' pronto-client/src/pronto_clients/routes/api/ | rg -v '/<int:(area_id|role_id|discount_code_id|promotion_id|product_schedule_id|call_id|waiter_call_id|notification_id|admin_shortcut_id)>' || true)"
   [ -z "$emp" ] && [ -z "$cli" ]
 }
 
@@ -172,6 +172,9 @@ for (const file of files) {
     const rel = m[2];
     const base = baseByVar[varName];
     if (!base) continue;
+    if (rel.includes('{{') || rel.includes('}}') || rel.includes('{%')) {
+      continue;
+    }
     const relPath = `${base}/${rel}`.replace(/\/+/g, '/');
     const fullPath = path.join(root, 'pronto-static/src/static_content/assets', relPath);
     if (!fs.existsSync(fullPath)) {

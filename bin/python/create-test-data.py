@@ -84,15 +84,33 @@ print("📋 Creando tablas...")
 cursor.execute(
     """
     CREATE TABLE IF NOT EXISTS pronto_customers (
-        id SERIAL PRIMARY KEY,
-        email_hash VARCHAR(128) NOT NULL UNIQUE,
-        contact_hash VARCHAR(128) NOT NULL,
-        name_encrypted TEXT NOT NULL,
-        email_encrypted TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        anon_id VARCHAR(36) UNIQUE,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100),
+        email_hash VARCHAR(128) UNIQUE,
+        password_hash VARCHAR(255),
+        loyalty_points INTEGER DEFAULT 0,
+        total_spent NUMERIC(12, 2) DEFAULT 0.00,
+        visit_count INTEGER DEFAULT 0,
+        notes TEXT,
+        preferences JSONB,
+        email_encrypted TEXT,
+        name_encrypted TEXT,
         phone_encrypted TEXT,
         physical_description TEXT,
         avatar VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        kind VARCHAR(20) DEFAULT 'customer',
+        kiosk_location VARCHAR(50),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        name_search TEXT,
+        email_normalized TEXT,
+        phone_e164 VARCHAR(50),
+        tax_id VARCHAR(32),
+        tax_name VARCHAR(255),
+        tax_address TEXT,
+        tax_email VARCHAR(255)
     );
 """
 )
@@ -102,18 +120,35 @@ print("   ✓ pronto_customers")
 cursor.execute(
     """
     CREATE TABLE IF NOT EXISTS pronto_employees (
-        id SERIAL PRIMARY KEY,
-        email_hash VARCHAR(128) NOT NULL UNIQUE,
-        auth_hash VARCHAR(128) NOT NULL DEFAULT '',
-        role VARCHAR(50) NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        name_encrypted TEXT NOT NULL,
-        email_encrypted TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        employee_code VARCHAR(50) NOT NULL UNIQUE,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100),
+        email VARCHAR(255) UNIQUE,
+        phone VARCHAR(20),
+        pin VARCHAR(10),
+        role VARCHAR(50) DEFAULT 'staff',
+        department VARCHAR(100),
+        hire_date DATE,
+        status VARCHAR(20) DEFAULT 'active',
+        permissions JSONB,
+        clocked_in BOOLEAN DEFAULT FALSE,
+        current_session_id UUID,
+        last_clock_in TIMESTAMP WITH TIME ZONE,
+        total_hours NUMERIC(10,2) DEFAULT 0.00,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        auth_hash VARCHAR(255),
+        email_hash VARCHAR(128) UNIQUE,
+        email_encrypted TEXT,
         phone_encrypted TEXT,
-        avatar VARCHAR(255),
-        preferences TEXT,
-        allow_scopes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name_encrypted TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        allow_scopes JSONB,
+        additional_roles TEXT,
+        signed_in_at TIMESTAMP,
+        last_activity_at TIMESTAMP,
+        preferences JSONB
     );
 """
 )
@@ -177,6 +212,7 @@ cursor.execute(
     """
     CREATE TABLE IF NOT EXISTS pronto_orders (
         id SERIAL PRIMARY KEY,
+        order_number BIGSERIAL UNIQUE,
         customer_id INTEGER REFERENCES pronto_customers(id) ON DELETE SET NULL,
         session_id INTEGER REFERENCES pronto_dining_sessions(id) ON DELETE SET NULL,
         workflow_status VARCHAR(32) NOT NULL DEFAULT 'requested',
@@ -190,7 +226,6 @@ cursor.execute(
         total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
         waiter_id INTEGER REFERENCES pronto_employees(id) ON DELETE SET NULL,
         chef_id INTEGER REFERENCES pronto_employees(id) ON DELETE SET NULL,
-        notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT NOW()
     );
@@ -214,27 +249,39 @@ cursor.execute(
 )
 print("   ✓ pronto_order_items")
 
-# pronto_business_config table
+# pronto_system_settings table (V6 Canon)
 cursor.execute(
     """
-    CREATE TABLE IF NOT EXISTS pronto_business_config (
+    CREATE TABLE IF NOT EXISTS pronto_system_settings (
         id SERIAL PRIMARY KEY,
-        config_key VARCHAR(255) NOT NULL UNIQUE,
-        config_value TEXT,
+        key VARCHAR(255) NOT NULL UNIQUE,
+        value TEXT,
         value_type VARCHAR(50) DEFAULT 'string',
         category VARCHAR(100) DEFAULT 'general',
         display_name VARCHAR(255),
         description TEXT,
-        min_value VARCHAR(255),
-        max_value VARCHAR(255),
-        unit VARCHAR(50),
+        min_value FLOAT,
+        max_value FLOAT,
+        unit VARCHAR(32),
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_by INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 """
 )
-print("   ✓ pronto_business_config")
+print("   ✓ pronto_system_settings")
+
+# Hard-fail if legacy table exists to force cleanup
+cursor.execute(
+    "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'pronto_business_config');"
+)
+if cursor.fetchone()[0]:
+    print("\n❌ ERROR CRÍTICO: Se detectó la tabla legacy 'pronto_business_config'.")
+    print(
+        "   V6 prohíbe el uso de esta tabla. Por favor, elimínala manualmente antes de continuar:"
+    )
+    print("   DROP TABLE pronto_business_config CASCADE;")
+    sys.exit(1)
 
 # pronto_business_info table
 cursor.execute(
@@ -256,20 +303,32 @@ print("   ✓ pronto_business_info")
 # Create indexes
 print("")
 print("📋 Creando índices...")
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_customer_email_hash ON pronto_customers(email_hash);")
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_customer_created_at ON pronto_customers(created_at);")
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_customer_email_hash ON pronto_customers(email_hash);"
+)
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_customer_created_at ON pronto_customers(created_at);"
+)
 cursor.execute(
     "CREATE INDEX IF NOT EXISTS ix_order_workflow_status ON pronto_orders(workflow_status);"
 )
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_order_customer_id ON pronto_orders(customer_id);")
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_order_session_id ON pronto_orders(session_id);")
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_order_created_at ON pronto_orders(created_at);")
-cursor.execute("CREATE INDEX IF NOT EXISTS ix_order_item_order_id ON pronto_order_items(order_id);")
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_order_customer_id ON pronto_orders(customer_id);"
+)
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_order_session_id ON pronto_orders(session_id);"
+)
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_order_created_at ON pronto_orders(created_at);"
+)
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS ix_order_item_order_id ON pronto_order_items(order_id);"
+)
 cursor.execute(
     "CREATE INDEX IF NOT EXISTS ix_order_item_menu_item_id ON pronto_order_items(menu_item_id);"
 )
 cursor.execute(
-    "CREATE INDEX IF NOT EXISTS ix_business_config_key ON pronto_business_config(config_key);"
+    "CREATE INDEX IF NOT EXISTS ix_system_setting_key ON pronto_system_settings(key);"
 )
 
 print("   ✓ Índices creados")
@@ -322,9 +381,22 @@ print("👥 Creando empleados de prueba...")
 
 employees = [
     {
+        "email": "system@pronto.test",
+        "role": "system",
+        "name": "System Administrator",
+        "employee_code": "SYS001",
+        "phone": "",
+        "is_active": True,
+        "email_encrypted": "system@pronto.test",
+        "name_encrypted": "System Administrator",
+        "phone_encrypted": "",
+        "allow_scopes": '["system"]',
+    },
+    {
         "email": "admin@cafeteria.test",
         "role": "admin",
         "name": "Administrador",
+        "employee_code": "ADM001",
         "phone": "",
         "is_active": True,
         "email_encrypted": "admin@cafeteria.test",
@@ -336,6 +408,7 @@ employees = [
         "email": "carlos.chef@cafeteria.test",
         "role": "chef",
         "name": "Carlos Chef",
+        "employee_code": "CHF001",
         "phone": "",
         "is_active": True,
         "email_encrypted": "carlos.chef@cafeteria.test",
@@ -347,6 +420,7 @@ employees = [
         "email": "juan.mesero@cafeteria.test",
         "role": "waiter",
         "name": "Juan Mesero",
+        "employee_code": "WTR001",
         "phone": "",
         "is_active": True,
         "email_encrypted": "juan.mesero@cafeteria.test",
@@ -358,6 +432,7 @@ employees = [
         "email": "laura.cajera@cafeteria.test",
         "role": "cashier",
         "name": "Laura Cajera",
+        "employee_code": "CSH001",
         "phone": "",
         "is_active": True,
         "email_encrypted": "laura.cajera@cafeteria.test",
@@ -372,12 +447,14 @@ for emp in employees:
     email_hash = hash_identifier(email)
     auth_hash = hash_credentials(email, "ChangeMe!123")
     allow_scopes = emp.get("allow_scopes", "[]")
+    preferences = emp.get("preferences", "{}")
+    employee_code = emp["employee_code"]
 
     cursor.execute(
         """
         INSERT INTO pronto_employees
-            (email_hash, auth_hash, role, is_active, name_encrypted, email_encrypted, phone_encrypted, preferences, allow_scopes)
-            VALUES (%s, %s, %s, true, %s, %s, %s, %s, %s)
+            (email_hash, auth_hash, role, is_active, name_encrypted, email_encrypted, phone_encrypted, preferences, allow_scopes, employee_code, first_name)
+            VALUES (%s, %s, %s, true, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (email_hash) DO UPDATE SET
                 auth_hash = EXCLUDED.auth_hash,
                 role = EXCLUDED.role,
@@ -385,7 +462,10 @@ for emp in employees:
                 name_encrypted = EXCLUDED.name_encrypted,
                 email_encrypted = EXCLUDED.email_encrypted,
                 phone_encrypted = EXCLUDED.phone_encrypted,
-                allow_scopes = EXCLUDED.allow_scopes
+                preferences = EXCLUDED.preferences,
+                allow_scopes = EXCLUDED.allow_scopes,
+                employee_code = EXCLUDED.employee_code,
+                first_name = EXCLUDED.first_name
         """,
         (
             email_hash,
@@ -394,8 +474,10 @@ for emp in employees:
             emp["name"],
             email,
             emp.get("phone", ""),
-            emp.get("preferences", ""),
+            preferences,
             allow_scopes,
+            employee_code,
+            emp["name"].split()[0],
         ),
     )
 
@@ -418,16 +500,23 @@ customers = [
 for cust in customers:
     email_encrypted = cust["email_encrypted"]
     phone_encrypted = cust["phone_encrypted"]
-    contact_hash = cust["contact_hash"]
     name_encrypted = cust["name_encrypted"]
+    email_hash = hash_identifier(email_encrypted)
 
     cursor.execute(
         """
         INSERT INTO pronto_customers
-            (email_hash, contact_hash, name_encrypted, email_encrypted, phone_encrypted, physical_description)
+            (email_hash, first_name, name_encrypted, email_encrypted, phone_encrypted, physical_description)
             VALUES (%s, %s, %s, %s, %s, 'Cliente de prueba')
+            ON CONFLICT (email_hash) DO NOTHING
         """,
-        (email_encrypted, contact_hash, name_encrypted, phone_encrypted, phone_encrypted),
+        (
+            email_hash,
+            cust["name_encrypted"].split()[0],
+            name_encrypted,
+            email_encrypted,
+            phone_encrypted,
+        ),
     )
 
 print("   ✓ " + str(len(customers)) + " clientes creados")
@@ -437,41 +526,34 @@ print("")
 print("📋 Creando configuraciones por defecto...")
 
 default_configs = [
-    ("restaurant_name", "Cafetería de Prueba"),
-    ("tax_rate", "0.16"),
-    ("currency", "MXN"),
-    ("time_zone", "America/Mexico_City"),
-    ("session_timeout_minutes", "30"),
-    ("order_preparation_time_minutes", "15"),
-    ("enable_notifications", "true"),
-    ("customer_session_cookie_name", "pronto_customer_session"),
-    ("employee_session_cookie_name", "pronto_employee_session"),
-    ("restaurant_email", "noreply@cafeteria.test"),
-    ("restaurant_phone", "+52555555555"),
-    ("restaurant_address", "Av. Principal 123"),
-    ("business_hours_start", "08:00"),
-    ("business_hours_end", "22:00"),
-    ("logo_url", "/assets/cafeteria-test/logo.png"),
-    ("primary_color", "#FF5722"),
-    ("secondary_color", "#FFC107"),
-    ("table_count", "20"),
-    ("enable_orders", "true"),
-    ("enable_kitchen_display", "true"),
-    ("enable_payments", "true"),
+    ("restaurant_name", "Cafetería de Prueba", "string", "business"),
+    ("tax_rate", "0.16", "float", "business"),
+    ("currency_code", "MXN", "string", "business"),
+    ("currency_symbol", "$", "string", "business"),
+    ("system.performance.poll_interval_ms", "2000", "int", "system"),
+    ("system.orders.new_badge_minutes", "2", "int", "system"),
+    ("system.session.client_ttl_seconds", "3600", "int", "system"),
+    ("system.api.items_per_page", "10", "int", "system"),
+    ("orders.estimated_time_min", "25", "int", "business"),
+    ("orders.estimated_time_max", "30", "int", "business"),
+    ("waiter_can_collect", "true", "bool", "business"),
+    ("waiter.call_cooldown_seconds", "60", "int", "business"),
+    ("client.checkout.redirect_seconds", "6", "int", "business"),
+    ("store_cancel_reason", "true", "bool", "business"),
 ]
 
-for config_key, config_value in default_configs:
-    display_name = config_key.replace("_", " ").title()
+for config_key, config_value, value_type, category in default_configs:
+    display_name = config_key.replace(".", " ").replace("_", " ").title()
     description = f"Default config for {display_name.lower()}"
 
     cursor.execute(
         """
-        INSERT INTO pronto_business_config
-            (config_key, config_value, value_type, category, display_name, description)
-            VALUES (%s, %s, 'string', 'general', %s, %s)
-            ON CONFLICT (config_key) DO NOTHING;
+        INSERT INTO pronto_system_settings
+            (key, value, value_type, category, display_name, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (key) DO NOTHING;
         """,
-        (config_key, config_value, display_name, description),
+        (config_key, config_value, value_type, category, display_name, description),
     )
 
 print("   ✓ " + str(len(default_configs)) + " configuraciones por defecto")

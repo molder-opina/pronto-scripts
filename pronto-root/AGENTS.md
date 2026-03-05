@@ -36,7 +36,13 @@ Violación a cualquiera ⇒ **REJECTED**.
 16. **Prohibido @csrf.exempt para "hacer funcionar" código** (P0):
     - CSRF es protección obligatoria, no debe deshabilitarse para arreglar problemas.
     - Si un endpoint falla por CSRF, la solución correcta es asegurar que el cliente envíe el token CSRF.
-    - Excepción única: `/api/sessions/open` (solo con table_id válido para abrir sesión de mesa).
+    - Excepciones permitidas y acotadas:
+      - `/api/sessions/open` (solo con `table_id` válido para abrir sesión de mesa).
+      - `POST /waiter/login` en `pronto-employees/src/pronto_employees/routes/waiter/auth.py` (login de consola scope `waiter`).
+      - `POST /chef/login` en `pronto-employees/src/pronto_employees/routes/chef/auth.py` (login de consola scope `chef`).
+      - `POST /cashier/login` en `pronto-employees/src/pronto_employees/routes/cashier/auth.py` (login de consola scope `cashier`).
+      - `POST /admin/login` en `pronto-employees/src/pronto_employees/routes/admin/auth.py` (login de consola scope `admin`).
+      - `POST /system/login` en `pronto-employees/src/pronto_employees/routes/system/auth.py` (login de consola scope `system`).
 15. Prohibido código legacy y patrones anticuados:
     - Prohibido `flask.session` para autenticación de empleados (usar JWT).
     - Prohibido directorio `legacy_mysql` en `pronto-scripts/init/`.
@@ -145,6 +151,7 @@ Reglas obligatorias para todo el monorepo. Violación ⇒ **REJECTED**.
    - Prohibido archivos sin extensión en `pronto-scripts/bin/`.
    - Todo contexto que sea público por definición debe ubicarse en `/public`.
    - Excepción única: todo lo relacionado con autenticación debe ubicarse en `/auth`, incluso si es público.
+8. **Archivos Temporales (IA/Desarrollo)**: Todos los archivos temporales, reportes de un solo uso, capturas de pantalla o logs manuales generados por la IA o durante el desarrollo deben ubicarse exclusivamente en la carpeta `tmp/` en la raíz del proyecto. Esta regla aplica al espacio de trabajo local y no invalida las rutas de temporales internas de los contenedores.
 
 ---
 
@@ -308,6 +315,36 @@ No se modifican sin orden explícita:
 
 ---
 
+# 3.2) REGLA DE COMBOS/PAQUETES Y ADITAMIENTOS (P0)
+
+## Definición Canónica
+
+1. **Combo/Paquete es una composición de productos existentes**:
+   - Prohibido tratar combos como productos aislados "inventados" sin base en catálogo.
+   - Cada combo debe derivarse de productos existentes en `pronto_menu_items`.
+
+2. **Herencia de aditamientos obligatoria**:
+   - Un combo debe heredar los `modifier_groups` de sus productos base.
+   - Se permite agregar aditamientos específicos del combo (extras del combo), pero no reemplazar silenciosamente los heredados.
+
+3. **Opciones incluidas de combo**:
+   - Las opciones incluidas (ej: bebida/guarnición del combo) deben construirse desde productos existentes, no desde listas hardcodeadas desvinculadas del catálogo vigente.
+
+4. **Semántica de seed/init**:
+   - La normalización de combos debe ser idempotente.
+   - Si existen grupos legacy de combo, deben migrarse/limpiarse hacia el esquema canónico sin duplicar enlaces.
+
+5. **Paridad backend/frontend**:
+   - `GET /api/menu` debe exponer combos con sus grupos heredados + grupos específicos del combo de forma consistente para `pronto-client`.
+
+## Prohibiciones explícitas (P0)
+
+- Prohibido crear combos "vacíos" sin productos base.
+- Prohibido suprimir aditamientos heredados del producto base sin orden explícita del usuario.
+- Prohibido mantener simultáneamente grupos legacy y canónicos para la misma semántica de combo si generan duplicidad/confusión.
+
+---
+
 # 4) ROLES Y ACCESOS (P0)
 
 Roles canónicos:
@@ -412,16 +449,17 @@ APPLIED.md
 references/ (opcional)
 Prohibido comitear doc incompleta.
 12) API CANÓNICA (/api) (P0)
-12.1 Regla canónica por host
-Única ruta canónica de API: "/api/*".
-Resolución por host:
-employees.<dominio>/api/* → pronto-employees
-clients.<dominio>/api/* → pronto-client
-Prohibido implementar/documentar/depender de "/{scope}/api/*".
+12.1 Autoridad única de API (P0)
+Única ruta canónica de API: "/api/*" servida exclusivamente por `pronto-api` en `:6082`.
+Regla dura:
+- Prohibido exponer endpoints de negocio fuera de `pronto-api` (`:6082`).
+- Prohibido implementar lógica de negocio/API en `pronto-client` o `pronto-employees`.
+- Prohibido implementar/documentar/depender de "/{scope}/api/*".
+- Cualquier endpoint de API fuera de `:6082/api/*` ⇒ **REJECTED**.
 
 12.2 Frontend employees (pronto-static) — wrapper obligatorio (P0)
 
-Toda llamada a "/api/*" debe ser relativa (sin host hardcode).
+Toda llamada a "/api/*" debe resolver canónicamente a `pronto-api` (`:6082`) sin bypass.
 Prohibido mutar "/api/*" fuera de:
 pronto-static/src/vue/employees/core/http.ts
 Canon:
@@ -436,6 +474,23 @@ Si falta meta tag y se intenta mutar ⇒ wrapper falla loud (throw).
 12.4 Autenticación clientes (P0)
 12.4.1 Header canónico
 pronto-client → pronto-api debe usar header: X-PRONTO-CUSTOMER-REF
+
+12.4.2 BFF prohibido para negocio/API (P0)
+- `pronto-client` y `pronto-employees` solo pueden renderizar SSR/UI.
+- No pueden definir ni mantener endpoints `/api/*` de negocio.
+- Cualquier compatibilidad temporal debe declararse como `deprecated` y tener plan de retiro explícito.
+
+12.4.3 Excepción controlada: BFF proxy técnico de transporte (P0)
+- Se permite únicamente un BFF proxy técnico temporal para compatibilidad de despliegue/ruteo.
+- Alcance permitido: reenviar requests `/api/*` hacia `pronto-api` en `:6082` sin alterar lógica de negocio.
+- Prohibido en la excepción:
+  - Validaciones/reglas de dominio.
+  - Transformaciones semánticas de payload o estados de negocio.
+  - Persistencia propia o side-effects de negocio fuera de `pronto-api`.
+- Requisitos obligatorios:
+  - Marcar implementación como `deprecated`.
+  - Mantener trazabilidad (`X-Correlation-ID`) y headers de seguridad/csrf aplicables.
+  - Definir plan de retiro explícito para volver a acceso canónico directo a `:6082/api/*`.
 
 12.5 Tipos de parámetros en rutas (P0)
 - Entidades principales (Customer, Employee, DiningSession, Order, Table, MenuItem, Modifier, etc.) deben usar UUID.

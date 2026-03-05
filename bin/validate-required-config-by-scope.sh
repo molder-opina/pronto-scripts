@@ -58,6 +58,7 @@ legacy_keys = {
     "estimated_time_min",
     "estimated_time_max",
     "paid_orders_window_minutes",
+    "paid_orders_retention_minutes",
     "items_per_page",
     "RESTAURANT_NAME",
 }

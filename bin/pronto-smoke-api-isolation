@@ -14,6 +14,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,7 +25,7 @@ NC='\033[0m' # No Color
 
 # Default values
 API_HOST="${API_HOST:-localhost:6082}"
-UI_HOST="${UI_HOST:-localhost:6080}"
+UI_HOST="${UI_HOST:-localhost:6081}"
 
 # Counters
 PASSED=0
@@ -31,12 +34,12 @@ FAILED=0
 # Helper functions
 pass() {
     echo -e "${GREEN}✓ PASS${NC}: $1"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 }
 
 fail() {
     echo -e "${RED}✗ FAIL${NC}: $1"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 }
 
 warn() {
@@ -77,14 +80,14 @@ else
     fail "pronto-api is not responding at http://${API_HOST}/health"
 fi
 
-# Test 2: Health check - pronto-employees
-header "Test 2: pronto-employees Health Check"
+# Test 2: Health check - UI SSR (employees/client)
+header "Test 2: UI SSR Health Check"
 if curl -sf "http://${UI_HOST}/health" > /dev/null 2>&1; then
-    pass "pronto-employees is running"
+    pass "UI SSR is running"
     UI_HEALTH=$(curl -sf "http://${UI_HOST}/health")
     info "UI Health Response: $UI_HEALTH"
 else
-    fail "pronto-employees is not responding at http://${UI_HOST}/health"
+    fail "UI SSR is not responding at http://${UI_HOST}/health"
 fi
 
 # Test 3: Check if /api/stats/public works (no auth required)
@@ -99,7 +102,7 @@ fi
 
 # Test 4: Check if /api/menu works (requires auth, just check endpoint exists)
 header "Test 4: Menu Endpoint - /api/menu (should return 401 or valid response)"
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/menu")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/menu")
 if [[ "$HTTP_CODE" =~ ^(200|401|403)$ ]]; then
     pass "/api/menu is responding (HTTP $HTTP_CODE)"
 else
@@ -108,7 +111,7 @@ fi
 
 # Test 5: Check if /api/orders works
 header "Test 5: Orders Endpoint - /api/orders (should return 401 or valid response)"
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/orders")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/orders")
 if [[ "$HTTP_CODE" =~ ^(200|401|403)$ ]]; then
     pass "/api/orders is responding (HTTP $HTTP_CODE)"
 else
@@ -117,51 +120,44 @@ fi
 
 # Test 6: Check if /api/sessions/all works
 header "Test 6: Sessions Endpoint - /api/sessions/all"
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/sessions/all")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${API_HOST}/api/sessions/all")
 if [[ "$HTTP_CODE" =~ ^(200|401|403)$ ]]; then
     pass "/api/sessions/all is responding (HTTP $HTTP_CODE)"
 else
     fail "/api/sessions/all is not responding correctly (HTTP $HTTP_CODE)"
 fi
 
-# Test 7: Check if UI templates have window.API_BASE
-header "Test 7: UI Templates - window.API_BASE"
-TEMPLATE_FILE="/Users/molder/projects/github-molder/pronto/pronto-employees/src/pronto_employees/templates/base.html"
-if grep -q "window.API_BASE" "$TEMPLATE_FILE" 2>/dev/null; then
-    pass "base.html contains window.API_BASE"
+# Test 7: Check SPA index template exists and defines API base inputs
+header "Test 7: SPA Template - index.html context"
+TEMPLATE_FILE="${REPO_ROOT}/pronto-employees/src/pronto_employees/templates/index.html"
+if [[ -f "$TEMPLATE_FILE" ]]; then
+    pass "index.html exists"
+    if grep -q "window.API_BASE\|api_base_url" "$TEMPLATE_FILE" 2>/dev/null; then
+        pass "index.html exposes API base context"
+    else
+        warn "index.html does not expose API base explicitly"
+    fi
 else
-    fail "base.html does not contain window.API_BASE"
+    fail "index.html not found in pronto-employees templates"
 fi
 
-# Test 8: Check if templates use window.API_BASE in fetch calls
-header "Test 8: Templates - Use window.API_BASE in fetch"
-TEMPLATE_FILES=(
-    "/Users/molder/projects/github-molder/pronto/pronto-employees/src/pronto_employees/templates/dashboard.html"
-    "/Users/molder/projects/github-molder/pronto/pronto-employees/src/pronto_employees/templates/login_waiter.html"
-    "/Users/molder/projects/github-molder/pronto/pronto-employees/src/pronto_employees/templates/login_admin.html"
-)
-
-MISSING=0
-for file in "${TEMPLATE_FILES[@]}"; do
-    if [[ -f "$file" ]]; then
-        if grep -q "fetch(\`\${window.API_BASE}" "$file" 2>/dev/null; then
-            pass "$(basename "$file") uses window.API_BASE"
-        else
-            warn "$(basename "$file") may not use window.API_BASE"
-            ((MISSING++))
-        fi
+# Test 8: Check canonical employees HTTP wrapper exists
+header "Test 8: Employees HTTP Wrapper"
+WRAPPER_FILE="${REPO_ROOT}/pronto-static/src/vue/employees/shared/core/http.ts"
+if [[ -f "$WRAPPER_FILE" ]]; then
+    pass "employees HTTP wrapper exists"
+    if grep -q "credentials:\s*'include'\|credentials:\s*\"include\"" "$WRAPPER_FILE" 2>/dev/null; then
+        pass "HTTP wrapper uses credentials=include"
+    else
+        fail "HTTP wrapper missing credentials=include"
     fi
-done
-
-if [[ $MISSING -eq 0 ]]; then
-    pass "All checked templates use window.API_BASE"
 else
-    fail "$MISSING template(s) may not use window.API_BASE"
+    fail "employees HTTP wrapper not found"
 fi
 
 # Test 9: Check if employees app.py has api_base_url
 header "Test 9: employees/app.py - api_base_url in context processor"
-APP_FILE="/Users/molder/projects/github-molder/pronto/pronto-employees/src/pronto_employees/app.py"
+APP_FILE="${REPO_ROOT}/pronto-employees/src/pronto_employees/app.py"
 if grep -q "api_base_url" "$APP_FILE" 2>/dev/null; then
     pass "app.py contains api_base_url"
 else
@@ -170,7 +166,7 @@ fi
 
 # Test 10: Check if PRONTO_API_ISOLATION feature flag exists
 header "Test 10: Feature Flag - PRONTO_API_ISOLATION"
-FEATURE_FLAG_FILE="/Users/molder/projects/github-molder/pronto/pronto-api/src/api_app/feature_flags.py"
+FEATURE_FLAG_FILE="${REPO_ROOT}/pronto-api/src/api_app/feature_flags.py"
 if [[ -f "$FEATURE_FLAG_FILE" ]]; then
     if grep -q "PRONTO_API_ISOLATION" "$FEATURE_FLAG_FILE" 2>/dev/null; then
         pass "Feature flag PRONTO_API_ISOLATION is defined"

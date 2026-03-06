@@ -307,6 +307,12 @@ if [ "$LOAD_SEED" = true ]; then
   echo "   📦 Datos de prueba cargados/actualizados (94+ productos)"
 fi
 echo ""
+echo "🛡️  Auditoría disponible: ./pronto-scripts/bin/pronto-full-audit.sh"
+if [[ "${PRONTO_RUN_AUDIT_ON_BOOT:-0}" == "1" ]]; then
+  echo ">> Ejecutando auditoría automática (PRONTO_RUN_AUDIT_ON_BOOT=1)..."
+  "${SCRIPT_DIR}/pronto-full-audit.sh" || echo "   ⚠️  Auditoría finalizó con hallazgos (revisar reporte)."
+fi
+echo ""
 echo "Ver logs con:"
 for service in "${SERVICES[@]}"; do
   echo "  ${CONTAINER_CLI} logs ${PROJECT_PREFIX}-${service} -f"

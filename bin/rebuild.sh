@@ -15,8 +15,11 @@ source "${SCRIPT_DIR}/lib/build_helpers.sh"
 source "${SCRIPT_DIR}/lib/cleanup_helpers.sh"
 # shellcheck source=bin/lib/static_helpers.sh
 source "${SCRIPT_DIR}/lib/static_helpers.sh"
+# shellcheck source=bin/lib/os_detect.sh
+source "${SCRIPT_DIR}/lib/os_detect.sh"
 
 ENV_FILE="${PROJECT_ROOT}/.env"
+ENV_FILE_DOT="${ENV_FILE}"
 LOAD_SEED=false
 
 # Carga variables de entorno
@@ -106,7 +109,7 @@ fi
 if [ "$LOAD_SEED" = true ]; then
   echo ">> Habilitando LOAD_SEED_DATA temporalmente..."
   if [[ -f "${ENV_FILE_DOT}" ]]; then
-    sed -i 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=true/' "${ENV_FILE_DOT}"
+    sed_inplace 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=true/' "${ENV_FILE_DOT}"
   fi
 fi
 
@@ -294,7 +297,7 @@ if [ "$LOAD_SEED" = true ]; then
   if [[ -f "${ENV_FILE_DOT}" ]]; then
     sleep 30
     echo ">> Restaurando LOAD_SEED_DATA=false en .env..."
-    sed -i 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE_DOT}"
+    sed_inplace 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE_DOT}"
   fi
 fi
 

@@ -20,6 +20,9 @@ source "${LIB_FILE}"
 # shellcheck source=bin/lib/static_helpers.sh
 source "${SCRIPT_DIR}/lib/static_helpers.sh"
 
+# shellcheck source=bin/lib/os_detect.sh
+source "${SCRIPT_DIR}/lib/os_detect.sh"
+
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -74,7 +77,7 @@ cleanup_env_file() {
 
 restore_seed_flag() {
     if [[ "${LOAD_SEED:-false}" == true && -f "${ENV_FILE}" ]]; then
-        sed -i '' 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE}" || true
+        sed_inplace 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE}" || true
     fi
 }
 trap 'restore_seed_flag; cleanup_env_file' EXIT
@@ -101,15 +104,15 @@ cp "${BASE_ENV_FILE}" "${ENV_FILE}"
 echo "✅ Configuración base cargada desde .env"
 echo ""
 echo "⚙️  Ajustando configuración a modo normal..."
-sed -i '' 's/^DEBUG_MODE=.*/DEBUG_MODE=false/' "${ENV_FILE}"
-sed -i '' 's/^FLASK_DEBUG=.*/FLASK_DEBUG=false/' "${ENV_FILE}"
-sed -i '' 's/^LOG_LEVEL=.*/LOG_LEVEL=INFO/' "${ENV_FILE}"
+sed_inplace 's/^DEBUG_MODE=.*/DEBUG_MODE=false/' "${ENV_FILE}"
+sed_inplace 's/^FLASK_DEBUG=.*/FLASK_DEBUG=false/' "${ENV_FILE}"
+sed_inplace 's/^LOG_LEVEL=.*/LOG_LEVEL=INFO/' "${ENV_FILE}"
 echo "✅ Modo normal configurado"
 echo ""
 
 if [ "$LOAD_SEED" = true ]; then
     echo "🔧 Habilitando LOAD_SEED_DATA temporalmente..."
-    sed -i '' 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=true/' "${ENV_FILE}"
+    sed_inplace 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=true/' "${ENV_FILE}"
 fi
 
 set -a
@@ -166,7 +169,7 @@ fi
 
 if [ "$LOAD_SEED" = true ]; then
     echo "🔧 Restaurando LOAD_SEED_DATA=false en entorno temporal..."
-    sed -i '' 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE}"
+    sed_inplace 's/^LOAD_SEED_DATA=.*/LOAD_SEED_DATA=false/' "${ENV_FILE}"
 fi
 
 # Validar que el servidor de contenido estático esté disponible

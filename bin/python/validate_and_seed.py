@@ -159,6 +159,24 @@ class DatabaseValidator:
     def seed_rbac(self, db):
         """Idempotent UPSERT for RBAC system"""
         print("\n🌱 Sincronizando Roles y Permisos (RBAC)...")
+
+        has_created_at = db.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'pronto_system_permissions'
+                  AND column_name = 'created_at'
+                LIMIT 1
+                """
+            )
+        ).first()
+        if not has_created_at:
+            log.warning(
+                "⚠️ Esquema RBAC legacy detectado (sin created_at en pronto_system_permissions). "
+                "Se omite seed_rbac en este entorno."
+            )
+            return
         
         for perm in Permission:
             code = perm.value

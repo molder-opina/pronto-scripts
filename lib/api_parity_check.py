@@ -113,6 +113,7 @@ def normalize_path(path: str) -> str:
 
 
 def _normalize_backend_rule(rule: str) -> str:
+    rule = re.sub(r"^/(waiter|chef|cashier|admin|system)/api(?=/|$)", "/api", rule)
     # Convert Flask converters to {var}
     # <int:id> -> {var}, <uuid:id> -> {var}, <id> -> {var}
     rule = re.sub(r"<[^>]+>", "{var}", rule)
@@ -420,7 +421,9 @@ def _scan_frontend_source(
                 continue
 
             # Wrapper / fetch / axios method inference (lightweight, string-literal oriented)
-            window = "\n".join(lines[idx - 1 : idx - 1 + 12])
+            window_start = max(0, idx - 2)
+            window_end = min(len(lines), idx + 12)
+            window = "\n".join(lines[window_start:window_end])
             method_match = re.search(
                 r"method\s*:\s*['\"](?P<m>[A-Za-z]+)['\"]", window, flags=re.IGNORECASE
             )
@@ -606,10 +609,17 @@ def get_backend_map(repo_root: Path, target: Target) -> dict[str, set[str]]:
             "    app_emp = create_emp()\n"
             "    for rule in app_emp.url_map.iter_rules():\n"
             "        p = rule.rule\n"
-            "        if not p.startswith('/api/'): continue\n"
+            "        if p.startswith('/api/'):\n"
+            "            pass\n"
+            "        elif p.startswith(('/waiter/api/', '/chef/api/', '/cashier/api/', '/admin/api/', '/system/api/')):\n"
+            "            parts = p.split('/', 2)\n"
+            "            p = '/' + parts[2]\n"
+            "        else:\n"
+            "            continue\n"
             "        methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
             "        out.setdefault(p, set()).update(methods)\n"
-            "except Exception as e: print(f'EMP_ERR: {e}', file=sys.stderr)\n"
+            "except Exception as e:\n"
+            "    raise SystemExit(f'EMP_ERR: {e}')\n"
             "try:\n"
             "    from api_app.app import create_app as create_api\n"
             "    app_api = create_api()\n"
@@ -618,7 +628,8 @@ def get_backend_map(repo_root: Path, target: Target) -> dict[str, set[str]]:
             "        if not p.startswith('/api/'): continue\n"
             "        methods = set(rule.methods or set()) - {'HEAD', 'OPTIONS'}\n"
             "        out.setdefault(p, set()).update(methods)\n"
-            "except Exception as e: print(f'API_ERR: {e}', file=sys.stderr)\n"
+            "except Exception as e:\n"
+            "    raise SystemExit(f'API_ERR: {e}')\n"
         )
     elif target == "clients":
         code = (
@@ -659,8 +670,23 @@ def get_backend_map(repo_root: Path, target: Target) -> dict[str, set[str]]:
         "print(json.dumps(out))\n"
     )
 
-    raw = subprocess.check_output([sys.executable, "-c", code], env=env, text=True)
-    parsed = json.loads(raw)
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        detail = stderr or stdout or f"subprocess failed with exit code {proc.returncode}"
+        raise RuntimeError(detail)
+
+    if proc.stderr.strip():
+        raise RuntimeError(proc.stderr.strip())
+
+    parsed = json.loads(proc.stdout)
 
     backend_map: dict[str, set[str]] = {}
     for rule, methods in parsed.items():

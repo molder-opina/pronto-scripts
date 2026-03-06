@@ -11,6 +11,17 @@ STAGED_FILES="$(git diff --cached --name-only)"
 
 [ -z "$STAGED_FILES" ] && echo "No hay archivos staged" && exit 0
 
+INIT_SEED_REVIEW_SCRIPT=""
+if [[ -x "$REPO_ROOT/pronto-scripts/bin/pronto-init-seed-review.sh" ]]; then
+  INIT_SEED_REVIEW_SCRIPT="$REPO_ROOT/pronto-scripts/bin/pronto-init-seed-review.sh"
+elif [[ -x "$REPO_ROOT/bin/pronto-init-seed-review.sh" ]]; then
+  INIT_SEED_REVIEW_SCRIPT="$REPO_ROOT/bin/pronto-init-seed-review.sh"
+fi
+
+if [[ -n "$INIT_SEED_REVIEW_SCRIPT" ]]; then
+  "$INIT_SEED_REVIEW_SCRIPT"
+fi
+
 OUT_DIR="docs/change-logs/PRECOMMIT-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUT_DIR"
 

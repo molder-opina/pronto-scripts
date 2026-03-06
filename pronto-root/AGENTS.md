@@ -56,16 +56,23 @@ Violación a cualquiera ⇒ **REJECTED**.
 16. Separación dura Init vs Migrations:
     - Init: `pronto-scripts/init/sql/00_bootstrap..40_seeds` (idempotente, sin `ALTER/RENAME/backfills`)
     - Migrations: `pronto-scripts/init/sql/migrations/` (evolutivo: `ALTER/RENAME/backfills/seed changes`)
-17. Reutilización: Antes de crear funcionalidad nueva, revisar `pronto-libs (pronto_shared)` y reutilizar ahí.
-18. No cambios silenciosos en `docker-compose*` ni en `pronto-scripts/bin`.
-19. Herramienta estándar de búsqueda: `rg`.
-20. Python deps: cada servicio `pronto-*` debe tener una sola fuente de verdad en `requirements.txt` en la raíz del proyecto del servicio (sin duplicados bajo `src/`). Excepción: `pronto-audit` usa `pyproject.toml` (poetry) y mantiene su propio ambiente virtual (`.venv`) interno.
-21. PostgreSQL canónico: **16-alpine**
-22. Root PRONTO es workspace aggregator local. **No se pushea**.
+17. Sincronía obligatoria Modelo/DB/Init/Seeds (P0):
+    - Todo cambio estructural (crear/modificar/renombrar/eliminar tablas, columnas, constraints, índices o modelos persistentes) debe actualizar sus scripts en `pronto-scripts/init/sql/**`.
+    - Si el cambio impacta datos base/catálogos o fixtures operativos, también debe actualizar `pronto-scripts/init/sql/40_seeds/**`.
+    - Antes de commit es obligatorio validar con:
+      - `./pronto-scripts/bin/pronto-migrate --check`
+      - `./pronto-scripts/bin/pronto-init --check`
+    - Si no aplica actualización de seeds, debe declararse explícitamente en la validación de commit (`PRONTO_INIT_SEED_NO_DATA_CHANGE=1`).
+18. Reutilización: Antes de crear funcionalidad nueva, revisar `pronto-libs (pronto_shared)` y reutilizar ahí.
+19. No cambios silenciosos en `docker-compose*` ni en `pronto-scripts/bin`.
+20. Herramienta estándar de búsqueda: `rg`.
+21. Python deps: cada servicio `pronto-*` debe tener una sola fuente de verdad en `requirements.txt` en la raíz del proyecto del servicio (sin duplicados bajo `src/`). Excepción: `pronto-audit` usa `pyproject.toml` (poetry) y mantiene su propio ambiente virtual (`.venv`) interno.
+22. PostgreSQL canónico: **16-alpine**
+23. Root PRONTO es workspace aggregator local. **No se pushea**.
 - Versión versionada en: `pronto-scripts/pronto-root/`
 - Ver sección 0.5.5 para flujo de versionado.
 - Se pushean repos hijos `pronto-*`.
-23. Autoridad Única de Transiciones de Estado (Orden + Pago) (P0)
+24. Autoridad Única de Transiciones de Estado (Orden + Pago) (P0)
 - Constantes canónicas: `pronto-libs/src/pronto_shared/constants.py`
 - Servicio canónico: `pronto-libs/src/pronto_shared/services/order_state_machine.py`
 - Prohibido `workflow_status = ...` fuera del servicio canónico
@@ -601,6 +608,10 @@ Pronto-Seed-Agent (P1)
 Solo en PRONTO_ENV in {dev,test}
 Requiere DB de dev/test
 Prohibido en prod
+Pronto-Init-Seed-Sync-Agent (P0)
+Verifica sincronía estructural entre código persistente y `pronto-scripts/init/sql/**`.
+En pre-commit pregunta/valida explícitamente si se ejecutaron `pronto-migrate --check` y `pronto-init --check`.
+Bloquea commit si hay cambios estructurales sin actualización de init/migrations/seeds o sin confirmación requerida.
 Pronto-Logging-Agent (P2)
 current_app.logger o get_logger
 No swallow exceptions
@@ -671,6 +682,11 @@ Ejecutar:
 rg -n --hidden "workflow_status\s*=" pronto-api/src | rg -v "order_state_machine\.py"
 rg -n --hidden "payment_status\s*="  pronto-api/src | rg -v "order_state_machine\.py"
 Si produce output ⇒ REJECTED
+Gate I: Init/Seeds Sync (P0)
+Ejecutar (pre-commit obligatorio):
+./pronto-scripts/bin/pronto-init-seed-review.sh
+
+Si hay cambios estructurales y no hay actualización en `pronto-scripts/init/sql/**` o falta confirmación de validación (`PRONTO_INIT_SEED_VALIDATED=1`) ⇒ REJECTED
 18) ERROR TRACKING OBLIGATORIO — Pronto-Error-Tracker-Agent (P0)
 Objetivo:
 Forzar que TODO bug quede documentado y solo pase a resuelto con corrección verificada.

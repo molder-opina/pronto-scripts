@@ -37,6 +37,9 @@ from pronto_shared.models import (
     Employee,
     MenuCategory,
     MenuItem,
+    ModifierGroup,
+    Modifier,
+    MenuItemModifierGroup,
     Table,
     SystemRole,
     SystemPermission,
@@ -317,6 +320,220 @@ class DatabaseValidator:
         db.commit()
         self.updated_data.append("Menu catalog seeded (UPSERT)")
 
+    def seed_modifier_and_package_coverage(self, db):
+        """Ensure QA data includes add-ons and combo package assignments."""
+        print("\n🌱 Sincronizando aditamientos y paquetes para QA...")
+
+        def find_group_by_name(name: str):
+            return (
+                db.query(ModifierGroup)
+                .filter(func.lower(func.trim(ModifierGroup.name)) == name.strip().lower())
+                .first()
+            )
+
+        def ensure_group(name: str, description: str, min_selection: int, max_selection: int, is_required: bool, display_order: int):
+            group = find_group_by_name(name)
+            if not group:
+                group = ModifierGroup(
+                    id=uuid4(),
+                    name=name,
+                    description=description,
+                    min_selection=min_selection,
+                    max_selection=max_selection,
+                    is_required=is_required,
+                    display_order=display_order,
+                )
+                db.add(group)
+                db.flush()
+            else:
+                group.description = description
+                group.min_selection = min_selection
+                group.max_selection = max_selection
+                group.is_required = is_required
+                group.display_order = display_order
+            return group
+
+        def ensure_modifier(group: ModifierGroup, name: str, price: Decimal, display_order: int):
+            modifier = (
+                db.query(Modifier)
+                .filter(
+                    Modifier.group_id == group.id,
+                    func.lower(func.trim(Modifier.name)) == name.strip().lower(),
+                )
+                .first()
+            )
+            if not modifier:
+                modifier = Modifier(
+                    id=uuid4(),
+                    group_id=group.id,
+                    name=name,
+                    price_adjustment=price,
+                    is_available=True,
+                    display_order=display_order,
+                )
+                db.add(modifier)
+            else:
+                modifier.price_adjustment = price
+                modifier.display_order = display_order
+                modifier.is_available = True
+
+        def ensure_link(menu_item_id, group_id, display_order: int):
+            exists = (
+                db.query(MenuItemModifierGroup)
+                .filter(
+                    MenuItemModifierGroup.menu_item_id == menu_item_id,
+                    MenuItemModifierGroup.modifier_group_id == group_id,
+                )
+                .first()
+            )
+            if not exists:
+                db.add(
+                    MenuItemModifierGroup(
+                        menu_item_id=menu_item_id,
+                        modifier_group_id=group_id,
+                        display_order=display_order,
+                    )
+                )
+
+        addon_group = ensure_group(
+            name="Aditamientos base QA",
+            description="Extras para pruebas de personalización",
+            min_selection=0,
+            max_selection=3,
+            is_required=False,
+            display_order=90,
+        )
+        ensure_modifier(addon_group, "Queso extra", Decimal("10.00"), 1)
+        ensure_modifier(addon_group, "Bacon", Decimal("15.00"), 2)
+        ensure_modifier(addon_group, "Aguacate", Decimal("12.00"), 3)
+
+        combo_drink_group = ensure_group(
+            name="Paquete QA: Bebida incluida",
+            description="Bebida incluida basada en productos existentes",
+            min_selection=1,
+            max_selection=1,
+            is_required=True,
+            display_order=91,
+        )
+        combo_side_group = ensure_group(
+            name="Paquete QA: Guarnición incluida",
+            description="Guarnición incluida basada en productos existentes",
+            min_selection=1,
+            max_selection=1,
+            is_required=True,
+            display_order=92,
+        )
+
+        beverage_aliases = ["beverages", "bebidas", "drink", "drinks", "beverage"]
+        appetizer_aliases = ["appetizers", "entradas", "starter", "starters", "appetizer"]
+
+        beverage_names = [
+            row[0]
+            for row in db.execute(
+                select(MenuItem.name)
+                .join(MenuCategory, MenuCategory.id == MenuItem.category_id)
+                .where(
+                    MenuItem.is_available.is_(True),
+                    func.lower(func.trim(MenuCategory.name)).in_(beverage_aliases),
+                )
+                .order_by(MenuItem.name.asc())
+                .limit(6)
+            ).all()
+        ]
+        appetizer_names = [
+            row[0]
+            for row in db.execute(
+                select(MenuItem.name)
+                .join(MenuCategory, MenuCategory.id == MenuItem.category_id)
+                .where(
+                    MenuItem.is_available.is_(True),
+                    func.lower(func.trim(MenuCategory.name)).in_(appetizer_aliases),
+                )
+                .order_by(MenuItem.name.asc())
+                .limit(6)
+            ).all()
+        ]
+
+        if not beverage_names:
+            beverage_names = ["Bebida de la casa"]
+        if not appetizer_names:
+            appetizer_names = ["Papas regulares"]
+
+        for idx, name in enumerate(beverage_names, start=1):
+            ensure_modifier(combo_drink_group, name, Decimal("0.00"), idx)
+        for idx, name in enumerate(appetizer_names, start=1):
+            ensure_modifier(combo_side_group, name, Decimal("0.00"), idx)
+
+        combo_items = (
+            db.query(MenuItem)
+            .join(MenuCategory, MenuCategory.id == MenuItem.category_id)
+            .filter(
+                MenuItem.is_available.is_(True),
+                func.lower(func.trim(MenuCategory.name)).in_(["combos", "combo"]),
+            )
+            .order_by(MenuItem.name.asc())
+            .all()
+        )
+        for combo in combo_items:
+            ensure_link(combo.id, combo_drink_group.id, 1)
+            ensure_link(combo.id, combo_side_group.id, 2)
+
+        non_combo_items = (
+            db.query(MenuItem)
+            .join(MenuCategory, MenuCategory.id == MenuItem.category_id)
+            .filter(
+                MenuItem.is_available.is_(True),
+                ~func.lower(func.trim(MenuCategory.name)).in_(["combos", "combo"]),
+            )
+            .order_by(MenuItem.name.asc())
+            .limit(18)
+            .all()
+        )
+        for product in non_combo_items:
+            ensure_link(product.id, addon_group.id, 1)
+
+        db.flush()
+        linked_products_count = (
+            db.query(func.count(func.distinct(MenuItemModifierGroup.menu_item_id))).scalar() or 0
+        )
+        if linked_products_count < 12:
+            raise RuntimeError(
+                f"Cobertura de aditamientos insuficiente: {linked_products_count} productos con aditamientos (<12)"
+            )
+
+        if len(combo_items) < 3:
+            raise RuntimeError(
+                f"Cobertura de paquetes insuficiente: {len(combo_items)} combos disponibles (<3)"
+            )
+
+        db.commit()
+        self.updated_data.append("Modifier/package coverage seeded")
+
+    def seed_delivery_mode_mix(self, db):
+        """Guarantee both quick-serve and prep-required items for QA visual/flow testing."""
+        print("\n🌱 Sincronizando tipos de entrega (rápida vs preparación)...")
+        available_items = db.query(MenuItem).filter(MenuItem.is_available.is_(True)).order_by(MenuItem.name.asc()).all()
+        quick_items = [item for item in available_items if item.is_quick_serve]
+        prep_items = [item for item in available_items if not item.is_quick_serve]
+
+        target_per_mode = 12
+        if len(quick_items) < target_per_mode:
+            candidates = [item for item in prep_items if item.preparation_time_minutes <= 8][: target_per_mode - len(quick_items)]
+            for item in candidates:
+                item.is_quick_serve = True
+
+        # Recompute after quick adjustments
+        available_items = db.query(MenuItem).filter(MenuItem.is_available.is_(True)).order_by(MenuItem.name.asc()).all()
+        quick_items = [item for item in available_items if item.is_quick_serve]
+        prep_items = [item for item in available_items if not item.is_quick_serve]
+        if len(prep_items) < target_per_mode:
+            candidates = [item for item in quick_items][: target_per_mode - len(prep_items)]
+            for item in candidates:
+                item.is_quick_serve = False
+
+        db.commit()
+        self.updated_data.append("Delivery mode coverage seeded")
+
     def validate_menu_coverage(self, db, min_items_per_type: int = 3) -> bool:
         """
         Validates that main customer categories have enough available items for QA flows.
@@ -382,6 +599,8 @@ class DatabaseValidator:
                 self.print_header("2. PROCESANDO CAMBIOS")
                 self.seed_business_config(db)
                 self.seed_menu_catalog(db)
+                self.seed_modifier_and_package_coverage(db)
+                self.seed_delivery_mode_mix(db)
                 self.seed_rbac(db)
                 if not self.validate_menu_coverage(db):
                     self.print_header("❌ FALLO DE COBERTURA DE MENÚ")

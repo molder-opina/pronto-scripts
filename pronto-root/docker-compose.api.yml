@@ -1,0 +1,37 @@
+name: pronto-api
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: pronto-api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      PRONTO_STATIC_CONTAINER_HOST: http://static:80
+    ports:
+      - "6082:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    profiles:
+      - apps
+    develop:
+      watch:
+        - path: ./pronto-api/src
+          action: sync
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+
+  networks:
+    pronto_net:
+      external: true

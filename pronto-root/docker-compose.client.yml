@@ -1,0 +1,37 @@
+name: pronto-client
+
+services:
+  client:
+    build:
+      context: .
+      dockerfile: pronto-client/src/pronto_clients/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      static:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "6080:5000"
+    networks:
+      - pronto_net
+    restart: unless-stopped
+    profiles:
+      - apps
+    volumes:
+      - ./pronto-client/src/pronto_clients:/opt/pronto/pronto_clients
+    develop:
+      watch:
+        - path: ./pronto-client/src
+          action: sync
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+
+  networks:
+    pronto_net:
+      external: true

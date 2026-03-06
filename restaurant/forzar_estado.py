@@ -17,7 +17,7 @@ Args:
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -80,7 +80,7 @@ def main():
 
         old_status = order.workflow_status
         order.workflow_status = args.status
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
         session.commit()
 
         if args.json:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fix employee scopes after bcrypt migration.
+Fix employee scopes after auth hardening migration.
 
 This script corrects the allow_scopes column for all employees.
 """
@@ -27,7 +27,7 @@ def fix_scopes():
     logger.info("Fixing employee scopes...")
 
     # Initialize database engine
-    config = load_config("migrate_to_bcrypt")
+    config = load_config("auth-hardening-migration")
     init_engine(config)
 
     with get_session() as db:

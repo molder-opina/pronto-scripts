@@ -4,7 +4,7 @@ Authentication endpoints for clients API.
 
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
 from flask import Blueprint, current_app, jsonify, request
@@ -55,7 +55,9 @@ def recover_password():
         with get_session() as db_session:
             email_hash = hash_identifier(sanitized_email)
             customer = (
-                db_session.execute(select(Customer).where(Customer.email_hash == email_hash))
+                db_session.execute(
+                    select(Customer).where(Customer.email_hash == email_hash)
+                )
                 .scalars()
                 .first()
             )
@@ -74,7 +76,7 @@ def recover_password():
 
             # Generate reset token
             reset_token = secrets.token_urlsafe(32)
-            datetime.utcnow() + timedelta(hours=1)
+            datetime.now(timezone.utc) + timedelta(hours=1)
 
             # Store reset token (would need a new field in Customer model in production)
             # For now, we log the token for testing
@@ -95,7 +97,9 @@ def recover_password():
             ), HTTPStatus.OK
 
     except Exception as e:
-        current_app.logger.error(f"Error requesting password recovery: {e}", exc_info=True)
+        current_app.logger.error(
+            f"Error requesting password recovery: {e}", exc_info=True
+        )
         return jsonify(
             {"error": "Error al procesar la solicitud"}
         ), HTTPStatus.INTERNAL_SERVER_ERROR
@@ -115,7 +119,9 @@ def reset_password():
     password = payload.get("password")
 
     if not token:
-        return jsonify({"error": "El token de recuperación es requerido"}), HTTPStatus.BAD_REQUEST
+        return jsonify(
+            {"error": "El token de recuperación es requerido"}
+        ), HTTPStatus.BAD_REQUEST
 
     if not password or len(password) < 6:
         return jsonify(
@@ -175,7 +181,9 @@ def register_customer():
 
                 email_hash = hash_identifier(sanitized_email)
                 customer = (
-                    db_session.execute(select(Customer).where(Customer.email_hash == email_hash))
+                    db_session.execute(
+                        select(Customer).where(Customer.email_hash == email_hash)
+                    )
                     .scalars()
                     .first()
                 )
@@ -208,7 +216,7 @@ def register_customer():
             access_token = create_client_token(
                 customer_id=customer.id,
                 customer_name=customer.name,
-                customer_phone=customer.phone
+                customer_phone=customer.phone,
             )
 
             response_data = {
@@ -227,6 +235,7 @@ def register_customer():
             }
 
             from flask import make_response
+
             response = make_response(jsonify(response_data), HTTPStatus.CREATED)
 
             # Set JWT cookie
@@ -236,8 +245,8 @@ def register_customer():
                 httponly=True,
                 secure=request.is_secure,
                 samesite="Lax",
-                max_age=86400, # 24 hours
-                path="/"
+                max_age=86400,  # 24 hours
+                path="/",
             )
 
             return response
@@ -274,7 +283,9 @@ def login_customer():
 
             email_hash = hash_identifier(sanitized_email)
             customer = (
-                db_session.execute(select(Customer).where(Customer.email_hash == email_hash))
+                db_session.execute(
+                    select(Customer).where(Customer.email_hash == email_hash)
+                )
                 .scalars()
                 .first()
             )
@@ -288,7 +299,7 @@ def login_customer():
             access_token = create_client_token(
                 customer_id=customer.id,
                 customer_name=customer.name,
-                customer_phone=customer.phone
+                customer_phone=customer.phone,
             )
 
             response_data = {
@@ -307,6 +318,7 @@ def login_customer():
             }
 
             from flask import make_response
+
             response = make_response(jsonify(response_data), HTTPStatus.OK)
 
             # Set JWT cookie
@@ -316,8 +328,8 @@ def login_customer():
                 httponly=True,
                 secure=request.is_secure,
                 samesite="Lax",
-                max_age=86400, # 24 hours
-                path="/"
+                max_age=86400,  # 24 hours
+                path="/",
             )
 
             return response
@@ -344,7 +356,9 @@ def update_customer(customer_id: int):
         return jsonify({"error": "Name is required"}), HTTPStatus.BAD_REQUEST
 
     if not email and not phone:
-        return jsonify({"error": "Either email or phone is required"}), HTTPStatus.BAD_REQUEST
+        return jsonify(
+            {"error": "Either email or phone is required"}
+        ), HTTPStatus.BAD_REQUEST
 
     with get_session() as db_session:
         customer = db_session.get(Customer, customer_id)
@@ -355,7 +369,7 @@ def update_customer(customer_id: int):
         customer.name = name
         customer.email = email
         customer.phone = phone
-        customer.updated_at = datetime.utcnow()
+        customer.updated_at = datetime.now(timezone.utc)
 
         db_session.commit()
         db_session.refresh(customer)

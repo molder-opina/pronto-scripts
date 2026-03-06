@@ -16,7 +16,7 @@ Args:
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -60,8 +60,8 @@ def main():
             table_id=args.table_id,
             employee_id=args.employee_id,
             workflow_status="pending",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         session.add(order)
         session.flush()

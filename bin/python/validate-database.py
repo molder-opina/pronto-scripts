@@ -399,7 +399,7 @@ class DatabaseValidator:
             cursor.execute(
                 """
                 SELECT COUNT(*) FROM pronto_orders
-                WHERE workflow_status NOT IN ('pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled')
+                WHERE workflow_status NOT IN ('new', 'queued', 'preparing', 'ready', 'delivered', 'awaiting_payment', 'paid', 'cancelled')
             """
             )
             invalid_status = cursor.fetchone()[0]

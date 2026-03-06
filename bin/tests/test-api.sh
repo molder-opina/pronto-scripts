@@ -98,7 +98,7 @@ sleep 5
 
 echo ""
 echo -e "${YELLOW}=== 1. PRUEBAS DE HEALTH CHECK ===${NC}"
-result=$(curl -s http://localhost:6081/api/health)
+result=$(curl -s http://localhost:6081/health)
 print_test "Health check employee API" "$result"
 
 echo ""

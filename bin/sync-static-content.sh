@@ -159,6 +159,7 @@ upload_to_static_server() {
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/css/clients
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/pronto/branding
     docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/pronto/menu
+    docker exec "$container_name" mkdir -p /usr/share/nginx/html/assets/pronto/config
 
     # Copiar JS de empleados
     log INFO "Copiando JS de empleados..."
@@ -184,6 +185,12 @@ upload_to_static_server() {
     if [ -d "${STATIC_ASSETS_DIR}/pronto/menu" ]; then
         log INFO "Copiando imágenes de productos..."
         docker cp "${STATIC_ASSETS_DIR}/pronto/menu/." "$container_name:/usr/share/nginx/html/assets/pronto/menu/" 2>/dev/null || true
+    fi
+
+    # Copiar config estatico (shortcuts y otros payloads de runtime)
+    if [ -d "${STATIC_ASSETS_DIR}/pronto/config" ]; then
+        log INFO "Copiando config estatico..."
+        docker cp "${STATIC_ASSETS_DIR}/pronto/config/." "$container_name:/usr/share/nginx/html/assets/pronto/config/" 2>/dev/null || true
     fi
 
     # Recargar nginx si está disponible

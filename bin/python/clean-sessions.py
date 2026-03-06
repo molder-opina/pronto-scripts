@@ -19,7 +19,7 @@ Opciones:
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     import psycopg2
@@ -101,7 +101,7 @@ def get_session_stats(cursor):
     status_counts = dict(cursor.fetchall())
 
     # Sesiones antiguas (más de 24 horas)
-    one_day_ago = datetime.utcnow() - timedelta(days=1)
+    one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
     cursor.execute(
         """
         SELECT COUNT(*)
@@ -135,18 +135,26 @@ def clean_closed_sessions(cursor, conn, dry_run=False):
     deleted_count = 0
     for session_id, table_number in sessions_to_delete:
         # Contar órdenes asociadas
-        cursor.execute("SELECT COUNT(*) FROM pronto_orders WHERE session_id = %s", (session_id,))
+        cursor.execute(
+            "SELECT COUNT(*) FROM pronto_orders WHERE session_id = %s", (session_id,)
+        )
         orders_count = cursor.fetchone()[0]
 
         # Eliminar registros dependientes en orden correcto (FK constraints)
-        cursor.execute("DELETE FROM pronto_feedback WHERE session_id = %s", (session_id,))
+        cursor.execute(
+            "DELETE FROM pronto_feedback WHERE session_id = %s", (session_id,)
+        )
         cursor.execute("DELETE FROM pronto_orders WHERE session_id = %s", (session_id,))
 
         # Eliminar sesión
-        cursor.execute("DELETE FROM pronto_dining_sessions WHERE id = %s", (session_id,))
+        cursor.execute(
+            "DELETE FROM pronto_dining_sessions WHERE id = %s", (session_id,)
+        )
 
         deleted_count += 1
-        print(f"  🗑️  Eliminada sesión {session_id} (mesa {table_number}) - {orders_count} órdenes")
+        print(
+            f"  🗑️  Eliminada sesión {session_id} (mesa {table_number}) - {orders_count} órdenes"
+        )
 
     conn.commit()
     return deleted_count
@@ -166,18 +174,26 @@ def clean_all_sessions(cursor, conn, dry_run=False):
     deleted_count = 0
     for session_id, table_number in all_sessions:
         # Contar órdenes asociadas
-        cursor.execute("SELECT COUNT(*) FROM pronto_orders WHERE session_id = %s", (session_id,))
+        cursor.execute(
+            "SELECT COUNT(*) FROM pronto_orders WHERE session_id = %s", (session_id,)
+        )
         orders_count = cursor.fetchone()[0]
 
         # Eliminar registros dependientes en orden correcto (FK constraints)
-        cursor.execute("DELETE FROM pronto_feedback WHERE session_id = %s", (session_id,))
+        cursor.execute(
+            "DELETE FROM pronto_feedback WHERE session_id = %s", (session_id,)
+        )
         cursor.execute("DELETE FROM pronto_orders WHERE session_id = %s", (session_id,))
 
         # Eliminar sesión
-        cursor.execute("DELETE FROM pronto_dining_sessions WHERE id = %s", (session_id,))
+        cursor.execute(
+            "DELETE FROM pronto_dining_sessions WHERE id = %s", (session_id,)
+        )
 
         deleted_count += 1
-        print(f"  🗑️  Eliminada sesión {session_id} (mesa {table_number}) - {orders_count} órdenes")
+        print(
+            f"  🗑️  Eliminada sesión {session_id} (mesa {table_number}) - {orders_count} órdenes"
+        )
 
     conn.commit()
     return deleted_count
@@ -186,8 +202,12 @@ def clean_all_sessions(cursor, conn, dry_run=False):
 def main():
     parser = argparse.ArgumentParser(description="Limpiar sesiones de la base de datos")
     parser.add_argument("--all", action="store_true", help="Limpiar TODAS las sesiones")
-    parser.add_argument("--dry-run", action="store_true", help="Solo mostrar qué se limpiaría")
-    parser.add_argument("--yes", action="store_true", help="Responder sí automáticamente")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Solo mostrar qué se limpiaría"
+    )
+    parser.add_argument(
+        "--yes", action="store_true", help="Responder sí automáticamente"
+    )
 
     args = parser.parse_args()
 

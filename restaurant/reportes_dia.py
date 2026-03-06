@@ -17,7 +17,7 @@ Genera:
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -31,7 +31,7 @@ if ENV_PATH.exists():
 
 def get_daily_report(date=None):
     if date is None:
-        date = datetime.utcnow().date()
+        date = datetime.now(timezone.utc).date()
 
     try:
         from pronto_shared.db import get_session
@@ -73,7 +73,7 @@ def main():
     report_date = (
         datetime.strptime(args.date, "%Y-%m-%d").date()
         if args.date
-        else datetime.utcnow().date()
+        else datetime.now(timezone.utc).date()
     )
     report = get_daily_report(report_date)
 

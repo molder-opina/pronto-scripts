@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add app context
 sys.path.append("/opt/pronto")
@@ -10,7 +10,14 @@ from flask import Flask
 
 from pronto_employees.app import create_app
 from pronto_shared.db import get_session, init_engine
-from pronto_shared.models import Customer, DiningSession, MenuItem, Order, OrderItem, OrderStatus
+from pronto_shared.models import (
+    Customer,
+    DiningSession,
+    MenuItem,
+    Order,
+    OrderItem,
+    OrderStatus,
+)
 from pronto_shared.services.order_service import list_orders
 
 
@@ -71,7 +78,7 @@ def verify_backend():
                     customer_id=customer.id,
                     total_amount=100.0,
                     workflow_status=OrderStatus.NEW.value,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                     # items=[...]  <-- This caused the error if passed as list of dicts
                 )
                 db.add(order)

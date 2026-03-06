@@ -12,4 +12,3 @@ min_indexes:
   - name: ix_pronto_init_runs_phase
     table: pronto_init_runs
     columns: [phase]
-EOF

@@ -15,7 +15,7 @@ Args:
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -105,8 +105,8 @@ def main():
             change = received - total
 
         order.workflow_status = "paid"
-        order.updated_at = datetime.utcnow()
-        order.paid_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
+        order.paid_at = datetime.now(timezone.utc)
         session.commit()
 
         if args.json:

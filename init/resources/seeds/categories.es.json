@@ -1,0 +1,50 @@
+{
+  "combos": {
+    "name": "Combos",
+    "description": "Combos listos para disfrutar"
+  },
+  "burgers": {
+    "name": "Hamburguesas",
+    "description": "Opciones clasicas y gourmet"
+  },
+  "pizzas": {
+    "name": "Pizzas",
+    "description": "Pizzas artesanales"
+  },
+  "tacos": {
+    "name": "Tacos",
+    "description": "Tacos mexicanos autenticos"
+  },
+  "salads": {
+    "name": "Ensaladas",
+    "description": "Frescas y saludables"
+  },
+  "beverages": {
+    "name": "Bebidas",
+    "description": "Bebidas frias y calientes"
+  },
+  "desserts": {
+    "name": "Postres",
+    "description": "Cierra con algo dulce"
+  },
+  "breakfast": {
+    "name": "Desayunos",
+    "description": "Comienza el dia con energia"
+  },
+  "snacks": {
+    "name": "Botanas",
+    "description": "Aperitivos para compartir"
+  },
+  "mexican_snacks": {
+    "name": "Antojitos Mexicanos",
+    "description": "Lo mejor de Mexico"
+  },
+  "soups": {
+    "name": "Sopas",
+    "description": "Sopas calientes y reconfortantes"
+  },
+  "specialties": {
+    "name": "Especialidades",
+    "description": "Platillos especiales de la casa"
+  }
+}

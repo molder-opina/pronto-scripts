@@ -11,7 +11,7 @@ Test Flow:
 
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from playwright.async_api import BrowserContext, Page, async_playwright
@@ -25,10 +25,12 @@ class QALogger:
         self.success: list[str] = []
         self.warnings: list[str] = []
 
-    def log_error(self, severity: str, description: str, location: str, impact: str, solution: str):
+    def log_error(
+        self, severity: str, description: str, location: str, impact: str, solution: str
+    ):
         """Log error in specified format"""
         error = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "severity": severity,
             "description": description,
             "location": location,
@@ -44,12 +46,16 @@ class QALogger:
 
     def log_success(self, message: str):
         """Log success message"""
-        self.success.append({"timestamp": datetime.utcnow().isoformat(), "message": message})
+        self.success.append(
+            {"timestamp": datetime.now(timezone.utc).isoformat(), "message": message}
+        )
         print(f"✅ {message}")
 
     def log_warning(self, message: str):
         """Log warning message"""
-        self.warnings.append({"timestamp": datetime.utcnow().isoformat(), "message": message})
+        self.warnings.append(
+            {"timestamp": datetime.now(timezone.utc).isoformat(), "message": message}
+        )
         print(f"⚠️ {message}")
 
     def print_summary(self):
@@ -103,7 +109,7 @@ class PRONTOQATest:
         print("=" * 80)
         print("PRONTO CAFETERÍA - QA COMPLETE FLOW TEST")
         print("=" * 80)
-        print(f"Start Time: {datetime.utcnow().isoformat()}")
+        print(f"Start Time: {datetime.now(timezone.utc).isoformat()}")
         print(f"Headless Mode: {headless}")
         print("")
 
@@ -114,7 +120,9 @@ class PRONTOQATest:
             # Prepare artifacts folder and start tracing
             os.makedirs("qa_artifacts", exist_ok=True)
             try:
-                await context.tracing.start(screenshots=True, snapshots=True, sources=True)
+                await context.tracing.start(
+                    screenshots=True, snapshots=True, sources=True
+                )
             except Exception:
                 # tracing may not be available in some environments
                 pass
@@ -178,7 +186,9 @@ class PRONTOQATest:
 
             # capture cart/menu screenshot
             try:
-                await page.screenshot(path="qa_artifacts/client_menu.png", full_page=True)
+                await page.screenshot(
+                    path="qa_artifacts/client_menu.png", full_page=True
+                )
             except Exception:
                 pass
 
@@ -199,10 +209,18 @@ class PRONTOQATest:
                 pass
 
             # Fill customer information
-            await page.fill('input[name="customer_name"]', self.test_data["customer_name"])
-            await page.fill('input[name="customer_email"]', self.test_data["customer_email"])
-            await page.fill('input[name="customer_phone"]', self.test_data["customer_phone"])
-            await page.fill('input[name="table_number"]', self.test_data["table_number"])
+            await page.fill(
+                'input[name="customer_name"]', self.test_data["customer_name"]
+            )
+            await page.fill(
+                'input[name="customer_email"]', self.test_data["customer_email"]
+            )
+            await page.fill(
+                'input[name="customer_phone"]', self.test_data["customer_phone"]
+            )
+            await page.fill(
+                'input[name="table_number"]', self.test_data["table_number"]
+            )
 
             self.logger.log_success("Customer information filled")
 
@@ -262,7 +280,9 @@ class PRONTOQATest:
                 await page.wait_for_timeout(500)
 
                 self.order_items.append(item)
-                self.logger.log_success(f"Added {item['name']} x{item['quantity']} to cart")
+                self.logger.log_success(
+                    f"Added {item['name']} x{item['quantity']} to cart"
+                )
             else:
                 self.logger.log_warning(f"Product {item['name']} not found on page")
 
@@ -291,7 +311,9 @@ class PRONTOQATest:
         """Validate required fields are present before adding to cart"""
         try:
             # Check if required field validation exists
-            required_fields = await page.query_selector_all('[required], [data-required="true"]')
+            required_fields = await page.query_selector_all(
+                '[required], [data-required="true"]'
+            )
 
             if len(required_fields) > 0:
                 self.logger.log_success(
@@ -313,7 +335,9 @@ class PRONTOQATest:
 
         try:
             # Login as chef
-            await page.goto("http://localhost:6081/chef/login", wait_until="networkidle")
+            await page.goto(
+                "http://localhost:6081/chef/login", wait_until="networkidle"
+            )
 
             await page.fill('input[name="email"]', "carlos.chef@cafeteria.test")
             await page.fill('input[name="password"]', "ChangeMe!123")
@@ -377,7 +401,9 @@ class PRONTOQATest:
 
         try:
             # Login as waiter
-            await page.goto("http://localhost:6081/waiter/login", wait_until="networkidle")
+            await page.goto(
+                "http://localhost:6081/waiter/login", wait_until="networkidle"
+            )
 
             await page.fill('input[name="email"]', "juan.mesero@cafeteria.test")
             await page.fill('input[name="password"]', "ChangeMe!123")
@@ -440,7 +466,9 @@ class PRONTOQATest:
 
         try:
             # Check Cashier App for paid orders
-            await page.goto("http://localhost:6081/cashier/login", wait_until="networkidle")
+            await page.goto(
+                "http://localhost:6081/cashier/login", wait_until="networkidle"
+            )
 
             await page.fill('input[name="email"]', "laura.cajera@cafeteria.test")
             await page.fill('input[name="password"]', "ChangeMe!123")
@@ -466,7 +494,9 @@ class PRONTOQATest:
                 self.test_data["order_in_paid"] = True
 
                 # Check for PDF download option
-                pdf_button = page.locator("text=Descargar PDF, [data-action='download-pdf']").first
+                pdf_button = page.locator(
+                    "text=Descargar PDF, [data-action='download-pdf']"
+                ).first
                 if await pdf_button.count() > 0:
                     self.logger.log_success("PDF download option available")
 
@@ -476,7 +506,9 @@ class PRONTOQATest:
 
                     download = await download_info.value
                     self.generated_pdfs.append(download.suggested_filename)
-                    self.logger.log_success(f"PDF downloaded: {download.suggested_filename}")
+                    self.logger.log_success(
+                        f"PDF downloaded: {download.suggested_filename}"
+                    )
                 else:
                     self.logger.log_warning("PDF download option not found")
 
@@ -490,7 +522,9 @@ class PRONTOQATest:
                 )
 
             # Check Admin App for reports
-            await page.goto("http://localhost:6081/admin/login", wait_until="networkidle")
+            await page.goto(
+                "http://localhost:6081/admin/login", wait_until="networkidle"
+            )
 
             await page.fill('input[name="email"]', "admin@cafeteria.test")
             await page.fill('input[name="password"]', "ChangeMe!123")
@@ -500,7 +534,9 @@ class PRONTOQATest:
             self.logger.log_success("Admin logged in successfully")
 
             # Check for debug panel
-            debug_panel = await page.query_selector("#debug-panel, [data-component='debug-panel']")
+            debug_panel = await page.query_selector(
+                "#debug-panel, [data-component='debug-panel']"
+            )
             if debug_panel:
                 self.logger.log_error(
                     severity="MEDIUM",

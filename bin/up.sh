@@ -2,11 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BASE_ENV_FILE="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
-LIB_FILE="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"
+LIB_FILE="${SCRIPT_DIR}/lib/stack_helpers.sh"
 LOAD_SEED=false
 WITH_STATIC=false
 WITH_STATIC_REQUESTED=false
@@ -123,10 +123,10 @@ STATIC_PORT="${STATIC_APP_HOST_PORT:-9088}"
 APP_NAME_VALUE="${APP_NAME:-pronto}"
 SERVICE_TARGETS=(
     "Clientes|${APP_NAME_VALUE}-client"
-    "Empleados|${APP_NAME_VALUE}-employee"
+    "Empleados|${APP_NAME_VALUE}-employees"
 )
 
-COMPOSE_SERVICES=(client employee)
+COMPOSE_SERVICES=(client employees)
 if [[ "${WITH_STATIC}" == true ]]; then
     SERVICE_TARGETS+=("Estático|${APP_NAME_VALUE}-static")
     COMPOSE_SERVICES+=(static)

@@ -15,6 +15,7 @@ Verifica:
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -72,7 +73,7 @@ def main():
     args = parser.parse_args()
 
     status = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "postgres": check_postgres(),
         "redis": check_redis(),
         "counts": get_counts(),
@@ -93,6 +94,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from datetime import datetime
-
     main()

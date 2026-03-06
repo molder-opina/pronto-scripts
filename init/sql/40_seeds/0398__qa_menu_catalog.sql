@@ -98,7 +98,7 @@ WHERE NOT EXISTS (
 ON CONFLICT DO NOTHING;
 
 -- 3) Modifier groups for add-ons and combo package options
-INSERT INTO pronto_modifier_groups (id, name, description, min_selection, max_selection, is_required, display_order)
+INSERT INTO pronto_modifier_groups (id, name, description, min_select, max_select, is_required, display_order)
 VALUES
   ('33333333-3333-3333-3333-333333333001'::uuid, 'Aditamientos base QA', 'Extras para personalización', 0, 3, FALSE, 90),
   ('33333333-3333-3333-3333-333333333002'::uuid, 'Paquete QA: Bebida incluida', 'Selecciona la bebida incluida del paquete', 1, 1, TRUE, 91),

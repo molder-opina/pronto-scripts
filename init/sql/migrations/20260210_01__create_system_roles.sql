@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS public.pronto_system_roles (
     display_name VARCHAR(120) NOT NULL,
     description TEXT,
     is_custom BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
 );
 
 -- Create system permissions table
@@ -14,7 +15,9 @@ CREATE TABLE IF NOT EXISTS public.pronto_system_permissions (
     id SERIAL PRIMARY KEY,
     code VARCHAR(64) NOT NULL UNIQUE,
     category VARCHAR(32) NOT NULL,
-    description TEXT
+    description TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
 );
 
 -- Create bindings table

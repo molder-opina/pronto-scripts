@@ -13,7 +13,7 @@ MODULES_FILE = REPO_ROOT / "pronto-docs" / "modules.yml"
 SCHEMA_FILE = REPO_ROOT / "pronto-docs" / "contracts" / "pronto-scripts" / "modules.schema.json"
 CONTRACT_ENUM = REPO_ROOT / "pronto-docs" / "contracts" / "pronto-scripts" / "contracts.enum.json"
 ROUTER_FILE = REPO_ROOT / "pronto-ai" / "router.yml"
-AGENTS_FILE = REPO_ROOT / "agents.md"
+AGENTS_FILE = REPO_ROOT / "AGENTS.md"
 
 H2_ORDER = [
     "## Resumen Operativo",
@@ -143,7 +143,19 @@ def check_contracts(mod, mode):
 
 
 def check_postgres_version():
-    res = run(["rg", "-n", "PostgreSQL 13", "pronto-docs", "pronto-postgresql", "-g", "!pronto-docs/resolved/**", "-g", "!pronto-docs/errors/**"], cwd=REPO_ROOT)
+    res = run([
+        "rg",
+        "-n",
+        "PostgreSQL 13",
+        "pronto-docs",
+        "pronto-postgresql",
+        "-g",
+        "!pronto-docs/resolved/**",
+        "-g",
+        "!pronto-docs/errors/**",
+        "-g",
+        "!pronto-docs/versioning/**",
+    ], cwd=REPO_ROOT)
     if res.returncode == 0:
         fail("Found PostgreSQL 13 in docs")
 

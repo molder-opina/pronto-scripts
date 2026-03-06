@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE public.pronto_business_info
+  ADD COLUMN IF NOT EXISTS tax_id VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS settings JSONB;
+
+COMMIT;

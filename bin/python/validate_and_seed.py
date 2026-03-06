@@ -44,6 +44,7 @@ from pronto_shared.config_contract import (
     CONFIG_CONTRACT, is_valid_key, expected_category, is_system_key
 )
 from pronto_shared.permissions import Permission, ROLE_PERMISSIONS
+from pronto_shared.services.seed import load_seed_data
 
 class DatabaseValidator:
     """Validates and seeds database with strict contract enforcement"""
@@ -187,6 +188,55 @@ class DatabaseValidator:
         
         db.commit()
 
+    def seed_menu_catalog(self, db):
+        """Runs canonical UPSERT menu seed to keep DB aligned with code/resources."""
+        print("\n🌱 Sincronizando catálogo de menú (seed canónico)...")
+        load_seed_data(db)
+        db.commit()
+        self.updated_data.append("Menu catalog seeded (UPSERT)")
+
+    def validate_menu_coverage(self, db, min_items_per_type: int = 3) -> bool:
+        """
+        Validates that main customer categories have enough available items for QA flows.
+        """
+        print(f"\n🔍 Validando cobertura de menú (mínimo {min_items_per_type} por tipo)...")
+        required_groups = {
+            "appetizers": {"appetizers", "entradas", "appetizer", "starters"},
+            "beverages": {"beverages", "bebidas", "drinks", "beverage"},
+            "combos": {"combos", "combo"},
+            "main_courses": {"main courses", "main_course", "platos fuertes", "platos_fuertes"},
+            "desserts": {"desserts", "postres", "dessert", "postre"},
+        }
+
+        rows = db.execute(
+            text(
+                """
+                SELECT LOWER(TRIM(c.name)) AS category_name,
+                       COUNT(mi.id) FILTER (WHERE mi.is_available) AS available_count
+                FROM pronto_menu_categories c
+                LEFT JOIN pronto_menu_items mi ON mi.category_id = c.id
+                GROUP BY LOWER(TRIM(c.name))
+                """
+            )
+        ).fetchall()
+        counts = {str(name or "").strip().lower(): int(available or 0) for name, available in rows}
+
+        valid = True
+        for group_name, aliases in required_groups.items():
+            group_total = sum(counts.get(alias, 0) for alias in aliases)
+            if group_total < min_items_per_type:
+                log.error(
+                    "❌ Cobertura insuficiente en '%s': %s disponibles (mínimo %s)",
+                    group_name,
+                    group_total,
+                    min_items_per_type,
+                )
+                valid = False
+            else:
+                log.info("✓ %s: %s disponibles", group_name, group_total)
+
+        return valid
+
     def run_validation(self):
         self.print_header("VALIDACIÓN Y SEED DE BASE DE DATOS (V6 ZERO LEGACY)")
         try:
@@ -209,7 +259,12 @@ class DatabaseValidator:
                 # 3. Procesar Seeds
                 self.print_header("2. PROCESANDO CAMBIOS")
                 self.seed_business_config(db)
+                self.seed_menu_catalog(db)
                 self.seed_rbac(db)
+                if not self.validate_menu_coverage(db):
+                    self.print_header("❌ FALLO DE COBERTURA DE MENÚ")
+                    log.error("El seed no cumple el mínimo de productos por categoría requerida.")
+                    return 1
 
                 self.print_header("RESUMEN")
                 print(f"✅ Creados: {len(self.created_data)}")

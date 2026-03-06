@@ -210,6 +210,42 @@ class DatabaseValidator:
     def seed_menu_catalog(self, db):
         """Ensures customer menu keeps minimum viable coverage for QA flows."""
         print("\n🌱 Sincronizando catálogo de menú (mínimo QA)...")
+        duplicate_rows = db.execute(
+            text(
+                """
+                SELECT LOWER(TRIM(name)) AS normalized_name,
+                       ARRAY_AGG(id ORDER BY display_order ASC, name ASC) AS ids
+                FROM pronto_menu_categories
+                GROUP BY LOWER(TRIM(name))
+                HAVING COUNT(*) > 1
+                """
+            )
+        ).fetchall()
+        for _, ids in duplicate_rows:
+            if not ids or len(ids) < 2:
+                continue
+            primary_id = ids[0]
+            duplicate_ids = ids[1:]
+            db.execute(
+                text(
+                    """
+                    UPDATE pronto_menu_items
+                    SET category_id = :primary_id
+                    WHERE category_id = ANY(:duplicate_ids)
+                    """
+                ),
+                {"primary_id": primary_id, "duplicate_ids": duplicate_ids},
+            )
+            db.execute(
+                text(
+                    """
+                    DELETE FROM pronto_menu_categories
+                    WHERE id = ANY(:duplicate_ids)
+                    """
+                ),
+                {"duplicate_ids": duplicate_ids},
+            )
+
         required_groups = {
             "appetizers": {"appetizers", "entradas", "appetizer", "starters"},
             "beverages": {"beverages", "bebidas", "drinks", "beverage"},

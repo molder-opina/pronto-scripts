@@ -9,6 +9,8 @@ import os
 import sys
 import re
 import logging
+from decimal import Decimal
+from uuid import uuid4
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -26,7 +28,7 @@ except ImportError:
     except ImportError:
         raise ImportError("pronto_shared package not found. Path: " + str(sys.path))
 
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from pronto_shared.db import get_session
 from pronto_shared.models import (
     Area,
@@ -44,7 +46,6 @@ from pronto_shared.config_contract import (
     CONFIG_CONTRACT, is_valid_key, expected_category, is_system_key
 )
 from pronto_shared.permissions import Permission, ROLE_PERMISSIONS
-from pronto_shared.services.seed import load_seed_data
 
 class DatabaseValidator:
     """Validates and seeds database with strict contract enforcement"""
@@ -189,9 +190,76 @@ class DatabaseValidator:
         db.commit()
 
     def seed_menu_catalog(self, db):
-        """Runs canonical UPSERT menu seed to keep DB aligned with code/resources."""
-        print("\n🌱 Sincronizando catálogo de menú (seed canónico)...")
-        load_seed_data(db)
+        """Ensures customer menu keeps minimum viable coverage for QA flows."""
+        print("\n🌱 Sincronizando catálogo de menú (mínimo QA)...")
+        required_groups = {
+            "appetizers": {"appetizers", "entradas", "appetizer", "starters"},
+            "beverages": {"beverages", "bebidas", "drinks", "beverage"},
+            "combos": {"combos", "combo"},
+            "main_courses": {"main courses", "main_course", "platos fuertes", "platos_fuertes"},
+            "desserts": {"desserts", "postres", "dessert", "postre"},
+        }
+        defaults = {
+            "appetizers": ("Entrada de prueba", "Entrada de soporte para QA", Decimal("9.99")),
+            "beverages": ("Bebida de prueba", "Bebida de soporte para QA", Decimal("3.99")),
+            "combos": ("Combo de prueba", "Combo de soporte para QA", Decimal("14.99")),
+            "main_courses": ("Plato fuerte de prueba", "Plato principal de soporte para QA", Decimal("18.99")),
+            "desserts": ("Postre de prueba", "Postre de soporte para QA", Decimal("6.99")),
+        }
+
+        for group_name, aliases in required_groups.items():
+            category_rows = (
+                db.execute(
+                    select(MenuCategory.id)
+                    .where(func.lower(func.trim(MenuCategory.name)).in_(list(aliases)))
+                    .order_by(MenuCategory.display_order.asc(), MenuCategory.name.asc())
+                )
+                .all()
+            )
+            if not category_rows:
+                continue
+
+            category_ids = [row[0] for row in category_rows]
+            available_count = (
+                db.query(MenuItem)
+                .filter(MenuItem.category_id.in_(category_ids), MenuItem.is_available.is_(True))
+                .count()
+            )
+
+            if available_count >= 3:
+                continue
+
+            missing = 3 - int(available_count)
+            unavailable_items = (
+                db.query(MenuItem)
+                .filter(MenuItem.category_id.in_(category_ids), MenuItem.is_available.is_(False))
+                .order_by(MenuItem.name.asc())
+                .limit(missing)
+                .all()
+            )
+            for item in unavailable_items:
+                item.is_available = True
+            updated = len(unavailable_items)
+            missing -= int(updated)
+
+            if missing > 0:
+                target_category_id = category_ids[0]
+                base_name, base_desc, base_price = defaults[group_name]
+                for idx in range(1, missing + 1):
+                    db.add(
+                        MenuItem(
+                            id=uuid4(),
+                            category_id=target_category_id,
+                            name=f"{base_name} {idx}",
+                            description=base_desc,
+                            price=base_price,
+                            image_path="/assets/pronto/menu/placeholder-food.webp",
+                            is_available=True,
+                            preparation_time_minutes=10,
+                            is_quick_serve=False,
+                        )
+                    )
+
         db.commit()
         self.updated_data.append("Menu catalog seeded (UPSERT)")
 

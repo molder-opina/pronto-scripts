@@ -3,12 +3,13 @@
 
 set -euo pipefail
 
-EMPLOYEE_API_BASE="${EMPLOYEE_API_BASE_URL:-http://localhost:${EMPLOYEE_APP_HOST_PORT:-6081}}"
-if [[ "$EMPLOYEE_API_BASE" == */api ]]; then
-  API_BASE="${EMPLOYEE_API_BASE%/}"
+CANONICAL_API_BASE="${PRONTO_API_URL:-http://localhost:6082}"
+if [[ "$CANONICAL_API_BASE" == */api ]]; then
+  API_BASE="${CANONICAL_API_BASE%/}"
 else
-  API_BASE="${EMPLOYEE_API_BASE%/}/api"
+  API_BASE="${CANONICAL_API_BASE%/}/api"
 fi
+HEALTH_BASE="${API_BASE%/api}"
 
 echo "╔═══════════════════════════════════════════════════════╗"
 echo "║                                                       ║"
@@ -17,9 +18,9 @@ echo "║                                                       ║"
 echo "╚═══════════════════════════════════════════════════════╝"
 echo ""
 
-echo "1️⃣  Verificando que la API de empleados esté activa..."
-if ! curl -sf "${API_BASE}/health" >/dev/null 2>&1; then
-    echo "❌ La API no está respondiendo en ${API_BASE}"
+echo "1️⃣  Verificando que la API canónica esté activa..."
+if ! curl -sf "${HEALTH_BASE}/health" >/dev/null 2>&1; then
+    echo "❌ La API no está respondiendo en ${HEALTH_BASE}/health"
     echo "💡 Solución: Ejecuta uno de estos comandos:"
     echo "   bash bin/up-debug.sh --seed"
     echo "   bash bin/rebuild.sh --seed"
@@ -43,14 +44,28 @@ menu_summary=$(printf '%s' "$menu_payload" | python3 -c 'import json
 import sys
 
 data = json.load(sys.stdin)
-categories = data.get("categories") or []
-item_count = sum(len(category.get("items") or []) for category in categories)
+payload = data.get("data") if isinstance(data, dict) else None
+payload = payload if isinstance(payload, dict) else data
+
+catalog_items = payload.get("catalog_items") or [] if isinstance(payload, dict) else []
+if catalog_items:
+    item_count = len(catalog_items)
+    category_names = sorted(
+        {
+            item.get("menu_category_name") or ""
+            for item in catalog_items
+            if item.get("menu_category_name")
+        }
+    )
+else:
+    categories = payload.get("categories") or [] if isinstance(payload, dict) else []
+    item_count = sum(len(category.get("items") or []) for category in categories)
+    category_names = [category.get("name") or "" for category in categories if category.get("name")]
+
 print(item_count)
-print(len(categories))
-for category in categories:
-    name = category.get("name") or ""
-    if name:
-        print(name)
+print(len(category_names))
+for name in category_names:
+    print(name)
 ')
 
 PRODUCT_COUNT=$(echo "$menu_summary" | sed -n '1p')

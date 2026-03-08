@@ -20,6 +20,7 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 try:
     import psycopg2
@@ -41,13 +42,52 @@ postgres_port = os.getenv("POSTGRES_PORT", "5432")
 postgres_user = os.getenv("POSTGRES_USER", "pronto")
 postgres_password = os.getenv("POSTGRES_PASSWORD", "pronto123")
 postgres_db = os.getenv("POSTGRES_DB", "pronto")
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_url = os.getenv("REDIS_URL", "")
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+redis_password = os.getenv("REDIS_PASSWORD", "")
+redis_db = int(os.getenv("REDIS_DB", "0"))
+
+
+def get_redis_connection_kwargs():
+    """Construir parámetros de conexión Redis desde REDIS_URL o variables separadas."""
+    if redis_url:
+        parsed = urlparse(redis_url)
+        host = parsed.hostname or redis_host
+        port = parsed.port or redis_port
+        password = parsed.password or redis_password or None
+        db = redis_db
+        if parsed.path and parsed.path != "/":
+            try:
+                db = int(parsed.path.lstrip("/"))
+            except ValueError:
+                db = redis_db
+        return {
+            "host": host,
+            "port": port,
+            "password": password,
+            "db": db,
+            "decode_responses": True,
+        }
+
+    return {
+        "host": redis_host,
+        "port": redis_port,
+        "password": redis_password or None,
+        "db": redis_db,
+        "decode_responses": True,
+    }
+
+
+def get_redis_display_url():
+    kwargs = get_redis_connection_kwargs()
+    return f"redis://{kwargs['host']}:{kwargs['port']}/{kwargs['db']}"
 
 print("📊 Configuración de BD:")
 print(f"   Host: {postgres_host}:{postgres_port}")
 print(f"   Usuario: {postgres_user}")
 print(f"   Base de datos: {postgres_db}")
-print(f"   Redis: {redis_url}")
+print(f"   Redis: {get_redis_display_url()}")
 print()
 
 
@@ -57,7 +97,7 @@ def clean_redis(dry_run=False):
         return 0
 
     try:
-        r = Redis.from_url(redis_url, decode_responses=True)
+        r = Redis(**get_redis_connection_kwargs())
         # Scan for keys to delete
         keys_to_delete = []
         for match in r.scan_iter("pronto:*"):

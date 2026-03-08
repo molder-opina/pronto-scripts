@@ -122,11 +122,11 @@ generate_image() {
     esac
 }
 
-EMPLOYEE_API_BASE="${EMPLOYEE_API_BASE_URL:-http://localhost:${EMPLOYEE_APP_HOST_PORT:-6081}}"
-if [[ "$EMPLOYEE_API_BASE" == */api ]]; then
-    API_BASE="${EMPLOYEE_API_BASE%/}"
+CANONICAL_API_BASE="${PRONTO_API_URL:-http://localhost:6082}"
+if [[ "$CANONICAL_API_BASE" == */api ]]; then
+    API_BASE="${CANONICAL_API_BASE%/}"
 else
-    API_BASE="${EMPLOYEE_API_BASE%/}/api"
+    API_BASE="${CANONICAL_API_BASE%/}/api"
 fi
 
 # Obtener productos desde la API
@@ -153,19 +153,37 @@ limit_arg = sys.argv[2].strip()
 limit = int(limit_arg) if limit_arg else 0
 
 rows = []
-for category in data.get("categories") or []:
-    name = category.get("name") or ""
-    if category_filter and name != category_filter:
-        continue
-    for item in category.get("items") or []:
+payload = data.get("data") if isinstance(data, dict) else None
+payload = payload if isinstance(payload, dict) else data
+
+catalog_items = payload.get("catalog_items") or [] if isinstance(payload, dict) else []
+if catalog_items:
+    for item in catalog_items:
+        category_name = item.get("menu_category_name") or ""
+        if category_filter and category_name != category_filter:
+            continue
         rows.append(
             (
                 item.get("id", ""),
                 item.get("name", ""),
                 item.get("description", "") or "",
-                name,
+                category_name,
             )
         )
+else:
+    for category in (payload.get("categories") or [] if isinstance(payload, dict) else []):
+        name = category.get("name") or ""
+        if category_filter and name != category_filter:
+            continue
+        for item in category.get("items") or []:
+            rows.append(
+                (
+                    item.get("id", ""),
+                    item.get("name", ""),
+                    item.get("description", "") or "",
+                    name,
+                )
+            )
 
 if limit > 0:
     rows = rows[:limit]
@@ -193,8 +211,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Crear directorio de salida
-mkdir -p "${OUTPUT_DIR}"
+# Crear directorio de salida solo si se van a generar archivos realmente
+if ! $DRY_RUN; then
+    mkdir -p "${OUTPUT_DIR}"
+fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -231,6 +251,7 @@ failed=0
 
 while IFS=$'\t' read -r id name description category; do
     ((count++))
+    category_normalized=$(printf '%s' "${category:-}" | tr '[:upper:]' '[:lower:]')
 
     # Limpiar nombre para archivo
     filename=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g')
@@ -253,7 +274,7 @@ while IFS=$'\t' read -r id name description category; do
     fi
 
     # Crear prompt basado en categoría
-    case "${category,,}" in
+    case "${category_normalized}" in
         *entrada*|*appetizer*)
             style="appetizer starter dish"
             ;;
@@ -308,8 +329,10 @@ while IFS=$'\t' read -r id name description category; do
 
 done <<< "$products"
 
-# Ajustar permisos
-chmod -R 755 "${OUTPUT_DIR}" 2>/dev/null || true
+# Ajustar permisos solo si se generaron archivos
+if ! $DRY_RUN; then
+    chmod -R 755 "${OUTPUT_DIR}" 2>/dev/null || true
+fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

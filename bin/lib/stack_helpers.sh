@@ -73,14 +73,27 @@ ensure_ports_free() {
   done
 }
 
+reset_named_array() {
+  local array_name="$1"
+  eval "${array_name}=()"
+}
+
+append_named_array() {
+  local array_name="$1"
+  local value="$2"
+  local escaped_value
+  printf -v escaped_value '%q' "${value}"
+  eval "${array_name}+=( ${escaped_value} )"
+}
+
 summarize_services() {
   local container_cli="$1"
-  local -n summary_ref="$2"
-  local -n failed_ref="$3"
+  local summary_ref_name="$2"
+  local failed_ref_name="$3"
   shift 3
 
-  summary_ref=()
-  failed_ref=()
+  reset_named_array "${summary_ref_name}"
+  reset_named_array "${failed_ref_name}"
 
   local target
   local label
@@ -92,23 +105,23 @@ summarize_services() {
     [[ -z "${container}" ]] && continue
 
     if ! "${container_cli}" ps -a --format '{{.Names}}' | grep -Fxq "${container}"; then
-      summary_ref+=("ERROR: ${label}: no encontrado (${container})")
-      failed_ref+=("${label} (${container})")
+      append_named_array "${summary_ref_name}" "ERROR: ${label}: no encontrado (${container})"
+      append_named_array "${failed_ref_name}" "${label} (${container})"
       continue
     fi
 
     status="$("${container_cli}" inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || true)"
     case "${status}" in
       running)
-        summary_ref+=("OK: ${label}: running")
+        append_named_array "${summary_ref_name}" "OK: ${label}: running"
         ;;
       exited)
-        summary_ref+=("ERROR: ${label}: exited")
-        failed_ref+=("${label} (${container})")
+        append_named_array "${summary_ref_name}" "ERROR: ${label}: exited"
+        append_named_array "${failed_ref_name}" "${label} (${container})"
         ;;
       *)
-        summary_ref+=("WARN: ${label}: ${status:-unknown}")
-        failed_ref+=("${label} (${container})")
+        append_named_array "${summary_ref_name}" "WARN: ${label}: ${status:-unknown}"
+        append_named_array "${failed_ref_name}" "${label} (${container})"
         ;;
     esac
   done

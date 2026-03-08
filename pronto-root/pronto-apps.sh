@@ -48,7 +48,10 @@ print_status() {
     echo "----------------------------------------"
 
     for app in "${APPS[@]}"; do
-        eval port="\${PORTS_${app^^}}"
+        local app_upper
+        app_upper="$(printf '%s' "$app" | tr '[:lower:]' '[:upper:]')"
+        local port_var="PORTS_${app_upper}"
+        local port="${!port_var}"
         if docker compose --profile apps ps --status running -q "$app" >/dev/null 2>&1; then
             status="RUNNING"
         else
@@ -139,7 +142,10 @@ cmd_status() {
     echo "URLs:"
     echo "----------------------------------------"
     for app in "${APPS[@]}"; do
-        eval port="\${PORTS_${app^^}}"
+        local app_upper
+        app_upper="$(printf '%s' "$app" | tr '[:lower:]' '[:upper:]')"
+        local port_var="PORTS_${app_upper}"
+        local port="${!port_var}"
         echo -e "  http://localhost:${port}  (${app})"
     done
     echo ""

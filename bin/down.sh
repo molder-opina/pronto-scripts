@@ -24,13 +24,13 @@ detect_compose_command "${PROJECT_ROOT}/docker-compose.yml"
 
 clean_pronto_containers() {
   local bases=("pronto-client" "pronto-employee" "pronto-static")
+  local name
   for base in "${bases[@]}"; do
-    mapfile -t containers < <("${CONTAINER_CLI}" ps -a --format '{{.Names}}' | grep -E "^${base}-" || true)
-    for name in "${containers[@]}"; do
+    while IFS= read -r name; do
       [[ -z "${name}" ]] && continue
       echo ">> Removing container ${name}"
       "${CONTAINER_CLI}" rm -f "${name}" >/dev/null 2>&1 || true
-    done
+    done < <("${CONTAINER_CLI}" ps -a --format '{{.Names}}' | grep -E "^${base}-" || true)
   done
 }
 

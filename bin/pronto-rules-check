@@ -160,6 +160,44 @@ def check_postgres_version():
         fail("Found PostgreSQL 13 in docs")
 
 
+def load_allowed_client_session_keys() -> set[str]:
+    agents_text = AGENTS_FILE.read_text()
+    for line in agents_text.splitlines():
+        if "allowlist:" in line:
+            keys = {value.strip() for value in re.findall(r"`([^`]+)`", line)}
+            if keys:
+                return keys
+
+    fail("Client session allowlist missing in AGENTS.md")
+
+
+def extract_session_keys(target: str) -> set[str]:
+    res = run(
+        [
+            "rg",
+            "-n",
+            "session\\s*\\[\\s*['\"]([^'\"]+)['\"]|session\\.get\\(\\s*['\"]([^'\"]+)['\"]",
+            target,
+        ],
+        cwd=REPO_ROOT,
+    )
+    if res.returncode != 0:
+        return set()
+
+    keys = set()
+    patterns = [
+        r"session\s*\[\s*['\"]([^'\"]+)['\"]",
+        r"session\.get\(\s*['\"]([^'\"]+)['\"]",
+    ]
+    for line in res.stdout.splitlines():
+        for pattern in patterns:
+            match = re.search(pattern, line)
+            if match:
+                keys.add(match.group(1))
+                break
+    return keys
+
+
 def check_session_rules():
     # forbid session in api/employees
     for path in ["pronto-api", "pronto-employees"]:
@@ -167,30 +205,29 @@ def check_session_rules():
         if res.returncode == 0:
             fail(f"flask.session usage forbidden in {path}")
     # client allowlist
-    allowlist = set()
-    allow_file = REPO_ROOT / "pronto-client" / "src" / "pronto_clients" / "utils" / "customer_session.py"
-    if allow_file.exists():
-        m = re.search(r"ALLOWED_SESSION_KEYS\s*=\s*\{([^}]+)\}", allow_file.read_text())
-        if m:
-            for k in m.group(1).split(","):
-                k = k.strip().strip("'\"")
-                if k:
-                    allowlist.add(k)
-    if not allowlist:
-        fail("ALLOWED_SESSION_KEYS missing")
-    res = run(["rg", "-n", "session\\s*\\[\\s*['\"]([^'\"]+)['\"]", "pronto-client"], cwd=REPO_ROOT)
-    if res.returncode == 0:
-        keys = set()
-        for line in res.stdout.splitlines():
-            m = re.search(r"session\s*\[\s*['\"]([^'\"]+)['\"]", line)
-            if m:
-                keys.add(m.group(1))
-        extra = keys - allowlist
-        if extra:
-            fail(f"Session keys outside allowlist: {sorted(extra)}")
-    res = run(["rg", "-n", "session\\s*\\[\\s*['\"](email|phone|name|address|token|jwt|auth|roles|permissions|card|payment|customer_data)", "pronto-client"], cwd=REPO_ROOT)
-    if res.returncode == 0:
-        fail("PII keys found in session usage")
+    allowlist = load_allowed_client_session_keys()
+    keys = extract_session_keys("pronto-client/src/pronto_clients")
+    extra = keys - allowlist
+    if extra:
+        fail(f"Session keys outside allowlist: {sorted(extra)}")
+
+    pii_markers = {
+        "email",
+        "phone",
+        "name",
+        "address",
+        "token",
+        "jwt",
+        "auth",
+        "roles",
+        "permissions",
+        "card",
+        "payment",
+        "customer_data",
+    }
+    pii_keys = keys & pii_markers
+    if pii_keys:
+        fail(f"PII keys found in session usage: {sorted(pii_keys)}")
 
 
 def check_no_legacy():

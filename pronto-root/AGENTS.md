@@ -30,7 +30,8 @@ Violación a cualquiera ⇒ **REJECTED**.
     - todo lo demás `DROP*` prohibido.
 15. **Todo flujo sin autenticación es prohibited**:
     - No debe existir ningún endpoint, ruta o página accesible sin autenticación válida.
-    - Excepciones: `/health`, `/api/sessions/open` (solo con table_id válido), login/register pages.
+    - Excepciones: `/health`, `/api/sessions/open` (solo con table_id válido), login/register pages y navegación pública de cliente (`/` y vistas de menú informativas sin mutación).
+    - En `pronto-client`, la autenticación se exige al primer intento de crear/confirmar orden o iniciar checkout/pago.
     - Todo endpoint de mutación (POST/PUT/DELETE) requiere autenticación.
     - Tests deben usar autenticación real, no flujos anónimos.
 16. **Prohibido @csrf.exempt para "hacer funcionar" código** (P0):
@@ -78,6 +79,12 @@ Violación a cualquiera ⇒ **REJECTED**.
 - Prohibido `workflow_status = ...` fuera del servicio canónico
 - Prohibido `payment_status = ...` fuera del servicio canónico
 - Estados: solo en constants.py (`OrderStatus`, `PaymentStatus`)
+25. Regla de Recurrencia de Errores y Deuda Técnica (P0)
+- Ante cualquier bug, deuda técnica o anti-patrón detectado, es obligatorio ejecutar validación transversal en todo el código para identificar ocurrencias similares.
+- No se permite cerrar un hallazgo corrigiendo solo un archivo/punto aislado si existen más ocurrencias del mismo patrón.
+- La búsqueda transversal debe cubrir al menos: `pronto-api`, `pronto-client`, `pronto-employees`, `pronto-static`, `pronto-libs`, `pronto-scripts`.
+- Herramienta canónica de búsqueda: `rg` (con evidencias de búsqueda y resultados).
+- Si hay múltiples ocurrencias, debe documentarse: alcance total, archivos impactados y estado por ocurrencia (corregido/pendiente con plan).
 
 ---
 
@@ -150,12 +157,14 @@ Reglas obligatorias para todo el monorepo. Violación ⇒ **REJECTED**.
 4. **TypeScript / JavaScript**:
    - Módulos de lógica y Composables: `kebab-case.ts` (ej: `use-rbac.ts`, `session-manager.ts`).
    - Interfaces/Tipos: `PascalCase` (dentro del archivo).
-5. **Shell Scripts**: Siempre `kebab-case.sh` (con extensión `.sh` obligatoria).
+5. **Shell Scripts**:
+   - Scripts shell generales: `kebab-case.sh`.
+   - Excepción en `pronto-scripts/bin/`: wrappers ejecutables canónicos pueden no usar extensión.
 6. **SQL/Backups**: `YYYYMMDD_descripción.sql` (dentro de `pronto-backups/` o `init/sql/`).
 7. **Prohibiciones**:
    - Prohibido espacios o caracteres especiales en nombres.
    - Prohibido archivos de datos (`.txt`, `.cookies`, `.sql`, `.log`) en el root del proyecto.
-   - Prohibido archivos sin extensión en `pronto-scripts/bin/`.
+   - Prohibido archivos sin extensión en `pronto-scripts/bin/`, excepto wrappers canónicos aprobados por `pronto-scripts`.
    - Todo contexto que sea público por definición debe ubicarse en `/public`.
    - Excepción única: todo lo relacionado con autenticación debe ubicarse en `/auth`, incluso si es público.
 8. **Archivos Temporales (IA/Desarrollo)**: Todos los archivos temporales, reportes de un solo uso, capturas de pantalla o logs manuales generados por la IA o durante el desarrollo deben ubicarse exclusivamente en la carpeta `tmp/` en la raíz del proyecto. Esta regla aplica al espacio de trabajo local y no invalida las rutas de temporales internas de los contenedores.
@@ -170,6 +179,60 @@ Para evitar desincronización y "deriva documental", se establece la siguiente j
 2. **.env.example**: Fuente de verdad para la configuración. Define las llaves válidas y sus valores por defecto.
 3. **pronto-docs/contracts/**: Fuente de verdad para integraciones entre servicios.
 4. **README.md locales**: Contexto operativo específico del servicio. **Prohibido duplicar** contenido de los niveles 1 y 2. Deben usar links relativos a la fuente de verdad global.
+
+---
+
+# 0.9) ESTÁNDARES DE CALIDAD DE CÓDIGO (P0)
+
+**Eres un desarrollador senior obsesionado con cero deuda técnica nueva.**
+
+## Reglas obligatorias para TODAS las implementaciones (P0)
+
+Violación a cualquiera ⇒ **REJECTED**.
+
+### 0.9.1 Calidad de Implementación (P0)
+- **Implementación COMPLETA y bien hecha**: Siempre implementa la funcionalidad completa, funcional y probada. No aceptes versiones parciales o "luego termino".
+- **Código limpio y legible**: Nombres claros y descriptivos. Prohibido: `x`, `tmp`, `data1`, `var`, `foo`, `bar`, etc. Usa nombres que expresen intención.
+- **Eliminación de duplicación**: Extrae funciones, clases, utilitarios o módulos cuando detectes código repetido. DRY (Don't Repeat Yourself) es mandatorio.
+- **Tests unitarios mínimos pero útiles**: Al menos 2-3 casos felices + 1-2 casos de borde/error por implementación.
+- **Extensibilidad por diseño**: Piensa en que añadir funcionalidades similares mañana no rompa ni obligue a reescribir mucho. Open/Closed Principle.
+- **Documentación inline breve pero clara**: Docstrings en funciones/clases, comentarios en puntos clave. No sobre-documentes ni sub-documentes.
+- **CERO DEUDA TÉCNICA NUEVA**: NUNCA dejes TODO, FIXME, // TODO, hack, nota mental ni comentarios tipo "luego lo arreglo". Si no puedes hacerlo ahora, no lo hagas a medias.
+- **Patrones y prácticas adecuadas**: Usa clean code, SOLID, principios del lenguaje/framework correspondientes.
+- **Manejo de errores correcto**: Excepciones apropiadas, validaciones de input, valores por defecto seguros. Nunca silencies errores con `pass` sin razón documentada.
+
+### 0.9.2 Implementaciones Rápidas/Sucias (P0)
+Solo puedes hacer una implementación rápida/sucia/hack si el usuario dice **textualmente** alguna de estas frases:
+- "hazlo sucio"
+- "versión rápida y sucia"
+- "hack rápido"
+- "no importa la calidad ahora"
+
+**En todos los demás casos → SIEMPRE versión completa y profesional.**
+
+### 0.9.3 Límite de Tokens (P1)
+Si por límite de tokens o complejidad extrema no cabe todo en una respuesta:
+1. Entrega la parte principal primero
+2. Marca claramente la deuda pendiente con un comentario grande:
+   ```
+   // DEUDA TÉCNICA PENDIENTE (necesita completarse):
+   // - [descripción exacta]
+   // - [impacto]
+   ```
+3. Luego entrega las partes restantes en mensajes siguientes si es necesario.
+4. La deuda técnica pendiente debe completarse antes de considerarse terminado.
+
+### 0.9.4 Response Style (P1)
+- Responde directo con el código + tests + explicación mínima si hace falta.
+- Sin preámbulos largos, sin preguntar "quieres rápido o bien", sin justificar.
+- Asume siempre: bien hecho.
+
+### 0.9.5 Cierre Sin Legacy Ni Deuda (P0)
+- **Cero legacy**: ante cualquier patrón legacy detectado, la corrección debe eliminarlo del flujo afectado; no se permite dejar compatibilidad legacy activa sin plan de retiro explícito aprobado por el usuario.
+- **Cero deuda técnica pendiente al cerrar tarea**: no se considera terminada una tarea si quedan FIXMEs, workarounds temporales, parches parciales o comportamientos inconsistentes derivados del cambio.
+- **Regla de completitud obligatoria**: todo fix debe incluir saneamiento integral del patrón relacionado (frontend, backend, shared/libs y scripts impactados), con validación final del flujo principal.
+- **Criterio de bloqueo**: si existe deuda técnica/legacy remanente del mismo hallazgo, el estado debe ser `REJECTED` hasta completar el saneamiento.
+- **Modo "aplica completo"**: cuando el usuario pida explícitamente aplicar un cambio "completo", "sin legacy", "sin compatibilidad" o "sin deuda técnica", el agente debe ejecutar el saneamiento end-to-end del alcance afectado y evitar planes por semanas/fases artificiales, bridges temporales, compatibilidad transicional o cierres parciales.
 
 ---
 
@@ -468,7 +531,7 @@ Regla dura:
 
 Toda llamada a "/api/*" debe resolver canónicamente a `pronto-api` (`:6082`) sin bypass.
 Prohibido mutar "/api/*" fuera de:
-pronto-static/src/vue/employees/core/http.ts
+pronto-static/src/vue/employees/shared/core/http.ts
 Canon:
 credentials: 'include'
 Prohibido: credentials: 'same-origin'
@@ -499,6 +562,26 @@ pronto-client → pronto-api debe usar header: X-PRONTO-CUSTOMER-REF
   - Mantener trazabilidad (`X-Correlation-ID`) y headers de seguridad/csrf aplicables.
   - Definir plan de retiro explícito para volver a acceso canónico directo a `:6082/api/*`.
 
+12.4.4 Excepción: Proxy SSR por consola (P0)
+- Se permite proxy técnico scope-aware en `pronto-employees` para rutas `/<scope>/api/*`.
+- Propósito: mantener sesiones JWT aisladas por consola (waiter/chef/cashier/admin/system).
+- Implementación:
+  - Blueprint `proxy_console_api` en `pronto-employees/src/pronto_employees/routes/api/proxy_console_api.py`.
+  - Resuelve scope desde URL path (`/waiter/api/*` → scope=waiter).
+  - Lee cookie namespaced `access_token_{scope}` y la propaga a `pronto-api:6082/api/*`.
+  - Valida que JWT role coincida con scope (protección contra escalación horizontal).
+  - Timeout máximo: 5s.
+  - Propaga headers: `X-Correlation-ID`, `X-CSRFToken`, `Content-Type`, `Content-Length`.
+  - Maneja streaming response y multipart/form-data.
+- Restricciones:
+  - Sin lógica de negocio.
+  - Sin transformación de payload.
+  - Sin modificación de status code (transparente).
+- Deprecación: este proxy es transporte temporal hasta que Nginx/proxy externo resuelva scope-aware routing.
+- Requisitos de seguridad:
+  - Si `jwt_role != scope` → 403 SCOPE_MISMATCH.
+  - Si scope inválido → 400 INVALID_SCOPE.
+
 12.5 Tipos de parámetros en rutas (P0)
 - Entidades principales (Customer, Employee, DiningSession, Order, Table, MenuItem, Modifier, etc.) deben usar UUID.
 - Solo entidades de lookup/técnicas usan Integer: Area, Role, DiscountCode, Promotion, ProductSchedule, WaiterCall, Notification.
@@ -512,9 +595,9 @@ pronto-client → pronto-api debe usar header: X-PRONTO-CUSTOMER-REF
 12.6 Gate de validación de tipos (P0)
 Ejecutar para validar:
 ```bash
-# Verificar que no haya <int:> para entidades UUID
-rg -n --hidden "/<int:[a-z_]+_id>" pronto-employees/src/pronto_employees/routes/api/
-rg -n --hidden "/<int:[a-z_]+_id>" pronto-client/src/pronto_clients/routes/api/
+# Verificar que no haya <int:> en entidades UUID (excluyendo allowlist Integer)
+rg -n --hidden "/<int:[a-z_]+_id>" pronto-employees/src/pronto_employees/routes/api/ | rg -v "waiter_calls|areas|roles|discount_codes|promotions|product_schedules|admin_shortcuts|notifications"
+rg -n --hidden "/<int:[a-z_]+_id>" pronto-client/src/pronto_clients/routes/api/ | rg -v "waiter_calls|areas|roles|discount_codes|promotions|product_schedules|admin_shortcuts|notifications"
 ```
 Si produce output ⇒ REJECTED
 
@@ -573,6 +656,7 @@ VIOLATIONS:
 Pronto-Audit-Agent (P1)
 - Sistema autónomo de auditoría integral (CrewAI).
 - Escanea: AGENTS.md compliance, API parity, Seguridad, TypeScript/Vue quality, Deduplicación.
+- Obligatorio: aplicar Regla de Recurrencia de Errores y Deuda Técnica (P0) en cada hallazgo.
 - Ubicación: `pronto-audit/`
 - Entorno: Virtualenv propio (`pronto-audit/.venv`), gestionado por Poetry (Python 3.12 obligatorio).
 - Salida: Reportes en `pronto-audit/reports/` y GitHub Issues.
@@ -615,6 +699,55 @@ Bloquea commit si hay cambios estructurales sin actualización de init/migration
 Pronto-Logging-Agent (P2)
 current_app.logger o get_logger
 No swallow exceptions
+Pronto-Recurrence-Auditor-Agent (P0)
+Valida que todo bug/deuda técnica se haya buscado transversalmente para detectar patrones repetidos.
+Obligatorio por hallazgo:
+- Evidencia de búsqueda global con `rg`
+- Inventario de ocurrencias por archivo
+- Estado por ocurrencia: corregido o pendiente con plan explícito
+Salida:
+STATUS: APPROVED|REJECTED
+RECURRENCE_CHECK:
+- Scope Covered: OK|FAIL
+- Evidence Attached: OK|FAIL
+- Similar Occurrences Addressed: OK|FAIL
+VIOLATIONS:
+Pronto-Zero-Technical-Debt-Agent (P0)
+Enforcement de cierre limpio sin deuda ni legacy remanente.
+Validaciones mínimas:
+- No quedan `TODO|FIXME|HACK|TEMP` introducidos por el cambio.
+- No quedan rutas/código legacy activos para el mismo flujo corregido.
+- El fix quedó aplicado en todas las ocurrencias equivalentes detectadas.
+Salida:
+STATUS: APPROVED|REJECTED
+ZERO_TECH_DEBT:
+- Legacy Removed: OK|FAIL
+- No Pending Workarounds: OK|FAIL
+- Flow Fully Closed: OK|FAIL
+VIOLATIONS:
+Pronto-Responsive-UI-Agent (P1)
+Valida que todo cambio de UI web sea responsive antes de commit.
+Implementación canónica:
+- `pronto-scripts/bin/pronto-responsive-check`
+- Integración en hook: `pronto-scripts/bin/pre-commit-ai`
+Cobertura mínima:
+- `pronto-client/src/pronto_clients/templates/**`
+- `pronto-static/src/static_content/assets/css/clients/**`
+- `pronto-static/src/vue/clients/**`
+Reglas:
+- Detectar estilos rígidos (`px` fijos) sin estrategia responsive asociada.
+- Detectar overlays/modales fixed sin ajustes móviles.
+- Reportar sugerencias concretas de corrección (breakpoints, clamp/min/max, unidades fluidas).
+Modo de bloqueo:
+- Advertencia por defecto.
+- Bloqueante si `PRONTO_RESPONSIVE_ENFORCE=1`.
+Salida:
+STATUS: APPROVED|WARNING|REJECTED
+RESPONSIVE_RULES:
+- Fluid Layout: OK|WARN|FAIL
+- Breakpoints: OK|WARN|FAIL
+- Modal Mobile Fit: OK|WARN|FAIL
+SUGGESTIONS:
 Pronto-Business-Order-Auditor-Agent (P0)
 Valida negocio + enforcement:
 - Grafo (ORDER_TRANSITIONS) y reglas (validate_transition)
@@ -652,10 +785,141 @@ Salida:
 STATUS: APPROVED|REJECTED
 VIOLATIONS:
 
+Pronto-AI-Audit-Orchestrator (P1)
+- Registro declarativo: `pronto-prompts/registry.yml`
+- Prompt maestro: `pronto-prompts/auditors/master/full_integrity_audit.md`
+- Ejecuta auditoría completa o individual por agente.
+- Script canónico: `./pronto-scripts/bin/pronto-ai-audit`
+
+Auditores IA declarados (P1 salvo indicación explícita):
+- `architecture_ownership_auditor`
+- `api_scope_canon_auditor`
+- `routes_only_auditor`
+- `static_ownership_auditor`
+- `frontend_backend_parity_auditor`
+- `ui_render_selector_auditor`
+- `asset_reference_integrity_auditor`
+- `vue_ssr_integration_auditor`
+- `scripts_runtime_parity_auditor`
+- `code_integrity_auditor`
+- `python_flask_quality_auditor`
+- `vue_quality_auditor`
+- `shell_script_quality_auditor`
+- `dependency_vulnerability_auditor`
+- `db_init_seed_parity_auditor` (P0 en cambios estructurales)
+- `runtime_ddl_auditor` (P0 por hallazgo)
+- `contract_completeness_auditor`
+- `api_contract_snapshot_auditor`
+- `security_guardrails_auditor` (P0 en hallazgos críticos)
+- `validator_coverage_auditor`
+- `test_obligation_auditor` (P0 si hay impacto crítico sin cobertura)
+- `agents_sync_auditor`
+- `readme_command_drift_auditor`
+
 ## 16.3 Herramientas de Auditoría (Ejecución Manual/CI)
 - `pronto-full-audit.sh`: Orquestador de auditoría LLM integral. Utiliza prompts especializados por proyecto para detectar inconsistencias de negocio, estáticos prohibidos y deuda técnica.
 - `pronto-inconsistency-check`: Script de validación rápida de invariantes locales (roles, versiones, sesiones).
 - `pronto-audit/bin/run-audit.sh`: Interfaz de ejecución para el agente basado en CrewAI (requiere `.venv` interno con Python 3.12).
+- `pronto-ai-audit`: Runner declarativo por registro (`pronto-prompts/registry.yml`) para auditoría completa o individual.
+- `pronto-ai-audit-fast`: Perfil rápido de auditores críticos.
+- `pronto-ai-audit-agent <id>`: Ejecuta un auditor individual.
+- `pronto-ai-audit-report --in-dir <ruta>`: Reconstruye consolidado desde salidas individuales.
+- `pronto-responsive-check`: Validador responsive para cambios frontend (warning por default, blocker con `PRONTO_RESPONSIVE_ENFORCE=1`).
+
+## 16.4 Skills operativos obligatorios/recomendados para acelerar desarrollo (P1)
+
+Regla general:
+- Si un skill aplica claramente al tipo de tarea, el agente debe usar su enfoque/patrón de trabajo antes de improvisar.
+- No usar un skill no sustituye guardrails P0/P1; los skills aceleran ejecución, no autorizan saltarse reglas.
+- Si múltiples skills aplican, priorizar el de mayor reducción de riesgo primero y el de mayor velocidad de validación después.
+- Si el usuario exige una corrección completa/end-to-end, usar los skills aplicables para cerrar el flujo entero en una sola línea de trabajo, no para justificar compatibilidades temporales o segmentaciones artificiales.
+
+### Tier 1 — impacto inmediato (uso prioritario)
+
+#### `plan-review` — OBLIGATORIO para planificación de trabajo no trivial
+Usar cuando:
+- se investiga un bug con múltiples archivos/superficies;
+- se necesita un plan de implementación o remediación por fases;
+- hay que priorizar lotes, riesgos, dependencias y validaciones;
+- el trabajo toca más de un repo PRONTO o mezcla código + docs + scripts.
+
+#### `senior-security` — OBLIGATORIO en auth, sesión, CSRF, JWT, permisos y rutas sensibles
+Usar cuando:
+- se modifican login/logout/refresh/me;
+- se tocan cookies, headers auth, CSRF o JWT;
+- se altera acceso a `/api/*`, SSR auth, proxies o scope enforcement;
+- se revisan posibles bypasses, exposición de PII o endurecimiento de seguridad.
+
+#### `flask-api-development` — OBLIGATORIO en cambios backend Flask
+Usar cuando:
+- se agregan o corrigen blueprints, endpoints, handlers o proxies técnicos Flask;
+- se tocan request/response, serialización, errores HTTP o middleware;
+- se modifican rutas en `pronto-api`, `pronto-client` SSR/BFF o `pronto-employees` SSR/proxy.
+
+#### `playwright-cli` — OBLIGATORIO para smoke/regresión web ejecutable
+Usar cuando:
+- se necesita verificar flujos web reales de cliente o employees;
+- se requiere reproducir bugs UI/SSR/auth en navegador;
+- hay cambios en templates, navegación, modal flows, checkout, login o pago.
+
+#### `playwright-skill` — RECOMENDADO para validación UX/E2E más rica
+Usar cuando:
+- además del smoke se necesita inspección visual, screenshots o validación paso a paso;
+- hay regresiones de interacción, overlays, modales, tabs, responsive o accesibilidad percibida.
+
+### Tier 2 — muy valiosos para estabilidad
+
+#### `postgresql-database-engineering` — OBLIGATORIO en cambios estructurales o dudas de integridad DB
+Usar cuando:
+- se tocan modelos persistentes, constraints, índices, migrations o `pronto-scripts/init/sql/**`;
+- hay drift entre ORM, schema y contratos SQL;
+- se revisa rendimiento de queries o consistencia de datos/DDL.
+
+#### `vueuse-functions` — RECOMENDADO en refactors Vue/composables
+Usar cuando:
+- se toca lógica reactiva en `pronto-static/src/vue/**`;
+- hay duplicación de watchers/computed/event listeners/state sync;
+- conviene extraer composables mantenibles en lugar de ampliar código ad hoc.
+
+#### `ui-ux-expert` — RECOMENDADO para cambios de UI, responsive y accesibilidad
+Usar cuando:
+- se modifican pantallas, formularios, modales, layouts o navegación cliente/empleados;
+- hay problemas de responsive, jerarquía visual, legibilidad o affordances;
+- se requiere criterio UX, no solo que “compile”.
+
+### Tier 3 — situacionales
+
+#### `browser-use` — OPCIONAL para exploración guiada del navegador
+Usar cuando:
+- conviene automatizar inspección web ligera sin llegar a un test formal largo;
+- se necesita capturar evidencia visual o recorrer manualmente un flujo repetitivo.
+
+#### `ai-sdk` — OPCIONAL solo para features AI reales
+Usar cuando:
+- se construyen capacidades de IA, generación, agentes, RAG o tool-calling dentro del producto.
+
+#### `find-skills` — OPCIONAL cuando falta una capacidad especializada
+Usar cuando:
+- el problema requiere una especialidad no cubierta por los skills ya definidos;
+- se busca descubrir si existe un skill mejor que reduzca tiempo/riesgo.
+
+### Mapa mínimo por repo
+- `pronto-api`: `flask-api-development` + `senior-security`; añadir `postgresql-database-engineering` si toca persistencia; `plan-review` para bugs multiarchivo.
+- `pronto-client`: `flask-api-development` + `senior-security` para BFF/SSR auth; `playwright-cli` para validación funcional; `ui-ux-expert` si toca templates/flujo visible.
+- `pronto-employees`: `flask-api-development` + `senior-security` para scopes/JWT/proxy auth; `playwright-cli` para login por rol y consola.
+- `pronto-static`: `playwright-cli` + `playwright-skill` para regresión; `vueuse-functions` y `ui-ux-expert` para refactors Vue y calidad UI.
+- `pronto-tests`: `playwright-cli` prioritario para smoke/E2E; `plan-review` para curar suites mezcladas, duplicadas o frágiles.
+- `pronto-scripts`: `plan-review` para lotes complejos de tooling; `postgresql-database-engineering` si toca init/migrations/schema; `senior-security` si el script afecta auth/guardrails.
+
+### Orden recomendado de aplicación cuando hay duda
+1. `plan-review`
+2. `senior-security`
+3. `flask-api-development`
+4. `playwright-cli`
+5. `playwright-skill`
+6. `postgresql-database-engineering`
+7. `vueuse-functions`
+8. `ui-ux-expert`
 
 17) GATES (ORDEN CANÓNICO) — EJECUCIÓN OBLIGATORIA
 Gate A: Arquitectura (P0)
@@ -687,6 +951,17 @@ Ejecutar (pre-commit obligatorio):
 ./pronto-scripts/bin/pronto-init-seed-review.sh
 
 Si hay cambios estructurales y no hay actualización en `pronto-scripts/init/sql/**` o falta confirmación de validación (`PRONTO_INIT_SEED_VALIDATED=1`) ⇒ REJECTED
+Gate J: Recurrencia Transversal de Hallazgos (P0)
+Para cada bug/deuda técnica detectado:
+- Ejecutar búsqueda transversal con `rg` para el patrón causal.
+- Documentar ocurrencias similares y su estado (corregido/pendiente con plan).
+Si no hay evidencia de búsqueda transversal o quedan ocurrencias críticas sin plan ⇒ REJECTED
+Gate K: Responsive Web UI (P1)
+Ejecutar:
+./pronto-scripts/bin/pronto-responsive-check --staged
+Resultado:
+- Si hay warnings: registrar sugerencias y corregir antes de release.
+- Si `PRONTO_RESPONSIVE_ENFORCE=1` y hay hallazgos ⇒ REJECTED
 18) ERROR TRACKING OBLIGATORIO — Pronto-Error-Tracker-Agent (P0)
 Objetivo:
 Forzar que TODO bug quede documentado y solo pase a resuelto con corrección verificada.
@@ -736,10 +1011,11 @@ No existe entrada en pronto-docs/resueltos.txt sin archivo correspondiente.
 
 # 19) MANDATO DE ACCESO Y LOGIN (P0)
 
-1. La aplicación solo funciona con login y registro previo.
-2. Prohibido realizar órdenes sin un usuario autenticado y una sesión activa.
-3. El flujo de invitados (anonymous) es transicional hacia un registro o login obligatorio para finalizar el checkout.
-4. **Caso Kiosko:** Se utilizará un usuario especial de tipo `kiosko`. Por ahora, su comportamiento y capacidades son idénticas a las de un usuario normal.
+1. La navegación del cliente (catálogo/menú y vistas informativas) debe funcionar sin login.
+2. El login/registro es obligatorio al primer intento de crear o confirmar una orden.
+3. Prohibido realizar órdenes sin un usuario autenticado y una sesión activa.
+4. El flujo de invitados (anonymous) es transicional hacia un registro o login obligatorio para finalizar checkout/pago.
+5. **Caso Kiosko:** Se utilizará un usuario especial de tipo `kiosko`. Por ahora, su comportamiento y capacidades son idénticas a las de un usuario normal.
 
 ---
 

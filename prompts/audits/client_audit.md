@@ -15,7 +15,7 @@ Garantizar que el flujo de orden del cliente es infalible, los datos están prot
 - **Inyección de Assets:** Verificar que se usen las variables `assets_css_clients` y `assets_js_clients`.
 
 ### 3. Seguridad y Privacidad (P0)
-- **Session Leak:** Detectar si se están guardando datos como Email, Nombre o Teléfono en `flask.session`. **USAR SOLO LLAVES PERMITIDAS** en `customer_session.py`.
+- **Session Leak:** Detectar si se están guardando datos como Email, Nombre o Teléfono en `flask.session`. **USAR SOLO LLAVES PERMITIDAS** definidas en `AGENTS.md` (`dining_session_id`, `customer_ref`).
 - **Imports:** Verificar que no existan dependencias circulares o imports directos desde folders de `pronto-employees` o `pronto-api` (usar siempre `pronto_shared`).
 
 ### 4. Usabilidad y Deuda Técnica

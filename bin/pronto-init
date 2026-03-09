@@ -122,15 +122,16 @@ list_phase_files() {
 
 deny_check_phase_file() {
   local phase="$1" f="$2"
+  local deny_pattern='(?i)\b(ALTER\s+TABLE|RENAME\b|UPDATE\s+[A-Za-z_"][A-Za-z0-9_"\.]*|DELETE\s+FROM\b|DO\s+\$\$|EXECUTE\b|CREATE\s+EXTENSION\b|DROP\s+INDEX\b|CREATE\s+VIEW\b|DROP\s+VIEW\b|CREATE\s+TYPE\b|CREATE\s+FUNCTION\b)'
 
   if [[ "$phase" == "00_bootstrap" ]]; then
     return 0
   fi
 
   # hard deny in 10..40
-  if rg -n --pcre2 '(?i)\b(ALTER\s+TABLE|RENAME\b|UPDATE\b|DELETE\b|DO\s+\$\$|EXECUTE\b|CREATE\s+EXTENSION\b|DROP\s+INDEX\b|CREATE\s+VIEW\b|DROP\s+VIEW\b|CREATE\s+TYPE\b|CREATE\s+FUNCTION\b)\b' "$f" >/dev/null; then
+  if rg -n --pcre2 "$deny_pattern" "$f" >/dev/null; then
     echo "pronto-init: deny hit en fase=$phase archivo=$f" >&2
-    rg -n --pcre2 '(?i)\b(ALTER\s+TABLE|RENAME\b|UPDATE\b|DELETE\b|DO\s+\$\$|EXECUTE\b|CREATE\s+EXTENSION\b|DROP\s+INDEX\b|CREATE\s+VIEW\b|DROP\s+VIEW\b|CREATE\s+TYPE\b|CREATE\s+FUNCTION\b)\b' "$f" >&2 || true
+    rg -n --pcre2 "$deny_pattern" "$f" >&2 || true
     exit 1
   fi
 

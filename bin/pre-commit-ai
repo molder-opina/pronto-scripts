@@ -90,9 +90,9 @@ collect_staged_files() {
 
 collect_changed_files() {
   local raw prefixed
-  raw="$(git -C "$REPO_GIT_ROOT" diff --name-only origin/main...HEAD 2>/dev/null || true)"
+  raw="$(git -C "$REPO_GIT_ROOT" diff --name-only --diff-filter=ACMRT origin/main...HEAD 2>/dev/null || true)"
   if [ -z "$raw" ]; then
-    raw="$(git -C "$REPO_GIT_ROOT" diff --name-only HEAD~1...HEAD 2>/dev/null || true)"
+    raw="$(git -C "$REPO_GIT_ROOT" diff --name-only --diff-filter=ACMRT HEAD~1...HEAD 2>/dev/null || true)"
   fi
 
   prefixed="$(prefix_repo_if_needed "$raw")"

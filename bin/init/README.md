@@ -4,10 +4,10 @@ Scripts para preparar un nuevo despliegue con variables de ambiente, sincronizac
 
 ## Flujo
 
-1. `01_backup_envs.sh` → crea backup con timestamp.
-2. `02_apply_envs.sh` → actualiza `.env`.
-3. `03_seed_params.sh` → sincroniza env → DB y carga dummy opcional.
-4. `04_deploy.sh` → compila y despliega.
+1. `01-backup-envs.sh` → crea backup con timestamp.
+2. `02-apply-envs.sh` → actualiza `.env`.
+3. `03-seed-params.sh` → sincroniza env → DB y carga dummy opcional.
+4. `04-deploy.sh` → compila y despliega.
 
 ## Uso interactivo
 
@@ -36,8 +36,8 @@ bash bin/init/init.sh --non-interactive --yes \
 
 - Crear tabla de secretos: `pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets.sql`
 - Rollback: `pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets_rollback.sql`
-- Ejecuta automático en `bin/init/03_seed_params.sh` (usa `--skip-migrations`, `--rollback-migrations` o `--force-rollback`)
-- `bin/init/05_apply_migrations.sh` acepta `--force-rollback` para aplicar el rollback sin prompt
+- Ejecuta automático en `bin/init/03-seed-params.sh` (usa `--skip-migrations`, `--rollback-migrations` o `--force-rollback`)
+- `bin/init/05-apply-migrations.sh` acepta `--force-rollback` para aplicar el rollback sin prompt
 
 ## Rollback rápido
 
@@ -48,13 +48,13 @@ bash bin/init/init.sh --rollback-migrations --force-rollback --skip-build --non-
 ## Solo migración
 
 ```bash
-bash bin/init/05_apply_migrations.sh pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets.sql
+bash bin/init/05-apply-migrations.sh pronto-libs/src/pronto_shared/migrations/009_add_pronto_secrets.sql
 ```
 
 ## Solo seed/sync
 
 ```bash
-bash bin/init/03_seed_params.sh --dummy-data
+bash bin/init/03-seed-params.sh --dummy-data
 ```
 
 ## Allowlist opcional

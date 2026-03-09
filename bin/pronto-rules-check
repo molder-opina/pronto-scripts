@@ -33,7 +33,7 @@ H3_ORDER = [
 
 CONTRACT_FILES = {
     "http_api": "openapi.yaml",
-    "redis_keys": "redis_keys.md",
+    "redis_keys": "redis-keys.md",
     "events": "events.md",
     "db_schema": "db_schema.sql",
     "http_assets": "files.md",

@@ -9,13 +9,13 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE_SRC="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
-LIB_FILE="${PROJECT_ROOT}/bin/lib/stack_helpers.sh"
+LIB_FILE="${PROJECT_ROOT}/bin/lib/stack-helpers.sh"
 LOAD_SEED=false
 
-# shellcheck source=bin/lib/docker_runtime.sh
-source "${SCRIPT_DIR}/lib/docker_runtime.sh"
+# shellcheck source=bin/lib/docker-runtime.sh
+source "${SCRIPT_DIR}/lib/docker-runtime.sh"
 
-# shellcheck source=bin/lib/stack_helpers.sh
+# shellcheck source=bin/lib/stack-helpers.sh
 source "${LIB_FILE}"
 
 # Parse arguments

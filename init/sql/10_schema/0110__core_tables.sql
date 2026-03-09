@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS pronto_dining_sessions (
 CREATE TABLE IF NOT EXISTS pronto_menu_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL UNIQUE,
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  revision INTEGER NOT NULL DEFAULT 1,
   description TEXT,
   image_url TEXT,
   parent_category_id UUID REFERENCES pronto_menu_categories(id),
@@ -113,17 +115,35 @@ CREATE TABLE IF NOT EXISTS pronto_menu_categories (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS pronto_menu_subcategories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    menu_category_id UUID NOT NULL REFERENCES pronto_menu_categories(id),
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(120) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    revision INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_menu_subcategories_category_slug UNIQUE (menu_category_id, slug)
+);
+
 CREATE TABLE IF NOT EXISTS pronto_menu_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id UUID REFERENCES pronto_menu_categories(id),
+  menu_category_id UUID REFERENCES pronto_menu_categories(id),
+  menu_subcategory_id UUID REFERENCES pronto_menu_subcategories(id),
+  item_kind VARCHAR(16) NOT NULL DEFAULT 'product',
   name VARCHAR(255) NOT NULL,
   description TEXT,
   price NUMERIC(10, 2) NOT NULL DEFAULT 0,
   image_path VARCHAR(255),
   image_url TEXT,
   is_available BOOLEAN DEFAULT TRUE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_featured BOOLEAN DEFAULT FALSE,
   display_order INTEGER DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   preparation_time_minutes INTEGER DEFAULT 15,
   calories INTEGER,
   allergens TEXT[],
@@ -135,17 +155,102 @@ CREATE TABLE IF NOT EXISTS pronto_menu_items (
   is_quick_serve BOOLEAN NOT NULL DEFAULT FALSE,
   is_breakfast_recommended BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT chk_menu_items_item_kind CHECK (item_kind IN ('product', 'combo', 'package'))
+);
+
+CREATE TABLE IF NOT EXISTS pronto_product_labels (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    label_type VARCHAR(24) NOT NULL DEFAULT 'badge',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_quick_filter BOOLEAN NOT NULL DEFAULT FALSE,
+    quick_filter_sort_order INTEGER NOT NULL DEFAULT 0,
+    revision INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_product_labels_type CHECK (label_type IN ('promo', 'badge', 'collection'))
+);
+
+CREATE TABLE IF NOT EXISTS pronto_product_label_map (
+    product_id UUID NOT NULL REFERENCES pronto_menu_items(id),
+    label_id UUID NOT NULL REFERENCES pronto_product_labels(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (product_id, label_id)
+);
+
+CREATE TABLE IF NOT EXISTS pronto_menu_home_modules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(160) NOT NULL,
+    slug VARCHAR(160) NOT NULL UNIQUE,
+    module_type VARCHAR(32) NOT NULL,
+    source_type VARCHAR(32) NOT NULL,
+    source_ref_id UUID,
+    source_item_kind VARCHAR(16),
+    placement VARCHAR(32) NOT NULL DEFAULT 'home_client',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    max_items INTEGER NOT NULL DEFAULT 8,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    show_title BOOLEAN NOT NULL DEFAULT TRUE,
+    show_view_all BOOLEAN NOT NULL DEFAULT FALSE,
+    revision INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_menu_home_module_type CHECK (module_type IN ('hero', 'carousel', 'grid', 'chips', 'category_section')),
+    CONSTRAINT chk_menu_home_source_type CHECK (source_type IN ('label', 'category', 'subcategory', 'item_kind', 'manual')),
+    CONSTRAINT chk_menu_home_item_kind CHECK (source_item_kind IS NULL OR source_item_kind IN ('product', 'combo', 'package')),
+    CONSTRAINT chk_menu_home_source_ref_rules CHECK (
+        (source_type = 'manual' AND source_ref_id IS NULL)
+        OR (source_type = 'item_kind' AND source_ref_id IS NULL AND source_item_kind IS NOT NULL)
+        OR (source_type IN ('label', 'category', 'subcategory') AND source_ref_id IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS pronto_menu_home_module_products (
+    module_id UUID NOT NULL REFERENCES pronto_menu_home_modules(id),
+    product_id UUID NOT NULL REFERENCES pronto_menu_items(id),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (module_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS pronto_menu_home_publication_state (
+    placement VARCHAR(32) PRIMARY KEY,
+    draft_version INTEGER NOT NULL DEFAULT 1,
+    published_version INTEGER NOT NULL DEFAULT 1,
+    snapshot_revision VARCHAR(64) NOT NULL DEFAULT 'baseline-v1',
+    publish_lock BOOLEAN NOT NULL DEFAULT FALSE,
+    publish_status VARCHAR(16) NOT NULL DEFAULT 'idle',
+    last_publish_at TIMESTAMPTZ,
+    last_publish_error TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_menu_home_publish_status CHECK (publish_status IN ('idle', 'running', 'failed', 'succeeded'))
+);
+
+CREATE TABLE IF NOT EXISTS pronto_menu_home_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    placement VARCHAR(32) NOT NULL,
+    version INTEGER NOT NULL,
+    revision VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    is_published BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_menu_home_snapshot_version UNIQUE (placement, version),
+    CONSTRAINT uq_menu_home_snapshot_revision UNIQUE (placement, revision)
 );
 
 CREATE TABLE IF NOT EXISTS pronto_modifier_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
+  description TEXT,
   selection_type VARCHAR(50) DEFAULT 'single',
   min_select INTEGER DEFAULT 0,
   max_select INTEGER DEFAULT 1,
   is_required BOOLEAN DEFAULT FALSE,
   is_active BOOLEAN DEFAULT TRUE,
+  display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -157,9 +262,30 @@ CREATE TABLE IF NOT EXISTS pronto_modifiers (
   price_adjustment NUMERIC(10, 2) DEFAULT 0,
   image_path VARCHAR(500),
   is_available BOOLEAN DEFAULT TRUE,
+  display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS pronto_menu_package_components (
+  package_item_id UUID NOT NULL REFERENCES pronto_menu_items(id) ON DELETE CASCADE,
+  component_item_id UUID NOT NULL REFERENCES pronto_menu_items(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  min_selection INTEGER NOT NULL DEFAULT 1,
+  max_selection INTEGER NOT NULL DEFAULT 1,
+  is_required BOOLEAN NOT NULL DEFAULT TRUE,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (package_item_id, component_item_id),
+  CONSTRAINT chk_package_components_selection_bounds
+    CHECK (min_selection >= 0 AND max_selection >= 0 AND min_selection <= max_selection)
+);
+
+CREATE INDEX IF NOT EXISTS idx_package_components_package
+  ON pronto_menu_package_components(package_item_id, display_order);
+CREATE INDEX IF NOT EXISTS idx_package_components_component
+  ON pronto_menu_package_components(component_item_id);
 
 CREATE TABLE IF NOT EXISTS pronto_areas (
   id SERIAL PRIMARY KEY,

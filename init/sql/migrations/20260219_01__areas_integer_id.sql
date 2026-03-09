@@ -30,7 +30,12 @@ ALTER TABLE pronto_areas RENAME COLUMN new_id TO id;
 
 -- Step 6: Set up primary key and sequence
 CREATE SEQUENCE IF NOT EXISTS pronto_areas_id_seq;
-SELECT setval('pronto_areas_id_seq', (SELECT MAX(id) FROM pronto_areas));
+SELECT setval(
+  'pronto_areas_id_seq',
+  GREATEST(COALESCE(MAX(id), 0), 1),
+  COUNT(*) > 0
+)
+FROM pronto_areas;
 ALTER TABLE pronto_areas ALTER COLUMN id SET DEFAULT nextval('pronto_areas_id_seq');
 ALTER TABLE pronto_areas ADD PRIMARY KEY (id);
 
@@ -56,7 +61,12 @@ CREATE INDEX ix_table_area ON pronto_tables(area_id);
 -- Step 10: Drop sequence if it was auto-created incorrectly
 DROP SEQUENCE IF EXISTS pronto_areas_id_seq CASCADE;
 CREATE SEQUENCE pronto_areas_id_seq;
-SELECT setval('pronto_areas_id_seq', (SELECT COALESCE(MAX(id), 0) FROM pronto_areas));
+SELECT setval(
+  'pronto_areas_id_seq',
+  GREATEST(COALESCE(MAX(id), 0), 1),
+  COUNT(*) > 0
+)
+FROM pronto_areas;
 ALTER TABLE pronto_areas ALTER COLUMN id SET DEFAULT nextval('pronto_areas_id_seq');
 ALTER SEQUENCE pronto_areas_id_seq OWNED BY pronto_areas.id;
 

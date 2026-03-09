@@ -27,10 +27,50 @@ CREATE TABLE IF NOT EXISTS pronto_business_info (
 CREATE INDEX IF NOT EXISTS idx_business_info_slug ON pronto_business_info(restaurant_slug);
 CREATE INDEX IF NOT EXISTS idx_business_info_active ON pronto_business_info(is_active);
 
--- Insert default business info if not exists
-INSERT INTO pronto_business_info (restaurant_slug, restaurant_name)
-SELECT 'default', 'PRONTO Restaurant'
-WHERE NOT EXISTS (SELECT 1 FROM pronto_business_info WHERE restaurant_slug = 'default');
+-- Repair legacy/live instances where the table exists but `id` lost its serial default.
+DO $$
+DECLARE
+    max_id integer;
+BEGIN
+    CREATE SEQUENCE IF NOT EXISTS pronto_business_info_id_seq;
+
+    ALTER SEQUENCE pronto_business_info_id_seq OWNED BY pronto_business_info.id;
+    ALTER TABLE pronto_business_info
+        ALTER COLUMN id SET DEFAULT nextval('pronto_business_info_id_seq');
+
+    SELECT COALESCE(MAX(id), 0) INTO max_id FROM pronto_business_info;
+
+    IF max_id > 0 THEN
+        PERFORM setval('pronto_business_info_id_seq', max_id, true);
+    ELSE
+        PERFORM setval('pronto_business_info_id_seq', 1, false);
+    END IF;
+END $$;
+
+-- Insert default business info if not exists, tolerating legacy live schemas that still require
+-- `business_name` before later alignment migrations run.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'pronto_business_info'
+          AND column_name = 'business_name'
+    ) THEN
+        INSERT INTO pronto_business_info (restaurant_slug, restaurant_name, business_name)
+        SELECT 'default', 'PRONTO Restaurant', 'PRONTO Restaurant'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM pronto_business_info WHERE restaurant_slug = 'default'
+        );
+    ELSE
+        INSERT INTO pronto_business_info (restaurant_slug, restaurant_name)
+        SELECT 'default', 'PRONTO Restaurant'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM pronto_business_info WHERE restaurant_slug = 'default'
+        );
+    END IF;
+END $$;
 
 COMMENT ON TABLE pronto_business_info IS 'Restaurant business configuration and branding settings';
 COMMENT ON COLUMN pronto_business_info.restaurant_slug IS 'URL-friendly identifier for the restaurant';

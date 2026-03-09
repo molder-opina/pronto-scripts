@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  cd "$REPO_ROOT"
+else
+  REPO_ROOT="$(pwd)"
+fi
+
+MODE="staged"
+ENFORCE="${PRONTO_RESPONSIVE_ENFORCE:-0}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --staged)
+      MODE="staged"
+      shift
+      ;;
+    --enforce)
+      ENFORCE="1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$MODE" != "staged" ]]; then
+  echo "RESPONSIVE_CHECK: INVALID_MODE"
+  exit 0
+fi
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  STAGED_FILES="$(git diff --cached --name-only || true)"
+else
+  STAGED_FILES=""
+fi
+if [[ -z "${STAGED_FILES:-}" ]]; then
+  echo "RESPONSIVE_CHECK: OK (no staged files)"
+  exit 0
+fi
+
+TARGET_FILES="$(echo "$STAGED_FILES" | rg -N \
+  "^(pronto-client/src/pronto_clients/templates/.*\.html|pronto-static/src/static_content/assets/css/clients/.*\.css|pronto-static/src/vue/clients/.*\.(vue|css|scss|ts|js))$" || true)"
+
+if [[ -z "${TARGET_FILES:-}" ]]; then
+  echo "RESPONSIVE_CHECK: OK (no frontend files)"
+  exit 0
+fi
+
+FINDINGS=""
+
+add_finding() {
+  local file="$1"
+  local issue="$2"
+  local evidence="$3"
+  local suggestion="$4"
+  FINDINGS="${FINDINGS}FILE: ${file}\nISSUE: ${issue}\nEVIDENCE: ${evidence}\nSUGGESTION: ${suggestion}\n---\n"
+}
+
+while IFS= read -r file; do
+  [[ -f "$file" ]] || continue
+
+  has_responsive_tokens=0
+  if rg -q "@media\s*\(|clamp\s*\(|min\s*\(|max\s*\(|\b[0-9]+(vw|vh|dvh|svh|%)\b|grid-template-columns:\s*repeat\(auto" "$file" 2>/dev/null; then
+    has_responsive_tokens=1
+  fi
+
+  hard_fixed_lines="$(rg -n "((min-|max-)?width|(min-|max-)?height|left|right|font-size|padding|margin)\s*:\s*[4-9][0-9]{2,}px" "$file" 2>/dev/null | head -n 3 || true)"
+  inline_fixed_lines="$(rg -n "style=\"[^\"]*((min-|max-)?width|(min-|max-)?height|padding|margin|font-size):\s*[4-9][0-9]{2,}px" "$file" 2>/dev/null | head -n 3 || true)"
+
+  if [[ -n "$hard_fixed_lines" && "$has_responsive_tokens" -eq 0 ]]; then
+    add_finding \
+      "$file" \
+      "Reglas con pixeles rígidos sin estrategia responsive detectable" \
+      "$hard_fixed_lines" \
+      "Agregar @media, clamp()/min()/max(), unidades fluidas (%, vw) y límites móviles/tablet."
+  fi
+
+  if [[ -n "$inline_fixed_lines" ]]; then
+    add_finding \
+      "$file" \
+      "Estilos inline con tamaños rígidos" \
+      "$inline_fixed_lines" \
+      "Mover estilos a CSS reusable y añadir breakpoints para <=768px y <=480px."
+  fi
+
+  if [[ "$file" =~ \.html$ ]] && rg -q "position:\s*fixed" "$file" 2>/dev/null; then
+    if ! rg -q "@media\s*\(max-width:\s*(768|767|640|600|576|480)px\)" "$file" 2>/dev/null; then
+      fixed_line="$(rg -n "position:\s*fixed" "$file" | head -n 1 || true)"
+      add_finding \
+        "$file" \
+        "Elementos fixed sin breakpoint móvil en plantilla" \
+        "$fixed_line" \
+        "Agregar reglas móviles para evitar overlays fuera de viewport (anchos fluidos y max-height con dvh)."
+    fi
+  fi
+done <<< "$TARGET_FILES"
+
+if [[ -z "$FINDINGS" ]]; then
+  echo "RESPONSIVE_CHECK: OK"
+  exit 0
+fi
+
+echo "RESPONSIVE_CHECK: WARNINGS_FOUND"
+echo -e "$FINDINGS"
+
+if [[ "$ENFORCE" == "1" ]]; then
+  echo "RESPONSIVE_CHECK: BLOCKING (PRONTO_RESPONSIVE_ENFORCE=1)"
+  exit 1
+fi
+
+exit 0

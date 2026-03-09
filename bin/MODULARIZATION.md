@@ -10,16 +10,16 @@ This document describes the modularization of large scripts in the `bin/` direct
 
 **Extracted modules:**
 
-- `bin/lib/build_helpers.sh` - Build and dependency preparation functions
+- `bin/lib/build-helpers.sh` - Build and dependency preparation functions
   - `run_frontend_builds()` - Builds TypeScript bundles for client/employee apps
   - `prepare_dependencies()` - Downloads Python wheels for offline installation
 
-- `bin/lib/cleanup_helpers.sh` - Container and image cleanup functions
+- `bin/lib/cleanup-helpers.sh` - Container and image cleanup functions
   - `exists_container_by_name()` - Check if container exists by name pattern
   - `kill_and_rm_by_name()` - Force kill and remove containers
   - `cleanup_old_images()` - Clean up old Docker images
 
-- `bin/lib/static_helpers.sh` - Static content synchronization
+- `bin/lib/static-helpers.sh` - Static content synchronization
   - `slugify()` - Convert restaurant name to URL-safe slug
   - `ensure_static_placeholder()` - Create placeholder images
   - `sync_static_content()` - Sync static files to nginx (Linux only)
@@ -62,11 +62,11 @@ This document describes the modularization of large scripts in the `bin/` direct
 ```
 bin/
 ├── lib/                          # Shared library functions
-│   ├── build_helpers.sh         # Build and dependency functions
-│   ├── cleanup_helpers.sh       # Container cleanup functions
-│   ├── docker_runtime.sh        # Docker/Podman detection
-│   ├── stack_helpers.sh         # Stack management helpers
-│   └── static_helpers.sh        # Static content sync
+│   ├── build-helpers.sh         # Build and dependency functions
+│   ├── cleanup-helpers.sh       # Container cleanup functions
+│   ├── docker-runtime.sh        # Docker/Podman detection
+│   ├── stack-helpers.sh         # Stack management helpers
+│   └── static-helpers.sh        # Static content sync
 ├── python/                       # Python utility scripts
 │   └── validate_and_seed.py    # Database validation/seeding
 ├── maintenance/                  # One-time/legacy scripts
@@ -98,7 +98,7 @@ bin/
 
 ```bash
 # In other scripts
-source "${SCRIPT_DIR}/lib/build_helpers.sh"
+source "${SCRIPT_DIR}/lib/build-helpers.sh"
 prepare_dependencies
 run_frontend_builds
 ```

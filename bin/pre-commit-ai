@@ -1,214 +1,569 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pre-commit hook: busca inconsistencias generales en archivos modificados
-# Analiza: pronto-static, pronto-api, pronto-employees, pronto-client
+usage() {
+  cat <<'USAGE'
+Usage:
+  pre-commit-ai [--repo NAME] [--staged|--changed|--files CSV] [--mode warn|enforce]
+                [--timeout-seconds N] [--report PATH] [--self-test]
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "$REPO_ROOT"
+Options:
+  --repo NAME            Target repo profile (auto-detected if omitted)
+  --staged               Use staged files (default when no source is provided)
+  --changed              Use changed files vs origin/main...HEAD
+  --files CSV            Use explicit comma-separated file list
+  --mode MODE            warn|enforce (default: warn)
+  --timeout-seconds N    Timeout per check in seconds (default: env PRONTO_TIMEOUT_SECONDS or 30)
+  --report PATH          Write report to path
+  --self-test            Validate gate configuration and check registry
+  -h, --help             Show this help
 
-STAGED_FILES="$(git diff --cached --name-only)"
-
-[ -z "$STAGED_FILES" ] && echo "No hay archivos staged" && exit 0
-
-INIT_SEED_REVIEW_SCRIPT=""
-if [[ -x "$REPO_ROOT/pronto-scripts/bin/pronto-init-seed-review.sh" ]]; then
-  INIT_SEED_REVIEW_SCRIPT="$REPO_ROOT/pronto-scripts/bin/pronto-init-seed-review.sh"
-elif [[ -x "$REPO_ROOT/bin/pronto-init-seed-review.sh" ]]; then
-  INIT_SEED_REVIEW_SCRIPT="$REPO_ROOT/bin/pronto-init-seed-review.sh"
-fi
-
-if [[ -n "$INIT_SEED_REVIEW_SCRIPT" ]]; then
-  "$INIT_SEED_REVIEW_SCRIPT"
-fi
-
-OUT_DIR="docs/change-logs/PRECOMMIT-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$OUT_DIR"
-
-INCONSISTENCIES=""
-WARNINGS=""
-
-add_inconsistencia() {
-  INCONSISTENCIES="${INCONSISTENCIES}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
+Exit codes:
+  0 = APPROVED
+  1 = REJECTED
+  2 = WARNINGS
+USAGE
 }
 
-add_warning() {
-  WARNINGS="${WARNINGS}- $1\n  ARCHIVO: $2\n  EVIDENCIA: $3\n\n"
+trim_lines() {
+  sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | sed '/^$/d'
 }
 
-echo "Analizando archivos modificados..."
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
 
-# Archivos modificados en cada proyecto
-STATIC_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-static/" || true)
-API_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-api/" || true)
-EMPLOYEES_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-employees/" || true)
-CLIENT_FILES=$(echo "$STAGED_FILES" | grep -E "^pronto-client/" || true)
+discover_roots() {
+  REPO_GIT_ROOT="$(git rev-parse --show-toplevel)"
 
-# ==================== PRONTO-API ====================
-if [ -n "$API_FILES" ]; then
-  echo "  Revisando pronto-api..."
-  
-  for f in $API_FILES; do
-    [ -f "$f" ] || continue
-    
-    # Flask session prohibido
-    if rg -q "flask\.session" "$f" 2>/dev/null; then
-      add_inconsistencia "flask.session usado (solo JWT permitido)" "$f" "$(rg -n "flask\.session" "$f" | head -2)"
-    fi
-    
-    # Secretos hardcodeados
-    if rg -q "api_key.*=.*['\"][a-zA-Z0-9]{8,}['\"]" "$f" 2>/dev/null; then
-      add_inconsistencia "api_key hardcodeado" "$f" "$(rg -n "api_key.*=.*['\"]" "$f" | head -2)"
-    fi
-    if rg -q "password.*=.*['\"][^'\"]+['\"]" "$f" 2>/dev/null | grep -v "os\.getenv\|os\.environ\|secret_service\|get_secret" | grep -v "# "; then
-      add_inconsistencia "password hardcodeado" "$f" "$(rg -n "password.*=.*['\"]" "$f" | grep -v "os\.getenv\|os\.environ\|secret_service\|get_secret" | head -2)"
-    fi
-    
-    # Imports duplicados de pronto-libs
-    if rg -q "^from pronto_shared\.services\.(\w+) import" "$f" 2>/dev/null; then
-      # Verificar si hay lógica duplicada
-      :
-    fi
-  done
-fi
-
-# ==================== PRONTO-EMPLOYEES ====================
-if [ -n "$EMPLOYEES_FILES" ]; then
-  echo "  Revisando pronto-employees..."
-  
-  for f in $EMPLOYEES_FILES; do
-    [ -f "$f" ] || continue
-    
-    # Flask session prohibido
-    if rg -q "flask\.session" "$f" 2>/dev/null; then
-      add_inconsistencia "flask.session usado (solo JWT permitido)" "$f" "$(rg -n "flask\.session" "$f" | head -2)"
-    fi
-    
-    # Static local prohibido
-    if rg -q "static_folder|static_url_path" "$f" 2>/dev/null; then
-      add_inconsistencia "static local configurado (debe usar pronto-static)" "$f" "$(rg -n "static_folder|static_url_path" "$f" | head -2)"
-    fi
-    
-    # Templates deben estar en templates/<rol>/
-    if [[ "$f" =~ \.html$ ]] && [[ ! "$f" =~ templates/(waiter|chef|cashier|admin|system)/ ]]; then
-      add_inconsistencia "template fuera de templates/<rol>/" "$f" "$f"
-    fi
-    
-    # Secretos hardcodeados
-    if rg -q "api_key.*=.*['\"][a-zA-Z0-9]{8,}['\"]" "$f" 2>/dev/null; then
-      add_inconsistencia "api_key hardcodeado" "$f" "$(rg -n "api_key.*=.*['\"]" "$f" | head -2)"
-    fi
-  done
-fi
-
-# ==================== PRONTO-CLIENT ====================
-if [ -n "$CLIENT_FILES" ]; then
-  echo "  Revisando pronto-client..."
-  
-  for f in $CLIENT_FILES; do
-    [ -f "$f" ] || continue
-    
-    # Static local prohibido
-    if rg -q "static_folder|static_url_path" "$f" 2>/dev/null; then
-      add_inconsistencia "static local configurado (debe usar pronto-static)" "$f" "$(rg -n "static_folder|static_url_path" "$f" | head -2)"
-    fi
-    
-    # Sesión solo puede tener dining_session_id o customer_ref
-    if rg -q "session\[" "$f" 2>/dev/null; then
-      SESSION_KEYS=$(rg -n "session\[(['\"])[^'\"]+['\"]\]" "$f" 2>/dev/null | sed 's/.*session\[\([^\]*\)\].*/\1/' | sort -u)
-      for key in $SESSION_KEYS; do
-        if [[ "$key" != "dining_session_id" ]] && [[ "$key" != "customer_ref" ]]; then
-          add_inconsistencia "clave de sesión no permitida: $key" "$f" "solo dining_session_id, customer_ref"
-        fi
-      done
-    fi
-  done
-fi
-
-# ==================== PRONTO-STATIC ====================
-if [ -n "$STATIC_FILES" ]; then
-  echo "  Revisando pronto-static..."
-  
-  for f in $STATIC_FILES; do
-    [ -f "$f" ] || continue
-    
-    # No JS vanilla en employees/client
-    if [[ "$f" =~ employees/ ]] || [[ "$f" =~ clients/ ]]; then
-      if [[ "$f" =~ \.js$ ]] && [[ ! "$f" =~ clientsvue/ ]]; then
-        add_inconsistencia "JS vanilla en employees/clients (usar Vue)" "$f" "$f"
-      fi
-    fi
-    
-    # No inline JS en HTML
-    if [[ "$f" =~ \.html$ ]] && rg -q "<script>" "$f" 2>/dev/null; then
-      add_inconsistencia "inline JS encontrado" "$f" "$(rg -n "<script>" "$f" | head -2)"
-    fi
-  done
-fi
-
-# ==================== GENERAL (todos los proyectos) ====================
-echo "  Revisando reglas generales..."
-
-# Roles no canónicos
-for f in $STAGED_FILES; do
-  [ -f "$f" ] || continue
-  if rg -q "admin_roles|super_roles|custom_roles|user_roles" "$f" 2>/dev/null; then
-    add_inconsistencia "rol no canónico detectado" "$f" "$(rg -n "admin_roles|super_roles|custom_roles|user_roles" "$f" | head -2)"
-  fi
-done
-
-# PostgreSQL 13 en docs
-for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/"); do
-  [ -f "$f" ] || continue
-  if rg -q "PostgreSQL 13|postgres:13|13-alpine" "$f" 2>/dev/null; then
-    add_inconsistencia "PostgreSQL 13 referenciado" "$f" "$(rg -n "PostgreSQL 13|postgres:13|13-alpine" "$f" | head -2)"
-  fi
-done
-
-# Docker compose modificado
-for f in $STAGED_FILES; do
-  if [[ "$f" =~ docker-compose ]] || [[ "$f" =~ Dockerfile ]]; then
-    add_inconsistencia "docker-compose/Dockerfile modificado" "$f" "requiere aprobación"
-  fi
-done
-
-# Contratos modificados
-for f in $(echo "$STAGED_FILES" | grep -E "pronto-docs/contracts|pronto-ai/" || true); do
-  if [ "${PRONTO_ALLOW_CONTRACT_CHANGES:-}" = "1" ]; then
-    add_warning "contrato modificado (permitido por PRONTO_ALLOW_CONTRACT_CHANGES=1)" "$f" "verificar impacto en consumers"
+  if [ -d "$REPO_GIT_ROOT/pronto-scripts/bin" ]; then
+    WORKSPACE_ROOT="$REPO_GIT_ROOT"
+  elif [ -d "$(dirname "$REPO_GIT_ROOT")/pronto-scripts/bin" ]; then
+    WORKSPACE_ROOT="$(dirname "$REPO_GIT_ROOT")"
   else
-    add_inconsistencia "contrato modificado" "$f" "set PRONTO_ALLOW_CONTRACT_CHANGES=1 si fue aprobado explicitamente"
+    WORKSPACE_ROOT="$REPO_GIT_ROOT"
   fi
-done
+}
 
-echo ""
-
-# ==================== REPORTE ====================
-{
-  echo "# Pre-commit Audit"
-  echo "Fecha: $(date)"
-  echo ""
-  echo "Archivos staged:"
-  echo "$STAGED_FILES" | head -20
-  echo ""
-
-  if [ -n "$WARNINGS" ]; then
-    echo "WARNINGS:"
-    echo ""
-    echo -e "$WARNINGS"
+auto_detect_repo() {
+  if [ -n "$TARGET_REPO" ]; then
+    return
   fi
 
-  if [ -n "$INCONSISTENCIES" ]; then
-    echo "INCONSISTENCIAS DETECTADAS:"
-    echo ""
-    echo -e "$INCONSISTENCIES"
-    echo "Corrige antes de hacer commit."
-    echo -e "$INCONSISTENCIES" > "$OUT_DIR/inconsistencies.md"
+  local root_name
+  root_name="$(basename "$REPO_GIT_ROOT")"
+  case "$root_name" in
+    pronto-api|pronto-client|pronto-employees|pronto-static|pronto-libs|pronto-scripts|pronto-tests)
+      TARGET_REPO="$root_name"
+      ;;
+    *)
+      TARGET_REPO=""
+      ;;
+  esac
+}
+
+prefix_repo_if_needed() {
+  local input_files="$1"
+
+  if [ -z "$input_files" ]; then
+    return
+  fi
+
+  if [ "$REPO_GIT_ROOT" = "$WORKSPACE_ROOT" ]; then
+    printf '%s\n' "$input_files"
+  else
+    printf '%s\n' "$input_files" | sed "s#^#${TARGET_REPO}/#"
+  fi
+}
+
+collect_staged_files() {
+  local raw prefixed
+  raw="$(git -C "$REPO_GIT_ROOT" diff --cached --name-only --diff-filter=ACM || true)"
+  prefixed="$(prefix_repo_if_needed "$raw")"
+
+  if [ -n "$TARGET_REPO" ] && [ "$REPO_GIT_ROOT" = "$WORKSPACE_ROOT" ]; then
+    prefixed="$(printf '%s\n' "$prefixed" | grep -E "^${TARGET_REPO}/" || true)"
+  fi
+
+  printf '%s\n' "$prefixed" | trim_lines
+}
+
+collect_changed_files() {
+  local raw prefixed
+  raw="$(git -C "$REPO_GIT_ROOT" diff --name-only origin/main...HEAD 2>/dev/null || true)"
+  if [ -z "$raw" ]; then
+    raw="$(git -C "$REPO_GIT_ROOT" diff --name-only HEAD~1...HEAD 2>/dev/null || true)"
+  fi
+
+  prefixed="$(prefix_repo_if_needed "$raw")"
+
+  if [ -n "$TARGET_REPO" ] && [ "$REPO_GIT_ROOT" = "$WORKSPACE_ROOT" ]; then
+    prefixed="$(printf '%s\n' "$prefixed" | grep -E "^${TARGET_REPO}/" || true)"
+  fi
+
+  printf '%s\n' "$prefixed" | trim_lines
+}
+
+collect_explicit_files() {
+  if [ -z "$FILES_CSV" ]; then
+    return
+  fi
+  printf '%s' "$FILES_CSV" | tr ',' '\n' | trim_lines
+}
+
+append_files() {
+  local incoming="$1"
+  if [ -z "$incoming" ]; then
+    return
+  fi
+
+  TARGET_FILES="$(
+    printf '%s\n%s\n' "$TARGET_FILES" "$incoming" |
+      trim_lines |
+      awk '!seen[$0]++'
+  )"
+}
+
+has_repo_changes() {
+  if [ -z "$TARGET_FILES" ]; then
+    return 1
+  fi
+
+  if has_cmd rg; then
+    printf '%s\n' "$TARGET_FILES" | rg -q "^${TARGET_REPO}/"
+  else
+    printf '%s\n' "$TARGET_FILES" | grep -qE "^${TARGET_REPO}/"
+  fi
+}
+
+parse_inline_csv_from_line() {
+  local line="$1"
+  printf '%s\n' "$line" |
+    sed -E 's/.*\[(.*)\].*/\1/' |
+    tr ',' '\n' |
+    trim_lines
+}
+
+load_config() {
+  GATE_CONFIG="$WORKSPACE_ROOT/pronto-scripts/config/gate-profiles.yml"
+  if [ ! -f "$GATE_CONFIG" ]; then
+    echo "ERROR: gate config missing: $GATE_CONFIG"
     exit 1
   fi
-  
-  echo "OK: sin inconsistencias detectadas"
-} > "$OUT_DIR/result.md"
 
-cat "$OUT_DIR/result.md"
+  GATE_VERSION="$(awk -F: '/^version:/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' "$GATE_CONFIG")"
+
+  local core_line
+  core_line="$(awk '/^core_checks:/ {print; exit}' "$GATE_CONFIG")"
+  CORE_CHECKS="$(parse_inline_csv_from_line "$core_line")"
+
+  PROFILE_CHECKS=""
+  if [ -n "$TARGET_REPO" ]; then
+    local profile_line
+    profile_line="$(awk -v repo="$TARGET_REPO" '
+      $0 ~ "^[[:space:]]*" repo ":[[:space:]]*$" {in_repo=1; next}
+      in_repo && $0 ~ "^[[:space:]]*checks:[[:space:]]*\\[" {print; exit}
+      in_repo && $0 ~ "^[[:space:]]*[a-zA-Z0-9_-]+:[[:space:]]*$" {in_repo=0}
+    ' "$GATE_CONFIG")"
+
+    if [ -n "$profile_line" ]; then
+      PROFILE_CHECKS="$(parse_inline_csv_from_line "$profile_line")"
+    fi
+  fi
+
+  CHECKS_TO_RUN="$(printf '%s\n%s\n' "$CORE_CHECKS" "$PROFILE_CHECKS" | trim_lines | awk '!seen[$0]++')"
+}
+
+is_known_check() {
+  case "$1" in
+    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+mark_pass() {
+  PASSES=$((PASSES + 1))
+  PASS_LINES+="- [PASS] $1\n"
+}
+
+mark_warn() {
+  WARNS=$((WARNS + 1))
+  WARN_LINES+="- [WARN] $1\n"
+}
+
+mark_fail() {
+  FAILS=$((FAILS + 1))
+  FAIL_LINES+="- [FAIL] $1\n"
+}
+
+run_timed_capture() {
+  local out_file="$1"
+  shift
+
+  if has_cmd timeout; then
+    timeout "$TIMEOUT_SECONDS" "$@" >"$out_file" 2>&1
+  elif has_cmd gtimeout; then
+    gtimeout "$TIMEOUT_SECONDS" "$@" >"$out_file" 2>&1
+  else
+    "$@" >"$out_file" 2>&1
+  fi
+}
+
+classify_failure() {
+  local check_name="$1"
+  local reason="$2"
+  local hard_block="$3"
+
+  if [ "$hard_block" = "1" ]; then
+    mark_fail "$check_name -> $reason"
+    return
+  fi
+
+  if [ "$MODE" = "enforce" ] || [ "$GATE_CONTEXT" = "ci" ]; then
+    mark_fail "$check_name -> $reason"
+  else
+    mark_warn "$check_name -> $reason"
+  fi
+}
+
+run_check() {
+  local check_name="$1"
+  local hard_block="$2"
+  local out_file rc output
+  out_file="$(mktemp)"
+
+  case "$check_name" in
+    staged_artifacts)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-staged-artifacts" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    file_naming)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-file-naming-check" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    mypy)
+      if [ "$ENABLE_TYPES" != "1" ]; then
+        echo "types disabled (PRONTO_ENABLE_TYPES=0)" >"$out_file"
+        rc=0
+      elif ! has_cmd mypy; then
+        echo "mypy not found" >"$out_file"
+        rc=1
+      else
+        local repo_dir="$WORKSPACE_ROOT/$TARGET_REPO"
+        if [ -d "$repo_dir/src" ]; then
+          set +e
+          run_timed_capture "$out_file" bash -lc "cd '$repo_dir' && mypy --ignore-missing-imports src"
+          rc=$?
+          set -e
+        else
+          set +e
+          run_timed_capture "$out_file" bash -lc "cd '$repo_dir' && mypy --ignore-missing-imports ."
+          rc=$?
+          set -e
+        fi
+      fi
+      ;;
+    tsc_no_emit)
+      local repo_dir="$WORKSPACE_ROOT/$TARGET_REPO"
+      if [ "$ENABLE_TYPES" != "1" ]; then
+        echo "types disabled (PRONTO_ENABLE_TYPES=0)" >"$out_file"
+        rc=0
+      elif [ ! -f "$repo_dir/tsconfig.json" ]; then
+        echo "tsconfig.json not found (skip)" >"$out_file"
+        rc=0
+      elif ! has_cmd npx; then
+        echo "npx not found" >"$out_file"
+        rc=1
+      else
+        set +e
+        run_timed_capture "$out_file" bash -lc "cd '$repo_dir' && npx tsc --noEmit"
+        rc=$?
+        set -e
+      fi
+      ;;
+    api_auth_policy)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-api-auth-policy" --workspace-root "$WORKSPACE_ROOT" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    assets_policy)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-assets-policy" --workspace-root "$WORKSPACE_ROOT" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    *)
+      echo "Unknown check: $check_name" >"$out_file"
+      rc=1
+      ;;
+  esac
+
+  output="$(cat "$out_file")"
+  rm -f "$out_file"
+
+  if [ "$rc" -eq 0 ]; then
+    mark_pass "$check_name"
+    if [ -n "$output" ]; then
+      printf '%s\n' "$output"
+    fi
+    return
+  fi
+
+  if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ] || [ "$rc" -eq 143 ]; then
+    classify_failure "$check_name" "timeout(${TIMEOUT_SECONDS}s)" "$hard_block"
+    if [ -n "$output" ]; then
+      printf '%s\n' "$output"
+    fi
+    return
+  fi
+
+  classify_failure "$check_name" "failed" "$hard_block"
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output"
+  fi
+  return
+}
+
+run_self_test() {
+  local all_checks profile_checks
+
+  if [ ! -f "$GATE_CONFIG" ]; then
+    mark_fail "self-test -> missing gate config"
+    return
+  fi
+
+  if [ "$GATE_VERSION" != "1" ]; then
+    mark_fail "self-test -> unsupported version: ${GATE_VERSION:-empty}"
+    return
+  fi
+
+  if [ ! -x "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-staged-artifacts" ]; then
+    mark_fail "self-test -> pronto-check-staged-artifacts missing"
+    return
+  fi
+
+  if [ ! -x "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-api-auth-policy" ]; then
+    mark_fail "self-test -> pronto-check-api-auth-policy missing"
+    return
+  fi
+
+  if [ ! -x "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-assets-policy" ]; then
+    mark_fail "self-test -> pronto-check-assets-policy missing"
+    return
+  fi
+
+  profile_checks="$(awk '/checks:/ {print}' "$GATE_CONFIG" | sed -E 's/.*\[(.*)\].*/\1/' | tr ',' '\n' | trim_lines)"
+  all_checks="$(printf '%s\n%s\n' "$CORE_CHECKS" "$profile_checks" | trim_lines | awk '!seen[$0]++')"
+
+  while IFS= read -r check_name; do
+    [ -z "$check_name" ] && continue
+    if ! is_known_check "$check_name"; then
+      mark_fail "self-test -> unknown check in config: $check_name"
+      return
+    fi
+  done <<< "$all_checks"
+
+  mark_pass "self-test"
+}
+
+emit_report() {
+  local status
+  if [ "$FAILS" -gt 0 ]; then
+    status="REJECTED"
+  elif [ "$WARNS" -gt 0 ]; then
+    status="WARNINGS"
+  else
+    status="APPROVED"
+  fi
+
+  REPORT_CONTENT="STATUS: $status
+REPO: ${TARGET_REPO:-n/a}
+MODE: $MODE
+CONTEXT: $GATE_CONTEXT
+CHECKS_TOTAL: $TOTAL_CHECKS
+CHECKS_FAILED: $FAILS
+CHECKS_WARN: $WARNS
+CHECKS_PASS: $PASSES
+
+PASS:
+${PASS_LINES:-}
+WARN:
+${WARN_LINES:-}
+FAIL:
+${FAIL_LINES:-}
+"
+
+  printf '%b\n' "$REPORT_CONTENT"
+
+  if [ -n "$REPORT_PATH" ]; then
+    mkdir -p "$(dirname "$REPORT_PATH")"
+    printf '%b\n' "$REPORT_CONTENT" > "$REPORT_PATH"
+  fi
+}
+
+TARGET_REPO=""
+USE_STAGED=0
+USE_CHANGED=0
+FILES_CSV=""
+MODE="${PRONTO_GATE_MODE:-warn}"
+TIMEOUT_SECONDS="${PRONTO_TIMEOUT_SECONDS:-30}"
+REPORT_PATH=""
+SELF_TEST=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo)
+      TARGET_REPO="${2:-}"
+      shift 2
+      ;;
+    --staged)
+      USE_STAGED=1
+      shift
+      ;;
+    --changed)
+      USE_CHANGED=1
+      shift
+      ;;
+    --files)
+      FILES_CSV="${2:-}"
+      shift 2
+      ;;
+    --mode)
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --timeout-seconds)
+      TIMEOUT_SECONDS="${2:-}"
+      shift 2
+      ;;
+    --report)
+      REPORT_PATH="${2:-}"
+      shift 2
+      ;;
+    --self-test)
+      SELF_TEST=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$MODE" != "warn" ] && [ "$MODE" != "enforce" ]; then
+  echo "ERROR: --mode must be warn or enforce"
+  exit 1
+fi
+
+if ! [[ "$TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$TIMEOUT_SECONDS" -lt 1 ]; then
+  echo "ERROR: --timeout-seconds must be a positive integer"
+  exit 1
+fi
+
+GATE_CONTEXT="${PRONTO_GATE_CONTEXT:-local}"
+ENABLE_TYPES="${PRONTO_ENABLE_TYPES:-0}"
+
+if [ "$USE_STAGED" -eq 0 ] && [ "$USE_CHANGED" -eq 0 ] && [ -z "$FILES_CSV" ] && [ "$SELF_TEST" -eq 0 ]; then
+  USE_STAGED=1
+fi
+
+discover_roots
+auto_detect_repo
+load_config
+
+PASSES=0
+WARNS=0
+FAILS=0
+PASS_LINES=""
+WARN_LINES=""
+FAIL_LINES=""
+TOTAL_CHECKS=0
+
+if [ "$SELF_TEST" -eq 1 ]; then
+  run_self_test
+  TOTAL_CHECKS=1
+  emit_report
+  if [ "$FAILS" -gt 0 ]; then
+    exit 1
+  fi
+  if [ "$WARNS" -gt 0 ]; then
+    exit 2
+  fi
+  exit 0
+fi
+
+if [ -z "$TARGET_REPO" ]; then
+  echo "ERROR: unable to auto-detect repo, use --repo"
+  exit 1
+fi
+
+TARGET_FILES=""
+if [ "$USE_STAGED" -eq 1 ]; then
+  append_files "$(collect_staged_files)"
+fi
+if [ "$USE_CHANGED" -eq 1 ]; then
+  append_files "$(collect_changed_files)"
+fi
+if [ -n "$FILES_CSV" ]; then
+  append_files "$(collect_explicit_files)"
+fi
+
+if [ -z "$TARGET_FILES" ]; then
+  mark_pass "no matching files"
+  TOTAL_CHECKS=1
+  emit_report
+  exit 0
+fi
+
+if ! has_repo_changes; then
+  mark_pass "no files for repo profile ${TARGET_REPO}"
+  TOTAL_CHECKS=1
+  emit_report
+  exit 0
+fi
+
+TARGET_FILES_FILE="$(mktemp)"
+printf '%s\n' "$TARGET_FILES" > "$TARGET_FILES_FILE"
+trap 'rm -f "$TARGET_FILES_FILE"' EXIT
+
+while IFS= read -r check_name; do
+  [ -z "$check_name" ] && continue
+  TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+  if ! is_known_check "$check_name"; then
+    mark_fail "$check_name -> unknown check"
+    continue
+  fi
+
+  hard_block=0
+  if [ "$check_name" = "staged_artifacts" ] || [ "$check_name" = "file_naming" ]; then
+    hard_block=1
+  fi
+
+  run_check "$check_name" "$hard_block"
+done <<< "$CHECKS_TO_RUN"
+
+emit_report
+
+if [ "$FAILS" -gt 0 ]; then
+  exit 1
+fi
+if [ "$WARNS" -gt 0 ]; then
+  exit 2
+fi
 exit 0

@@ -6,22 +6,22 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BASE_ENV_FILE="${PROJECT_ROOT}/.env"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
-LIB_FILE="${SCRIPT_DIR}/lib/stack_helpers.sh"
+LIB_FILE="${SCRIPT_DIR}/lib/stack-helpers.sh"
 LOAD_SEED=false
 WITH_STATIC=false
 WITH_STATIC_REQUESTED=false
 
-# shellcheck source=bin/lib/docker_runtime.sh
-source "${SCRIPT_DIR}/lib/docker_runtime.sh"
+# shellcheck source=bin/lib/docker-runtime.sh
+source "${SCRIPT_DIR}/lib/docker-runtime.sh"
 
-# shellcheck source=bin/lib/stack_helpers.sh
+# shellcheck source=bin/lib/stack-helpers.sh
 source "${LIB_FILE}"
 
-# shellcheck source=bin/lib/static_helpers.sh
-source "${SCRIPT_DIR}/lib/static_helpers.sh"
+# shellcheck source=bin/lib/static-helpers.sh
+source "${SCRIPT_DIR}/lib/static-helpers.sh"
 
-# shellcheck source=bin/lib/os_detect.sh
-source "${SCRIPT_DIR}/lib/os_detect.sh"
+# shellcheck source=bin/lib/os-detect.sh
+source "${SCRIPT_DIR}/lib/os-detect.sh"
 
 
 # Parse arguments

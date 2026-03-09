@@ -1,0 +1,17 @@
+version: 1
+core_checks: [staged_artifacts, file_naming]
+profiles:
+  pronto-api:
+    checks: [api_auth_policy, mypy]
+  pronto-client:
+    checks: [mypy]
+  pronto-employees:
+    checks: [mypy]
+  pronto-static:
+    checks: [assets_policy, tsc_no_emit]
+  pronto-libs:
+    checks: [mypy]
+  pronto-scripts:
+    checks: [mypy]
+  pronto-tests:
+    checks: [assets_policy]

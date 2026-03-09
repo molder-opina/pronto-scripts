@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WORKSPACE_ROOT=""
+TARGET_REPO=""
+FILES_FILE=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --workspace-root)
+      WORKSPACE_ROOT="${2:-}"
+      shift 2
+      ;;
+    --repo)
+      TARGET_REPO="${2:-}"
+      shift 2
+      ;;
+    --files-file)
+      FILES_FILE="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$WORKSPACE_ROOT" ] || [ -z "$TARGET_REPO" ] || [ -z "$FILES_FILE" ]; then
+  echo "Missing required args: --workspace-root --repo --files-file" >&2
+  exit 2
+fi
+
+if [ ! -f "$FILES_FILE" ]; then
+  echo "Files list not found: $FILES_FILE" >&2
+  exit 2
+fi
+
+PY_FILES="$(grep -E "^${TARGET_REPO}/.*\.py$" "$FILES_FILE" || true)"
+if [ -z "$PY_FILES" ]; then
+  echo "api_auth_policy: no changed python files"
+  exit 0
+fi
+
+MATCHES=""
+while IFS= read -r relative_path; do
+  [ -z "$relative_path" ] && continue
+  absolute_path="$WORKSPACE_ROOT/$relative_path"
+  [ -f "$absolute_path" ] || continue
+
+  hit="$(rg -n 'flask\.session|\bsession\[' "$absolute_path" || true)"
+  if [ -n "$hit" ]; then
+    MATCHES+="$hit"$'\n'
+  fi
+done <<< "$PY_FILES"
+
+if [ -n "$MATCHES" ]; then
+  printf '%s\n' "$MATCHES"
+  exit 1
+fi
+
+echo "api_auth_policy: PASS"
+exit 0

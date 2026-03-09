@@ -150,12 +150,12 @@ bin/
 
 | Library | Purpose |
 |---------|---------|
-| `build_helpers.sh` | Build and dependency preparation (TS, Python wheels) |
-| `cleanup_helpers.sh` | Container and image removal functions |
-| `docker_runtime.sh` | Docker/Podman runtime abstraction |
-| `os_detect.sh` | Operating system detection |
-| `stack_helpers.sh` | Stack management and service discovery |
-| `static_helpers.sh` | Static content sync and validation |
+| `build-helpers.sh` | Build and dependency preparation (TS, Python wheels) |
+| `cleanup-helpers.sh` | Container and image removal functions |
+| `docker-runtime.sh` | Docker/Podman runtime abstraction |
+| `os-detect.sh` | Operating system detection |
+| `stack-helpers.sh` | Stack management and service discovery |
+| `static-helpers.sh` | Static content sync and validation |
 
 ### Database Scripts
 
@@ -171,11 +171,11 @@ bin/
 
 | Script | Purpose |
 |--------|---------|
-| `check-employees.py` | Verify employee records |
-| `clean-orders.py` | Clean order data |
-| `create-test-data.py` | Generate test data |
+| `check_employees.py` | Verify employee records |
+| `clean_orders.py` | Clean order data |
+| `create_test_data.py` | Generate test data |
 | `fix-*.py` | Various data fixes |
-| `validate-database.py` | Database validation |
+| `validate_database.py` | Database validation |
 
 ### Typical Workflows
 
@@ -487,19 +487,19 @@ The project includes 15 specialized automated agents that verify code quality:
 |-------|---------|--------|
 | `developer.sh` | General development | TODOs, print(), static asset variables |
 | `designer.sh` | Design quality | Images >1MB, CSS !important, missing alt tags |
-| `db_specialist.sh` | Database | Migration naming, destructive SQL warnings |
+| `db-specialist.sh` | Database | Migration naming, destructive SQL warnings |
 | `sysadmin.sh` | System security | .env files, Dockerfile USER, shell shebangs |
-| `qa_tester.sh` | Test quality | Focused tests (.only, fit, fdescribe) |
+| `qa-tester.sh` | Test quality | Focused tests (.only, fit, fdescribe) |
 | `scribe.sh` | Documentation | TODO markers, critical files |
-| `container_specialist.sh` | Docker | latest tags, apt-get cleanup, HEALTHCHECK |
-| `business_expert.sh` | Domain | Key terms, currency formatting |
-| `waiter_agent.sh` | Waiter module | Templates, table assignment |
-| `admin_agent.sh` | Admin module | Admin modules, permissions |
-| `cashier_agent.sh` | Cashier module | Payment modules, providers |
-| `chef_agent.sh` | Chef module | KDS, order state transitions |
+| `container-specialist.sh` | Docker | latest tags, apt-get cleanup, HEALTHCHECK |
+| `business-expert.sh` | Domain | Key terms, currency formatting |
+| `waiter-agent.sh` | Waiter module | Templates, table assignment |
+| `admin-agent.sh` | Admin module | Admin modules, permissions |
+| `cashier-agent.sh` | Cashier module | Payment modules, providers |
+| `chef-agent.sh` | Chef module | KDS, order state transitions |
 | `system_agent.sh` | Security | Global security, ScopeGuard |
-| `deployment_agent.sh` | Deployment | Deployment validation |
-| `audit_agent.sh` | Multi-model audit | Claude, Minimax, GLM4 review |
+| `deployment-agent.sh` | Deployment | Deployment validation |
+| `audit-agent.sh` | Multi-model audit | Claude, Minimax, GLM4 review |
 
 **Run manually:**
 
@@ -508,7 +508,7 @@ The project includes 15 specialized automated agents that verify code quality:
 pre-commit run agent-developer --all-files
 
 # Multi-model audit
-./bin/agents/audit_agent.sh --all-files
+./bin/agents/audit-agent.sh --all-files
 ```
 
 ---
@@ -865,10 +865,10 @@ pronto-scripts/
 ./bin/postgres-rebuild.sh
 
 # Apply migration
-./bin/apply_migration.sh
+./bin/apply-migration.sh
 
 # Apply migration with compose
-./bin/apply_migration_compose.sh
+./bin/apply-migration-compose.sh
 ```
 
 ### Seed & Test Data

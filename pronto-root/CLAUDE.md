@@ -208,19 +208,19 @@ The project uses specialized agents in `bin/agents/` that validate code before c
 |-------|---------|
 | `developer.sh` | TODOs, print(), static asset variables |
 | `designer.sh` | Images >1MB, CSS !important, accessibility |
-| `db_specialist.sh` | Migration naming, destructive SQL |
+| `db-specialist.sh` | Migration naming, destructive SQL |
 | `sysadmin.sh` | .env files, Dockerfile USER, shebangs |
-| `qa_tester.sh` | Focused tests (.only, fit, fdescribe) |
+| `qa-tester.sh` | Focused tests (.only, fit, fdescribe) |
 | `scribe.sh` | Documentation, TODO markers |
-| `container_specialist.sh` | Docker latest tags, cleanup, HEALTHCHECK |
-| `business_expert.sh` | Domain terms, currency formatting |
-| `waiter_agent.sh` | Waiter module validation |
-| `admin_agent.sh` | Admin module, permissions |
-| `cashier_agent.sh` | Payment modules, providers |
-| `chef_agent.sh` | KDS, order state transitions |
+| `container-specialist.sh` | Docker latest tags, cleanup, HEALTHCHECK |
+| `business-expert.sh` | Domain terms, currency formatting |
+| `waiter-agent.sh` | Waiter module validation |
+| `admin-agent.sh` | Admin module, permissions |
+| `cashier-agent.sh` | Payment modules, providers |
+| `chef-agent.sh` | KDS, order state transitions |
 | `system_agent.sh` | Global security, ScopeGuard |
-| `deployment_agent.sh` | Deployment validation |
-| `audit_agent.sh` | Multi-model review (Claude, Minimax, GLM4) |
+| `deployment-agent.sh` | Deployment validation |
+| `audit-agent.sh` | Multi-model review (Claude, Minimax, GLM4) |
 
 Run manually: `./bin/agents/developer.sh` or `pre-commit run agent-developer --all-files`
 

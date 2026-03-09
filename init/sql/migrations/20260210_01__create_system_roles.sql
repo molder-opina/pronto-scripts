@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.pronto_system_permissions (
 CREATE TABLE IF NOT EXISTS public.pronto_role_permission_bindings (
     role_id INTEGER NOT NULL REFERENCES pronto_system_roles(id),
     permission_id INTEGER NOT NULL REFERENCES pronto_system_permissions(id),
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
     PRIMARY KEY (role_id, permission_id)
 );
 

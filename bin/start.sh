@@ -11,12 +11,12 @@ COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LOAD_SEED=false
 SERVICES=()
 
-# shellcheck source=bin/lib/docker_runtime.sh
-source "${SCRIPT_DIR}/lib/docker_runtime.sh"
-# shellcheck source=bin/lib/stack_helpers.sh
-source "${SCRIPT_DIR}/lib/stack_helpers.sh"
-# shellcheck source=bin/lib/static_helpers.sh
-source "${SCRIPT_DIR}/lib/static_helpers.sh"
+# shellcheck source=bin/lib/docker-runtime.sh
+source "${SCRIPT_DIR}/lib/docker-runtime.sh"
+# shellcheck source=bin/lib/stack-helpers.sh
+source "${SCRIPT_DIR}/lib/stack-helpers.sh"
+# shellcheck source=bin/lib/static-helpers.sh
+source "${SCRIPT_DIR}/lib/static-helpers.sh"
 
 show_usage() {
   cat <<EOF

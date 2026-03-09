@@ -146,28 +146,53 @@ Violación a cualquiera ⇒ **REJECTED**.
 
 Reglas obligatorias para todo el monorepo. Violación ⇒ **REJECTED**.
 
-1. **Directorios**: Siempre `kebab-case` (ej: `pronto-static`, `shared-utils`).
+1. **Directorios**:
+   - Directorios funcionales del monorepo: siempre `kebab-case` (ej: `pronto-static`, `shared-utils`).
+   - Excepciones canónicas: paquetes Python (`pronto_api`, `pronto_clients`, `pronto_employees`, `pronto_shared`, `pronto_audit`, `api_app`), directorios dunder (`__pycache__`) y dotdirs (`.git`, `.github`, `.venv`, etc.).
+   - Directorios generados/vendor/archive conservan su naming upstream y quedan fuera de enforcement (`node_modules/`, `build/`, `dist/`, `archive/`, `archived/`, `vendor/`, `pronto-backups/**`, `pronto-logs/`, `postgres_data/`).
 2. **Python**:
-   - Archivos y paquetes: `snake_case.py` (PEP8).
+   - Archivos de código: `snake_case.py` (PEP8).
+   - Paquetes Python: `snake_case`.
+   - Excepciones canónicas exactas: `__init__.py`, `conftest.py`.
    - Clases: `PascalCase`.
    - Funciones/Variables: `snake_case`.
 3. **Vue (Frontend)**:
    - Componentes (SFC): `PascalCase.vue` (ej: `RoleCard.vue`).
    - Directorios de componentes: `kebab-case` (ej: `components/roles/`).
+   - Excepción canónica exacta permitida: `App.vue`.
 4. **TypeScript / JavaScript**:
-   - Módulos de lógica y Composables: `kebab-case.ts` (ej: `use-rbac.ts`, `session-manager.ts`).
+   - Módulos de lógica, composables, utils, helpers y tests: `kebab-case.ts|js` (ej: `use-rbac.ts`, `session-manager.ts`, `api-guard.ts`).
+   - Entrypoints/configs canónicos pueden conservar naming del ecosistema cuando aplique: `main.ts`, `main.js`, `index.ts`, `index.js`, `vite.config.ts`, `playwright.config.ts`, `vitest.config.ts`.
+   - Declaration files permitidos: `global.d.ts`, `shims-vue.d.ts`, `<kebab-case>.d.ts`.
    - Interfaces/Tipos: `PascalCase` (dentro del archivo).
 5. **Shell Scripts**:
    - Scripts shell generales: `kebab-case.sh`.
-   - Excepción en `pronto-scripts/bin/`: wrappers ejecutables canónicos pueden no usar extensión.
-6. **SQL/Backups**: `YYYYMMDD_descripción.sql` (dentro de `pronto-backups/` o `init/sql/`).
-7. **Prohibiciones**:
-   - Prohibido espacios o caracteres especiales en nombres.
+   - En `pronto-scripts/bin/` los wrappers ejecutables canónicos pueden no usar extensión, pero si usan `.sh` deben respetar `kebab-case.sh`.
+6. **HTML/CSS**:
+   - Templates SSR/Jinja: `snake_case.html`.
+   - Partials/includes SSR pueden usar prefijo `_snake_case.html`.
+   - Hojas de estilo y assets CSS/JS no generados: `kebab-case.css|js`.
+7. **Markdown / documentación**:
+   - Documentación general: `kebab-case.md`.
+   - Incidentes, errores, resolved y bitácoras fechadas: `YYYYMMDD_slug.md`.
+   - Changelogs generados pueden usar IDs canónicos: `CHG-...`, `PRECOMMIT-...`, y anexos tipo `inconsistencies.<provider>.md`.
+   - Documentos de autoridad exactos permitidos: `README.md`, `AGENTS.md`, `CHANGELOG.md`, `CLAUDE.md`, `GEMINI.md`, `DOCKER_COMPOSE.md`.
+   - Documentos operativos canónicos de tooling pueden conservar `SCREAMING_SNAKE_CASE.md` cuando el nombre ya es contrato activo del proyecto.
+8. **SQL/Backups**:
+   - Migrations/init SQL respetan su contrato de prefijos existentes (`00_bootstrap`, `0110__core_tables.sql`, `YYYYMMDD_description.sql` según carpeta).
+   - No inventar nuevos formatos fuera de esos contratos.
+9. **Tooling / configs con nombre contractual**:
+   - Se preservan nombres exactos de herramientas/ecosistema: `Dockerfile`, `Makefile`, `package.json`, `package-lock.json`, `pyproject.toml`, `poetry.lock`, `requirements.txt`, `tsconfig.json`, `pytest.ini`, `.env`, `.env.example`, `.gitignore`, `.dockerignore`, `.prettierrc`, `.eslintrc.cjs`.
+10. **Prohibiciones**:
+   - Prohibido espacios o caracteres especiales en nombres de archivos propios del proyecto.
    - Prohibido archivos de datos (`.txt`, `.cookies`, `.sql`, `.log`) en el root del proyecto.
-   - Prohibido archivos sin extensión en `pronto-scripts/bin/`, excepto wrappers canónicos aprobados por `pronto-scripts`.
+   - Prohibido introducir nuevas excepciones ad hoc fuera de este canon o del checker central.
    - Todo contexto que sea público por definición debe ubicarse en `/public`.
    - Excepción única: todo lo relacionado con autenticación debe ubicarse en `/auth`, incluso si es público.
-8. **Archivos Temporales (IA/Desarrollo)**: Todos los archivos temporales, reportes de un solo uso, capturas de pantalla o logs manuales generados por la IA o durante el desarrollo deben ubicarse exclusivamente en la carpeta `tmp/` en la raíz del proyecto. Esta regla aplica al espacio de trabajo local y no invalida las rutas de temporales internas de los contenedores.
+11. **Enforcement obligatorio**:
+   - Checker canónico: `./pronto-scripts/bin/pronto-file-naming-check`.
+   - Todo archivo nuevo debe nacer cumpliendo el canon; si un archivo legacy no puede renombrarse sin riesgo, debe quedar explícitamente cubierto por una excepción canónica del checker, nunca por improvisación local.
+12. **Archivos Temporales (IA/Desarrollo)**: Todos los archivos temporales, reportes de un solo uso, capturas de pantalla o logs manuales generados por la IA o durante el desarrollo deben ubicarse exclusivamente en la carpeta `tmp/` en la raíz del proyecto. Esta regla aplica al espacio de trabajo local y no invalida las rutas de temporales internas de los contenedores.
 
 ---
 
@@ -622,7 +647,7 @@ Fuente de verdad:
 pronto-docs/contracts/<mod>/
 Requisitos mínimos por módulo:
 openapi.yaml (si aplica)
-redis_keys.md
+redis-keys.md
 events.md
 db_schema.sql (generado con pg_dump --schema-only)
 files.md (si aplica)

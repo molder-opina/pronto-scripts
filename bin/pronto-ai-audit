@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd -P)"
+
+python_bin="${PRONTO_PYTHON:-}"
+if [ -z "$python_bin" ] && [ -x "$repo_root/pronto-libs/.venv/bin/python3" ]; then
+  python_bin="$repo_root/pronto-libs/.venv/bin/python3"
+fi
+if [ -z "$python_bin" ]; then
+  python_bin="python3"
+fi
+
+has_repo_root="0"
+for arg in "$@"; do
+  if [ "$arg" = "--repo-root" ]; then
+    has_repo_root="1"
+    break
+  fi
+done
+
+args=(run)
+if [ "$has_repo_root" = "0" ]; then
+  args+=(--repo-root "$repo_root")
+fi
+args+=("$@")
+
+exec "$python_bin" "$repo_root/pronto-scripts/lib/ai_audit_runner.py" "${args[@]}"

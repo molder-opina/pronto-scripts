@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-source "${SCRIPT_DIR}/_env_utils.sh"
+source "${SCRIPT_DIR}/env-utils.sh"
 
 NON_INTERACTIVE=false
 AUTO_CONFIRM=false
@@ -84,7 +84,7 @@ fi
 
 BACKUP_DIR=$(resolve_backup_dir init-env)
 
-bash "${SCRIPT_DIR}/01_backup_envs.sh" "$BACKUP_DIR"
+bash "${SCRIPT_DIR}/01-backup-envs.sh" "$BACKUP_DIR"
 
 APPLY_ARGS=("--yes")
 if [ -n "$GENERAL_ENV_SRC" ]; then
@@ -104,9 +104,9 @@ for pair in "${SET_VALUES[@]}"; do
  done
 
 if [ "$AUTO_CONFIRM" = true ]; then
-  bash "${SCRIPT_DIR}/02_apply_envs.sh" "${APPLY_ARGS[@]}"
+  bash "${SCRIPT_DIR}/02-apply-envs.sh" "${APPLY_ARGS[@]}"
 else
-  bash "${SCRIPT_DIR}/02_apply_envs.sh" "${APPLY_ARGS[@]/--yes/}"
+  bash "${SCRIPT_DIR}/02-apply-envs.sh" "${APPLY_ARGS[@]/--yes/}"
 fi
 
 SEED_ARGS=()
@@ -122,10 +122,10 @@ fi
 if [ "$FORCE_ROLLBACK" = true ]; then
   SEED_ARGS+=("--force-rollback")
 fi
-bash "${SCRIPT_DIR}/03_seed_params.sh" "${SEED_ARGS[@]}"
+bash "${SCRIPT_DIR}/03-seed-params.sh" "${SEED_ARGS[@]}"
 
 if [ "$SKIP_BUILD" = false ]; then
-  bash "${SCRIPT_DIR}/04_deploy.sh" "${SEED_ARGS[@]}"
+  bash "${SCRIPT_DIR}/04-deploy.sh" "${SEED_ARGS[@]}"
 fi
 
 echo "✅ Inicialización completada. Backup: ${BACKUP_DIR}"

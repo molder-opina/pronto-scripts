@@ -5,9 +5,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
-source "${SCRIPT_DIR}/_check_required_files.sh" 2>/dev/null || true
-# shellcheck source=../../bin/lib/static_helpers.sh
-source "${SCRIPT_DIR}/../lib/static_helpers.sh"
+source "${SCRIPT_DIR}/check-required-files.sh" 2>/dev/null || true
+# shellcheck source=../../bin/lib/static-helpers.sh
+source "${SCRIPT_DIR}/../lib/static-helpers.sh"
 ENV_FILE="$(mktemp -t pronto.env.XXXXXX)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 LOAD_SEED=false

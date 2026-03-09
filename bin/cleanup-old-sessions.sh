@@ -65,7 +65,7 @@ normalize_host_redis_url() {
 }
 
 run_offline_cleanup() {
-  local clean_script="${SCRIPT_DIR}/python/clean-sessions.py"
+  local clean_script="${SCRIPT_DIR}/python/clean_sessions.py"
   local offline_postgres_host
   local offline_redis_url
 

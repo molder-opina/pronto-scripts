@@ -9,10 +9,10 @@ SECRETS_FILE="${PROJECT_ROOT}/.env"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 SERVICES=()
 
-# shellcheck source=bin/lib/docker_runtime.sh
-source "${SCRIPT_DIR}/lib/docker_runtime.sh"
-# shellcheck source=bin/lib/stack_helpers.sh
-source "${SCRIPT_DIR}/lib/stack_helpers.sh"
+# shellcheck source=bin/lib/docker-runtime.sh
+source "${SCRIPT_DIR}/lib/docker-runtime.sh"
+# shellcheck source=bin/lib/stack-helpers.sh
+source "${SCRIPT_DIR}/lib/stack-helpers.sh"
 
 show_usage() {
   cat <<EOF

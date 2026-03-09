@@ -7,11 +7,11 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 ENV_FILE="${PROJECT_ROOT}/.env"
 
-source "${SCRIPT_DIR}/_check_required_files.sh" 2>/dev/null || true
+source "${SCRIPT_DIR}/check-required-files.sh" 2>/dev/null || true
 
 # Source library modules
-# shellcheck source=../../bin/lib/static_helpers.sh
-source "${SCRIPT_DIR}/../lib/static_helpers.sh"
+# shellcheck source=../../bin/lib/static-helpers.sh
+source "${SCRIPT_DIR}/../lib/static-helpers.sh"
 
 # Load environment variables
 set -a

@@ -8,7 +8,7 @@ TS="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="pronto-docs/change-logs/CHG-${TS}"
 mkdir -p "$OUT_DIR"
 
-PROMPT_FILE="pronto-scripts/prompts/inconsistency_check.md"
+PROMPT_FILE="pronto-scripts/prompts/inconsistency-check.md"
 
 fail_blocker() {
   echo "BLOCKER detectado. Ver $OUT_DIR"

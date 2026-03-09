@@ -104,10 +104,10 @@ run_check "Client API health check (localhost:${CLIENT_PORT})" "health_check \"$
 run_check "Datos seed cargados" "bash \"${PROJECT_ROOT}/bin/check-seed-status.sh\""
 
 run_check "Suite API (autenticacion y CRUD)" "bash \"${PROJECT_ROOT}/bin/test-api.sh\""
-run_check "Flujo mesero y cocina" "EMPLOYEES_PORT=\"${EMPLOYEE_PORT}\" bash \"${PROJECT_ROOT}/bin/test_waiter_kitchen.sh\""
+run_check "Flujo mesero y cocina" "EMPLOYEES_PORT=\"${EMPLOYEE_PORT}\" bash \"${PROJECT_ROOT}/bin/test-waiter-kitchen.sh\""
 run_check "Flujo propinas" "CLIENT_APP_HOST_PORT=\"${CLIENT_PORT}\" EMPLOYEE_APP_HOST_PORT=\"${EMPLOYEE_PORT}\" bash \"${PROJECT_ROOT}/bin/test-tips-flow.sh\""
 run_check "Flujo compra anonima" "bash \"${PROJECT_ROOT}/bin/test-anonymous.sh\""
-run_check "Flujo de pago completo" "EMPLOYEE_APP_HOST_PORT=\"${EMPLOYEE_PORT}\" bash \"${PROJECT_ROOT}/test_payment_flow.sh\""
+run_check "Flujo de pago completo" "EMPLOYEE_APP_HOST_PORT=\"${EMPLOYEE_PORT}\" bash \"${PROJECT_ROOT}/test-payment-flow.sh\""
 
 echo "Resumen"
 echo "----------------------------------------"

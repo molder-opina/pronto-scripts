@@ -31,8 +31,8 @@ check_opencode() {
 }
 
 run_structures_audit() {
-    local prompt_file="${PROMPTS_DIR}/structures_audit.md"
-    local output_file="pronto-docs/audits/last_structures_audit.md"
+    local prompt_file="${PROMPTS_DIR}/structures-audit.md"
+    local output_file="pronto-docs/audits/last_structures-audit.md"
 
     log_info "Iniciando auditoría de estructuras e integridad (DDL vs Modelos vs TS)..."
     

@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+import argparse
+import re
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Optional
+
+EXACT_ALLOW = {
+    'README.md', 'AGENTS.md', 'CHANGELOG.md', 'CLAUDE.md', 'GEMINI.md', 'DOCKER_COMPOSE.md',
+    'Dockerfile', 'Makefile', 'package.json', 'package-lock.json', 'pyproject.toml', 'poetry.lock',
+    'requirements.txt', 'tsconfig.json', 'pytest.ini', 'conftest.py', '__init__.py',
+    '.env', '.env.example', '.gitignore', '.dockerignore', '.prettierrc', '.eslintrc.cjs',
+    'main.ts', 'main.js', 'index.ts', 'index.js', 'vite.config.ts', 'playwright.config.ts',
+    'vitest.config.ts', 'global.d.ts', 'lucide.d.ts', 'shims-vue.d.ts', 'App.vue',
+}
+IGNORE_SEGMENTS = {
+    '.git', '.github', '.venv', 'venv', 'node_modules', 'dist', 'build', '__pycache__',
+    '.pytest_cache', '.mypy_cache', '.ruff_cache', 'vendor', 'archive', 'archived',
+    'playwright-report', 'test-results', 'reports', 'pronto-root', 'postgres_data', 'pronto-logs'
+}
+IGNORE_PREFIXES = (
+    'pronto-backups/', 'src/static_content/assets/js/', 'src/static_content/assets/css/',
+    'src/static_content/assets/images/', 'src/static_content/assets/audio/'
+)
+
+
+def repo_files(repo: str) -> list[str]:
+    try:
+        out = subprocess.check_output(['git', '-C', repo, 'ls-files'], text=True, stderr=subprocess.DEVNULL)
+        return [line.strip() for line in out.splitlines() if line.strip()]
+    except subprocess.CalledProcessError:
+        base = Path(repo)
+        items = []
+        for path in base.rglob('*'):
+            if path.is_dir():
+                continue
+            rel = path.relative_to(base).as_posix()
+            if not ignored(rel):
+                items.append(rel)
+        return items
+
+
+def staged_files(repo: str, files_file: str) -> list[str]:
+    items = []
+    prefix = f'{repo}/'
+    for raw in Path(files_file).read_text().splitlines():
+        path = raw.strip()
+        if not path:
+            continue
+        if path == repo:
+            continue
+        if path.startswith(prefix):
+            items.append(path[len(prefix):])
+    return items
+
+
+def ignored(path: str) -> bool:
+    p = PurePosixPath(path)
+    return any(seg in IGNORE_SEGMENTS for seg in p.parts) or path.startswith(IGNORE_PREFIXES)
+
+
+def valid_md(name: str) -> bool:
+    stem = name[:-3]
+    return (
+        name in EXACT_ALLOW
+        or re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*\.md', name)
+        or re.fullmatch(r'\d{8}_[a-z0-9_]+\.md', name)
+        or re.fullmatch(r'inconsistencies\.[a-z0-9-]+\.md', name)
+        or re.fullmatch(r'(CHG|PRECOMMIT)-[A-Za-z0-9._-]+', stem)
+        or re.fullmatch(r'[A-Z0-9_-]+\.md', name)
+    )
+
+
+def classify(path: str) -> Optional[str]:
+    if ignored(path):
+        return None
+    name = PurePosixPath(path).name
+    stem = name.rsplit('.', 1)[0] if '.' in name else name
+    suffix = '.' + name.rsplit('.', 1)[1] if '.' in name else ''
+    if name in EXACT_ALLOW:
+        return None
+    if name.endswith('.d.ts') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*\.d\.ts', name):
+        return None
+    if ' ' in name or re.search(r'[^A-Za-z0-9._-]', name):
+        return 'INVALID_CHARS'
+    if suffix == '.py' and re.search(r'[A-Z-]', stem):
+        return 'PY_NOT_SNAKE'
+    if suffix in {'.ts', '.js'}:
+        if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*(?:\.(spec|test))?', stem):
+            return 'TSJS_NOT_KEBAB'
+    if suffix == '.vue' and not re.fullmatch(r'[A-Z][A-Za-z0-9]*', stem):
+        return 'VUE_NOT_PASCAL'
+    if suffix == '.sh' and not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', stem):
+        return 'SH_NOT_KEBAB'
+    if suffix == '.html' and not re.fullmatch(r'_?[a-z0-9]+(?:_[a-z0-9]+)*', stem):
+        return 'HTML_NOT_SNAKE'
+    if suffix == '.css' and not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', stem):
+        return 'CSS_NOT_KEBAB'
+    if suffix == '.md' and not valid_md(name):
+        return 'MD_NOT_ALLOWED'
+    return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--repo', required=True)
+    parser.add_argument('--files-file')
+    parser.add_argument('--report', action='store_true')
+    args = parser.parse_args()
+
+    files = staged_files(args.repo, args.files_file) if args.files_file else repo_files(args.repo)
+    violations = [(kind, path) for path in files if (kind := classify(path))]
+
+    if violations:
+        print(f'FILE_NAMING_VIOLATIONS {len(violations)}')
+        for kind, path in violations:
+            print(f'{kind} {args.repo}/{path}')
+        return 0 if args.report else 1
+
+    print(f'FILE_NAMING_OK {args.repo}')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+

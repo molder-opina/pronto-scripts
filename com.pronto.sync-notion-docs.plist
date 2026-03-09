@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.pronto.sync-notion-docs</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/molder/projects/github-molder/pronto/pronto-scripts/bin/sync-pronto-docs-notion.py</string>
+        <string>--docs-root</string>
+        <string>/Users/molder/projects/github-molder/pronto/pronto-docs</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <integer>86400</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/tmp/pronto-sync-notion.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/pronto-sync-notion-error.log</string>
+</dict>
+</plist>

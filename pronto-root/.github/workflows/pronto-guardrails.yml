@@ -1,0 +1,110 @@
+name: PRONTO Guardrails
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  guardrails-static:
+    name: guardrails-static
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: [pronto-api, pronto-client, pronto-employees, pronto-static]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Gate Self-Test
+        run: bash pronto-scripts/bin/pre-commit-ai --self-test
+
+      - name: Run Guardrails (${{ matrix.repo }})
+        env:
+          PRONTO_GATE_CONTEXT: ci
+          PRONTO_ENABLE_TYPES: '0'
+        run: |
+          bash pronto-scripts/bin/pre-commit-ai \
+            --repo "${{ matrix.repo }}" \
+            --changed \
+            --mode enforce \
+            --timeout-seconds 30
+
+  smoke-critical:
+    name: smoke-critical
+    runs-on: ubuntu-latest
+    needs: guardrails-static
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install smoke test dependencies
+        run: |
+          cd pronto-tests
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start stack
+        run: |
+          docker compose --profile apps up -d
+
+      - name: Wait for services
+        run: |
+          for url in http://127.0.0.1:6080/ http://127.0.0.1:6081/health http://127.0.0.1:6082/api/public/config; do
+            echo "waiting for $url"
+            for i in {1..40}; do
+              if curl -fsS "$url" >/dev/null; then
+                break
+              fi
+              sleep 3
+              if [ "$i" -eq 40 ]; then
+                echo "Service not ready: $url"
+                docker compose ps
+                docker compose logs --tail=200
+                exit 1
+              fi
+            done
+          done
+
+      - name: Run smoke-critical
+        env:
+          API_URL: http://127.0.0.1:6082
+          CLIENT_URL: http://127.0.0.1:6080
+          EMPLOYEES_URL: http://127.0.0.1:6081
+        run: |
+          cd pronto-tests
+          npm run test:smoke-critical
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-critical-report
+          path: |
+            pronto-tests/playwright-report
+            pronto-tests/test-results
+
+      - name: Stop stack
+        if: always()
+        run: |
+          docker compose down -v

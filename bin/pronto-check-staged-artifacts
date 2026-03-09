@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_FILTER=""
+FILES_FILE=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo)
+      REPO_FILTER="${2:-}"
+      shift 2
+      ;;
+    --files-file)
+      FILES_FILE="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -n "$FILES_FILE" ]; then
+  if [ ! -f "$FILES_FILE" ]; then
+    echo "files file not found: $FILES_FILE" >&2
+    exit 2
+  fi
+  FILES_CONTENT="$(cat "$FILES_FILE")"
+else
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  cd "$REPO_ROOT"
+  FILES_CONTENT="$(git diff --cached --name-only --diff-filter=ACM || true)"
+fi
+
+if [ -z "$FILES_CONTENT" ]; then
+  echo "CHECK staged-artifacts: PASS (no candidate files)"
+  exit 0
+fi
+
+if [ -n "$REPO_FILTER" ]; then
+  FILES_CONTENT="$(printf '%s\n' "$FILES_CONTENT" | grep -E "^${REPO_FILTER}/" || true)"
+fi
+
+if [ -z "$FILES_CONTENT" ]; then
+  echo "CHECK staged-artifacts: PASS (no candidate files for repo filter)"
+  exit 0
+fi
+
+if command -v rg >/dev/null 2>&1; then
+  MATCHES="$(printf '%s\n' "$FILES_CONTENT" | rg -n '(^|/)(node_modules|dist|build)/' || true)"
+else
+  MATCHES="$(printf '%s\n' "$FILES_CONTENT" | grep -nE '(^|/)(node_modules|dist|build)/' || true)"
+fi
+
+if [ -n "$MATCHES" ]; then
+  echo "CHECK staged-artifacts: FAIL"
+  echo "REASON: forbidden generated/dependency artifacts staged (node_modules/dist/build)"
+  printf '%s\n' "$MATCHES" | sed 's/^/ - /'
+  exit 1
+fi
+
+echo "CHECK staged-artifacts: PASS"
+exit 0

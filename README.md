@@ -70,10 +70,10 @@ pronto-scripts/
 ./bin/postgres-rebuild.sh
 
 # Apply migration
-./bin/apply_migration.sh
+./bin/apply-migration.sh
 
 # Apply migration with compose
-./bin/apply_migration_compose.sh
+./bin/apply-migration-compose.sh
 ```
 
 ### Seed & Test Data

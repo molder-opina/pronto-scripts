@@ -5,18 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Source library modules
-# shellcheck source=bin/lib/docker_runtime.sh
-source "${SCRIPT_DIR}/lib/docker_runtime.sh"
-# shellcheck source=bin/lib/stack_helpers.sh
-source "${SCRIPT_DIR}/lib/stack_helpers.sh"
-# shellcheck source=bin/lib/build_helpers.sh
-source "${SCRIPT_DIR}/lib/build_helpers.sh"
-# shellcheck source=bin/lib/cleanup_helpers.sh
-source "${SCRIPT_DIR}/lib/cleanup_helpers.sh"
-# shellcheck source=bin/lib/static_helpers.sh
-source "${SCRIPT_DIR}/lib/static_helpers.sh"
-# shellcheck source=bin/lib/os_detect.sh
-source "${SCRIPT_DIR}/lib/os_detect.sh"
+# shellcheck source=bin/lib/docker-runtime.sh
+source "${SCRIPT_DIR}/lib/docker-runtime.sh"
+# shellcheck source=bin/lib/stack-helpers.sh
+source "${SCRIPT_DIR}/lib/stack-helpers.sh"
+# shellcheck source=bin/lib/build-helpers.sh
+source "${SCRIPT_DIR}/lib/build-helpers.sh"
+# shellcheck source=bin/lib/cleanup-helpers.sh
+source "${SCRIPT_DIR}/lib/cleanup-helpers.sh"
+# shellcheck source=bin/lib/static-helpers.sh
+source "${SCRIPT_DIR}/lib/static-helpers.sh"
+# shellcheck source=bin/lib/os-detect.sh
+source "${SCRIPT_DIR}/lib/os-detect.sh"
 
 ENV_FILE="${PROJECT_ROOT}/.env"
 ENV_FILE_DOT="${ENV_FILE}"

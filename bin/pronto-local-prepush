@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  pronto-local-prepush --repo <name> [--smoke|--skip-smoke]
+
+Description:
+  Runner local para hook pre-push en PRONTO.
+  1) Ejecuta pre-commit-ai en modo enforce sobre archivos changed.
+  2) Ejecuta smoke-critical opcionalmente (controlado por flag/env).
+
+Env vars:
+  PRONTO_PREPUSH_SMOKE=1        Fuerza ejecución de smoke-critical (default: 0)
+  PRONTO_GATE_CONTEXT=local     Contexto de gate (default: local)
+
+Exit codes:
+  0 success
+  1 rejected
+USAGE
+}
+
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+info() {
+  echo "[INFO] $*"
+}
+
+TARGET_REPO=""
+SMOKE_MODE="auto"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo)
+      TARGET_REPO="${2:-}"
+      shift 2
+      ;;
+    --smoke)
+      SMOKE_MODE="on"
+      shift
+      ;;
+    --skip-smoke)
+      SMOKE_MODE="off"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "flag no reconocida: $1"
+      ;;
+  esac
+done
+
+[ -n "$TARGET_REPO" ] || fail "--repo es obligatorio"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+REPO_DIR="${WORKSPACE_ROOT}/${TARGET_REPO}"
+
+if [ ! -d "${REPO_DIR}/.git" ]; then
+  fail "repo no válido o sin .git: ${REPO_DIR}"
+fi
+
+info "Running local guardrails for ${TARGET_REPO}..."
+set +e
+(
+  cd "${REPO_DIR}"
+  PRONTO_GATE_CONTEXT="${PRONTO_GATE_CONTEXT:-local}" \
+  bash "${WORKSPACE_ROOT}/pronto-scripts/bin/pre-commit-ai" \
+    --repo "${TARGET_REPO}" \
+    --changed \
+    --mode enforce \
+    --timeout-seconds 30
+)
+gate_code=$?
+set -e
+
+if [ "$gate_code" -ne 0 ]; then
+  fail "pre-commit-ai rejected push for ${TARGET_REPO} (exit ${gate_code})"
+fi
+
+run_smoke=0
+case "$SMOKE_MODE" in
+  on) run_smoke=1 ;;
+  off) run_smoke=0 ;;
+  auto)
+    if [ "${PRONTO_PREPUSH_SMOKE:-0}" = "1" ]; then
+      run_smoke=1
+    fi
+    ;;
+esac
+
+if [ "$run_smoke" -eq 0 ]; then
+  info "Smoke disabled (set PRONTO_PREPUSH_SMOKE=1 or use --smoke to enable)."
+  exit 0
+fi
+
+if [ ! -d "${WORKSPACE_ROOT}/pronto-tests" ]; then
+  fail "pronto-tests not found in workspace"
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  fail "npm no está instalado; no se puede ejecutar smoke-critical"
+fi
+
+info "Running local smoke-critical..."
+(cd "${WORKSPACE_ROOT}/pronto-tests" && npm run test:smoke-critical) || fail "smoke-critical failed"
+
+info "Local pre-push checks passed."
+exit 0

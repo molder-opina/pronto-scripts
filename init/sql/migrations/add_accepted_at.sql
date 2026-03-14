@@ -1,2 +1,3 @@
 
-ALTER TABLE pronto_orders ADD COLUMN accepted_at TIMESTAMP NULL;
+ALTER TABLE pronto_orders
+ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP NULL;

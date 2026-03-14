@@ -1,5 +1,13 @@
--- Insertar parámetro para guardar el motivo de cancelación (MySQL)
-INSERT INTO business_config (config_key, config_value, value_type, category, display_name, description, updated_at)
+-- Insertar parámetro para guardar el motivo de cancelación (PostgreSQL)
+INSERT INTO pronto_system_settings (
+    key,
+    value,
+    value_type,
+    category,
+    display_name,
+    description,
+    updated_at
+)
 VALUES (
     'store_cancel_reason',
     'true',
@@ -9,10 +17,11 @@ VALUES (
     'Si está activo se guardan los motivos cuando cliente o mesero cancelan una orden.',
     NOW()
 )
-ON DUPLICATE KEY UPDATE
-    config_value = VALUES(config_value),
-    value_type = VALUES(value_type),
-    category = VALUES(category),
-    display_name = VALUES(display_name),
-    description = VALUES(description),
+ON CONFLICT (key) DO UPDATE
+SET
+    value = EXCLUDED.value,
+    value_type = EXCLUDED.value_type,
+    category = EXCLUDED.category,
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
     updated_at = NOW();

@@ -1,7 +1,15 @@
--- Agregar parámetros de configuración para campanita y realtime (MySQL)
+-- Agregar parámetros de configuración para campanita y realtime (PostgreSQL)
 
 -- Cooldown de la campanita del mesero
-INSERT INTO business_config (config_key, config_value, value_type, category, display_name, description, updated_at)
+INSERT INTO pronto_system_settings (
+    key,
+    value,
+    value_type,
+    category,
+    display_name,
+    description,
+    updated_at
+)
 VALUES (
     'waiter_call_cooldown_seconds',
     '10',
@@ -11,13 +19,22 @@ VALUES (
     'Tiempo en segundos que la campanita permanece roja después de confirmar. Durante este tiempo no se permiten nuevas notificaciones.',
     NOW()
 )
-ON DUPLICATE KEY UPDATE
-    config_value = VALUES(config_value),
-    description = VALUES(description),
+ON CONFLICT (key) DO UPDATE
+SET
+    value = EXCLUDED.value,
+    description = EXCLUDED.description,
     updated_at = NOW();
 
 -- Intervalo de polling de eventos en tiempo real
-INSERT INTO business_config (config_key, config_value, value_type, category, display_name, description, updated_at)
+INSERT INTO pronto_system_settings (
+    key,
+    value,
+    value_type,
+    category,
+    display_name,
+    description,
+    updated_at
+)
 VALUES (
     'realtime_poll_interval_ms',
     '1000',
@@ -27,7 +44,8 @@ VALUES (
     'Intervalo en milisegundos para consultar eventos en tiempo real. Valores más bajos = notificaciones más rápidas pero más carga en el servidor.',
     NOW()
 )
-ON DUPLICATE KEY UPDATE
-    config_value = VALUES(config_value),
-    description = VALUES(description),
+ON CONFLICT (key) DO UPDATE
+SET
+    value = EXCLUDED.value,
+    description = EXCLUDED.description,
     updated_at = NOW();

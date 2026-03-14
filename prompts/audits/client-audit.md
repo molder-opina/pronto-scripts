@@ -3,6 +3,11 @@
 ## Misión
 Garantizar que el flujo de orden del cliente es infalible, los datos están protegidos y la aplicación no contiene lógica de presentación pesada o activos locales.
 
+## Gate UX Obligatorio (P0)
+- Cargar y validar SIEMPRE: `pronto-docs/audits/frontend-ux-rules.md`.
+- Reportar cada regla como `PASS` o `FAIL` con evidencia.
+- Si falta evaluar alguna regla, el resultado final debe marcarse como `REJECTED`.
+
 ## Dimensiones Críticas de Auditoría
 
 ### 1. Integridad del Flujo de Orden (P0)
@@ -24,5 +29,6 @@ Garantizar que el flujo de orden del cliente es infalible, los datos están prot
 
 ## Output Requerido
 Si encuentras datos personales en sesión o estáticos locales, documentar como ALTA. Si el checkout se rompe, documentar como BLOQUEANTE.
+Incluir sección explícita: `Validación de frontend-ux-rules.md` con estatus por `RULE_ID`.
 
 Respuesta si todo es correcto: "OK: pronto-client mantiene flujo seguro y estáticos externos."

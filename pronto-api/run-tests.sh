@@ -47,7 +47,7 @@ $PYTHON_CMD -c "import aiohttp" 2>/dev/null || $PYTHON_CMD -m pip install aiohtt
 export API_BASE_URL="${API_BASE_URL:-http://localhost:6082}"
 export CLIENT_BASE_URL="${CLIENT_BASE_URL:-http://localhost:6080}"
 export EMPLOYEES_BASE_URL="${EMPLOYEES_BASE_URL:-http://localhost:6081}"
-export ADMIN_EMAIL="${ADMIN_EMAIL:-system@cafeteria.test}"
+export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cafeteria.test}"
 export ADMIN_PASSWORD="${ADMIN_PASSWORD:-${SEED_EMPLOYEE_PASSWORD:-ChangeMe!123}}"
 
 # Verificar que el script de tests existe

@@ -2,7 +2,7 @@
 
 detect_compose_command() {
   local compose_file="$1"
-  local project_name="${COMPOSE_PROJECT_NAME:-pronto-app}"
+  local project_name="${COMPOSE_PROJECT_NAME:-pronto}"
 
   export COMPOSE_PROJECT_NAME="${project_name}"
 

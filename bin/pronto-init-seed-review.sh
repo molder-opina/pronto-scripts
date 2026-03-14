@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if ! git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "[Init/Seeds Sync] No se encontró repo git de pronto-scripts en $REPO_ROOT" >&2
+  exit 1
+fi
+
 cd "$REPO_ROOT"
 
-STAGED_FILES="$(git diff --cached --name-only)"
+STAGED_FILES="$(git -C "$REPO_ROOT" diff --cached --name-only)"
 
 if [[ -z "$STAGED_FILES" ]]; then
   exit 0

@@ -3,6 +3,11 @@
 ## Misión
 Asegurar que `pronto-static` es el cerebro visual del proyecto, con código altamente reutilizable y sin fugas de lógica de negocio hacia el cliente.
 
+## Gate UX Obligatorio (P0)
+- Cargar y validar SIEMPRE: `pronto-docs/audits/frontend-ux-rules.md`.
+- Reportar cada regla como `PASS` o `FAIL` con evidencia.
+- Si falta evaluar alguna regla, el resultado final debe marcarse como `REJECTED`.
+
 ## Dimensiones Críticas de Auditoría
 
 ### 1. Deduplicación Máxima (P1)
@@ -23,5 +28,6 @@ Asegurar que `pronto-static` es el cerebro visual del proyecto, con código alta
 
 ## Output Requerido
 Documentar fallos de arquitectura (duplicación masiva o fetch directo) como SEVERIDAD: ALTA.
+Incluir sección explícita: `Validación de frontend-ux-rules.md` con estatus por `RULE_ID`.
 
 Respuesta si todo es correcto: "OK: pronto-static es el único hub de estáticos y está optimizado."

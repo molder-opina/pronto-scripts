@@ -1,5 +1,5 @@
 version: 1
-core_checks: [staged_artifacts, file_naming]
+core_checks: [staged_artifacts, file_naming, business_invariants, rg_scans]
 profiles:
   pronto-api:
     checks: [api_auth_policy, mypy]

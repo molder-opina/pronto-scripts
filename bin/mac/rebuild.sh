@@ -65,6 +65,10 @@ wait_for_service_health() {
 
 ensure_infra_ready() {
   echo ">> Asegurando infraestructura (postgres y redis) antes del redeploy de apps..."
+  # Free infra host ports first to avoid collisions with parallel compose projects
+  # (e.g. pronto-app-postgres-1 / pronto-app-redis-1).
+  release_port_containers "${POSTGRES_PORT:-5432}"
+  release_port_containers "${REDIS_HOST_PORT:-6379}"
   "${COMPOSE_CMD[@]}" up -d --force-recreate postgres redis
   wait_for_service_health postgres || true
   wait_for_service_health redis || true

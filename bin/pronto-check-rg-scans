@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# RG scans for prohibited patterns in PRONTO architecture
+# This script runs the specific rg commands defined in ARCHITECTURE_GUARDRAILS.md
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  pronto-check-rg-scans [options]
+
+Options:
+  --repo REPO      Target repository (pronto-api, pronto-libs, etc.)
+  --all            Check all repositories
+  -h, --help       Show this help
+
+Exit codes:
+  0 = All scans passed
+  1 = Violation found
+USAGE
+}
+
+# Get git root
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+
+# Parse arguments
+TARGET_REPO=""
+CHECK_ALL=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo)
+      TARGET_REPO="${2:-}"
+      shift 2
+      ;;
+    --all)
+      CHECK_ALL=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+VIOLATIONS=0
+
+# Function to run a specific rg scan
+run_rg_scan() {
+  local description="$1"
+  local pattern="$2"
+  local exclude_pattern="$3"
+  local expected_result="$4"
+  
+  echo "Checking: $description"
+  
+  if [ -n "$exclude_pattern" ]; then
+    RESULT=$(rg -n "$pattern" . | rg -v "$exclude_pattern" || true)
+  else
+    RESULT=$(rg -n "$pattern" . || true)
+  fi
+  
+  if [ -n "$expected_result" ]; then
+    # Check if result matches expected (for counting)
+    ACTUAL_COUNT=$(echo "$RESULT" | wc -l)
+    if [ "$ACTUAL_COUNT" -gt "$expected_result" ]; then
+      echo "VIOLATION: $description - Found $ACTUAL_COUNT matches, expected <= $expected_result"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  else
+    # Check if any results found (should be none)
+    if [ -n "$RESULT" ]; then
+      echo "VIOLATION: $description"
+      echo "$RESULT"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  fi
+}
+
+# Check specific repositories or all
+if [ "$CHECK_ALL" -eq 1 ]; then
+  REPOS=("pronto-api" "pronto-libs" "pronto-static" "pronto-employees" "pronto-client")
+else
+  if [ -z "$TARGET_REPO" ]; then
+    # Auto-detect current repo
+    CURRENT_DIR=$(basename "$GIT_ROOT")
+    if [[ " pronto-api pronto-libs pronto-static pronto-employees pronto-client pronto-tests pronto-scripts " == *" $CURRENT_DIR "* ]]; then
+      TARGET_REPO="$CURRENT_DIR"
+    else
+      echo "ERROR: Cannot auto-detect repository. Use --repo or --all"
+      exit 1
+    fi
+  fi
+  REPOS=("$TARGET_REPO")
+fi
+
+# Run checks for each repository
+for repo in "${REPOS[@]}"; do
+  if [ -d "$GIT_ROOT/$repo" ]; then
+    echo "=== Checking $repo ==="
+    cd "$GIT_ROOT/$repo"
+    
+    # Check 1: Prohibido: mutaciones directas de workflow_status
+    run_rg_scan "Direct workflow_status mutations" "workflow_status\s*=" "order_state_machine\.py" ""
+    
+    # Check 2: Prohibido: uso de Order.payment_status
+    run_rg_scan "Order.payment_status usage" "order\.payment_status|\.payment_status\s*=" "test.*legacy" ""
+    
+    # Check 3: Prohibido: lógica financiera duplicada
+    run_rg_scan "Duplicate financial calculation functions" "def.*total.*\(" "" "3"
+    
+    # Check 4: Prohibido: business logic en frontend
+    if [ "$repo" = "pronto-static" ]; then
+      run_rg_scan "Business logic in frontend" "if.*paid|status.*==" "" "0"
+    fi
+    
+    cd "$GIT_ROOT"
+  fi
+done
+
+# Report results
+if [ "$VIOLATIONS" -eq 0 ]; then
+  echo "All RG scans passed"
+  exit 0
+else
+  echo "Found $VIOLATIONS violation(s) in RG scans"
+  exit 1
+fi

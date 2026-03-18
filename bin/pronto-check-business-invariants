@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  pronto-check-business-invariants
+    [--workspace-root PATH] [--repo NAME] [--files-file PATH]
+    [--files FILE1,FILE2,...] [--staged]
+
+Options:
+  --workspace-root PATH   Workspace root used to resolve prefixed file paths
+  --repo NAME             Optional repo prefix filter (for files-file mode)
+  --files-file PATH       Newline-delimited file list (preferred in gate runner)
+  --files CSV             Comma-separated list of files to check
+  --staged                Check staged files (default if no source is provided)
+  -h, --help              Show this help
+
+Exit codes:
+  0 = All invariants satisfied
+  1 = Violation found
+  2 = Invalid usage
+USAGE
+}
+
+WORKSPACE_ROOT=""
+TARGET_REPO=""
+FILES_FILE=""
+FILES_CSV=""
+USE_STAGED=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --workspace-root)
+      WORKSPACE_ROOT="${2:-}"
+      shift 2
+      ;;
+    --repo)
+      TARGET_REPO="${2:-}"
+      shift 2
+      ;;
+    --files-file)
+      FILES_FILE="${2:-}"
+      shift 2
+      ;;
+    --files)
+      FILES_CSV="${2:-}"
+      shift 2
+      ;;
+    --staged)
+      USE_STAGED=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+resolve_candidate_path() {
+  local raw_path="$1"
+  local path="${raw_path#./}"
+
+  if [ -n "$WORKSPACE_ROOT" ] && [ -f "$WORKSPACE_ROOT/$path" ]; then
+    printf '%s\n' "$WORKSPACE_ROOT/$path"
+    return
+  fi
+
+  if [ -f "$path" ]; then
+    printf '%s\n' "$path"
+    return
+  fi
+
+  if [ -n "$TARGET_REPO" ] && [[ "$path" == "$TARGET_REPO/"* ]]; then
+    local no_repo="${path#${TARGET_REPO}/}"
+    if [ -f "$no_repo" ]; then
+      printf '%s\n' "$no_repo"
+      return
+    fi
+    if [ -n "$WORKSPACE_ROOT" ] && [ -f "$WORKSPACE_ROOT/$no_repo" ]; then
+      printf '%s\n' "$WORKSPACE_ROOT/$no_repo"
+      return
+    fi
+  fi
+
+  if [[ "$path" == */* ]]; then
+    local no_prefix="${path#*/}"
+    if [ -f "$no_prefix" ]; then
+      printf '%s\n' "$no_prefix"
+      return
+    fi
+    if [ -n "$WORKSPACE_ROOT" ] && [ -f "$WORKSPACE_ROOT/$no_prefix" ]; then
+      printf '%s\n' "$WORKSPACE_ROOT/$no_prefix"
+      return
+    fi
+  fi
+
+  printf '\n'
+}
+
+collect_input_files() {
+  local files_raw=""
+
+  if [ -n "$FILES_FILE" ]; then
+    if [ ! -f "$FILES_FILE" ]; then
+      echo "Files list not found: $FILES_FILE" >&2
+      exit 2
+    fi
+    files_raw="$(cat "$FILES_FILE")"
+    if [ -n "$TARGET_REPO" ]; then
+      files_raw="$(printf '%s\n' "$files_raw" | grep -E "^${TARGET_REPO}/" || true)"
+    fi
+  elif [ -n "$FILES_CSV" ]; then
+    files_raw="$(printf '%s' "$FILES_CSV" | tr ',' '\n')"
+  else
+    if [ "$USE_STAGED" -eq 0 ]; then
+      USE_STAGED=1
+    fi
+    if [ "$USE_STAGED" -eq 1 ]; then
+      files_raw="$(git diff --cached --name-only --diff-filter=ACM || true)"
+    fi
+  fi
+
+  printf '%s\n' "$files_raw" |
+    sed -E 's/^[[:space:]]+|[[:space:]]+$//g' |
+    sed '/^$/d' |
+    awk '!seen[$0]++'
+}
+
+FILES="$(collect_input_files)"
+if [ -z "$FILES" ]; then
+  echo "No files to check"
+  exit 0
+fi
+
+RESOLVED_FILES=""
+while IFS= read -r file_path; do
+  [ -z "$file_path" ] && continue
+  resolved="$(resolve_candidate_path "$file_path")"
+  [ -n "$resolved" ] || continue
+  RESOLVED_FILES+="$resolved"$'\n'
+done <<< "$FILES"
+
+FILES="$(printf '%s' "$RESOLVED_FILES" | sed '/^$/d' | awk '!seen[$0]++')"
+if [ -z "$FILES" ]; then
+  echo "No matching files to check"
+  exit 0
+fi
+
+VIOLATIONS=0
+
+check_workflow_status_mutations() {
+  echo "Checking for direct workflow_status mutations..."
+
+  while IFS= read -r file; do
+    if [ -f "$file" ] && [[ "$file" == *.py ]]; then
+      if grep -n "workflow_status\s*=" "$file" | grep -v "order_state_machine" | grep -v "mark_status" | grep -v "test" | grep -v "#" >/dev/null 2>&1; then
+        echo "VIOLATION: Direct workflow_status mutation found in $file"
+        VIOLATIONS=$((VIOLATIONS + 1))
+      fi
+    fi
+  done <<< "$FILES"
+}
+
+check_order_payment_status_usage() {
+  echo "Checking for Order.payment_status usage..."
+
+  while IFS= read -r file; do
+    if [ -f "$file" ] && [[ "$file" == *.py ]]; then
+      if grep -n "order\.payment_status\|\.payment_status\s*=" "$file" | grep -v "test" | grep -v "legacy" | grep -v "#" >/dev/null 2>&1; then
+        echo "VIOLATION: Order.payment_status usage found in $file"
+        VIOLATIONS=$((VIOLATIONS + 1))
+      fi
+    fi
+  done <<< "$FILES"
+}
+
+check_duplicate_financial_calculations() {
+  echo "Checking for duplicate financial calculation functions..."
+
+  local total_calc_functions=0
+  while IFS= read -r file; do
+    if [ -f "$file" ] && [[ "$file" == *.py ]]; then
+      if grep -q "def.*total" "$file"; then
+        count="$(grep -c "def.*total" "$file" || true)"
+        total_calc_functions=$((total_calc_functions + count))
+      fi
+    fi
+  done <<< "$FILES"
+
+  if [ "$total_calc_functions" -gt 5 ]; then
+    echo "VIOLATION: Potential duplicate financial calculation functions detected"
+    VIOLATIONS=$((VIOLATIONS + 1))
+  fi
+}
+
+check_frontend_business_logic() {
+  echo "Checking for business logic in frontend..."
+
+  while IFS= read -r file; do
+    if [ -f "$file" ] && ([[ "$file" == *.vue ]] || [[ "$file" == *.ts ]] || [[ "$file" == *.js ]]); then
+      if grep -n "workflow_status.*==" "$file" | grep -v "computed" | grep -v "getter" >/dev/null 2>&1; then
+        echo "VIOLATION: Business logic detected in frontend file $file"
+        VIOLATIONS=$((VIOLATIONS + 1))
+      fi
+      if grep -n "payment_status.*==" "$file" | grep -v "computed" | grep -v "getter" >/dev/null 2>&1; then
+        echo "VIOLATION: Business logic detected in frontend file $file"
+        VIOLATIONS=$((VIOLATIONS + 1))
+      fi
+    fi
+  done <<< "$FILES"
+}
+
+check_workflow_status_mutations
+check_order_payment_status_usage
+check_duplicate_financial_calculations
+check_frontend_business_logic
+
+if [ "$VIOLATIONS" -eq 0 ]; then
+  echo "All business invariants satisfied"
+  exit 0
+fi
+
+echo "Found $VIOLATIONS violation(s) of business invariants"
+exit 1

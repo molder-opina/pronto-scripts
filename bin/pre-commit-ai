@@ -176,7 +176,7 @@ load_config() {
 
 is_known_check() {
   case "$1" in
-    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy)
+    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy|business_invariants|rg_scans)
       return 0
       ;;
     *)
@@ -236,7 +236,7 @@ run_check() {
   local out_file rc output
   out_file="$(mktemp)"
 
-  case "$check_name" in
+case "$check_name" in
     staged_artifacts)
       set +e
       run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-staged-artifacts" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
@@ -246,6 +246,18 @@ run_check() {
     file_naming)
       set +e
       run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-file-naming-check" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    business_invariants)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-business-invariants" --workspace-root "$WORKSPACE_ROOT" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
+      rc=$?
+      set -e
+      ;;
+    rg_scans)
+      set +e
+      run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-rg-scans" --repo "$TARGET_REPO"
       rc=$?
       set -e
       ;;

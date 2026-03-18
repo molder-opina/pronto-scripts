@@ -432,7 +432,8 @@ settings_reset_defaults() {
       ('system.session.client_ttl_seconds', '3600', 'integer', 'system', 'TTL sesión cliente (segundos)', NOW()),
       ('session.kiosk_non_expiring', 'true', 'boolean', 'business', 'Kiosko sin expiración', NOW()),
       ('system.session.employee_ttl_hours', '24', 'integer', 'system', 'TTL sesión empleados (horas)', NOW()),
-      ('waiter_can_collect', 'true', 'boolean', 'payments', 'Permite al mesero cobrar', NOW()),
+      ('payments.enable_cashier_role', 'true', 'boolean', 'payments', 'Habilita rol cajero en cobros', NOW()),
+      ('payments.allow_waiter_cashier_operations', 'true', 'boolean', 'payments', 'Permite cobro por mesero', NOW()),
       ('currency_code', 'MXN', 'string', 'business', 'Código de moneda', NOW()),
       ('currency_symbol', '$', 'string', 'business', 'Símbolo de moneda', NOW())
     ON CONFLICT (key)

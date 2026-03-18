@@ -34,10 +34,14 @@ if not host:
 
 try:
     socket.gethostbyname(host)
+except Exception:
+    host_is_resolvable = False
+else:
+    host_is_resolvable = True
+
+if host_is_resolvable:
     print(url)
     raise SystemExit(0)
-except Exception:
-    pass
 
 if host not in {"postgres", "pronto-postgres", "db"}:
     print(url)

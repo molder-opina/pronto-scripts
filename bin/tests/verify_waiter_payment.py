@@ -11,11 +11,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../../pronto-employe
 from pronto_shared.config import load_config
 from pronto_shared.db import init_engine, get_session
 from pronto_shared.models import SystemSetting, DiningSession, Order, Employee
-# We need to simulate the service call with correct context
-# Since can_collect_payment uses cached DB lookup, we need to invalidate cache or rely on it
 from pronto_shared.services.business_config_service import invalidate_config_cache
-from pronto_shared.services.order_service import prepare_checkout, finalize_payment
-from pronto_shared.constants import OrderStatus
+from pronto_shared.services.payment_permission_service import (
+    invalidate_payment_permissions_cache,
+)
 
 # Mocking get_current_user context
 from contextlib import contextmanager
@@ -39,19 +38,33 @@ def mock_waiter_context():
         
         yield
 
-def update_setting(session, allowed: bool):
-    stmt = select(SystemSetting).where(SystemSetting.config_key == 'waiter_can_collect')
+def _upsert_bool_setting(session, key: str, value: bool):
+    stmt = select(SystemSetting).where(SystemSetting.config_key == key)
     setting = session.execute(stmt).scalars().first()
     if setting:
-        setting.config_value = str(allowed).lower()
-        session.commit()
+        setting.config_value = str(value).lower()
+        setting.value_type = "bool"
     else:
-        print("Setting 'waiter_can_collect' not found!")
-    
+        setting = SystemSetting(
+            config_key=key,
+            config_value=str(value).lower(),
+            value_type="bool",
+            category="payments",
+            display_name=key,
+        )
+        session.add(setting)
+
+
+def update_setting(session, waiter_allowed: bool):
+    _upsert_bool_setting(session, "payments.enable_cashier_role", True)
+    _upsert_bool_setting(
+        session,
+        "payments.allow_waiter_cashier_operations",
+        waiter_allowed,
+    )
+    session.commit()
     invalidate_config_cache()
-    # Also invalidate lru_cache of route if possible, or just wait?
-    # The route calls `can_collect_payment_cached` which has lru_cache. 
-    # We can't easily clear that from here unless we import the route module.
+    invalidate_payment_permissions_cache()
 
 def run_verification():
     # Load env
@@ -61,7 +74,7 @@ def run_verification():
     # We need to import the route logic to test permission
     # Adjusted import path
     sys.path.append(os.path.join(os.path.dirname(__file__), "../../../pronto-api/src"))
-    from api_app.routes.employees.sessions import session_pay, _can_collect_payment_cached
+    from api_app.routes.employees.sessions import session_pay
     from werkzeug.test import EnvironBuilder
     from flask import Request
     
@@ -85,8 +98,8 @@ def run_verification():
         with get_session() as s:
             update_setting(s, as_allowed)
         
-        # Clear cache
-        _can_collect_payment_cached.cache_clear()
+        # Clear permission cache
+        invalidate_payment_permissions_cache()
         
         with app.test_request_context(json={"payment_method": "cash"}):
              # Mock request context
@@ -96,7 +109,10 @@ def run_verification():
                   patch("pronto_shared.services.order_service.finalize_payment", return_value=({}, 200)):
                 
                 # Call the route function directly
-                print(f"Testing with waiter_can_collect = {as_allowed}...")
+                print(
+                    "Testing with payments.allow_waiter_cashier_operations = "
+                    f"{as_allowed}..."
+                )
                 response, status = session_pay(session_id)
                 return status
 

@@ -1,12 +1,5 @@
--- Modifier Groups Seed
--- Demonstrates various min/max selection scenarios for UI testing:
--- - Required group with min_selection > 0 (e.g., min=3, max=5)
--- - Optional group with min_selection = 0
--- - Exact selection group (min = max)
--- - Maximum limited optional group
--- This seed helps validate UI displays of selection counters and requirements
-
--- Generated from generate_modifiers.py
+-- Modifier Groups
+-- Demonstrating various min/max selection scenarios for UI testing
 INSERT INTO pronto_modifier_groups (id, name, description, menu_item_id, min_selection, max_selection, is_required, created_at)
 VALUES ('d1d4839d-e5e3-58dc-96fa-94de4a2568eb', 'Size', 'Choose burger size (required: select exactly 1)', 'a9253e7f-d758-487f-bdcb-464880eb7765', 1, 1, True, now())
 ON CONFLICT (id) DO NOTHING;
@@ -50,3 +43,4 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO pronto_modifier_groups (id, name, description, menu_item_id, min_selection, max_selection, is_required, created_at)
 VALUES ('37e1d397-3d92-5f45-9cc0-115483a949ac', 'Dressing', 'Choose dressing (required: select exactly 1)', 'ec7c0797-1119-4c65-abb2-b977b3d413c1', 1, 1, True, now())
 ON CONFLICT (id) DO NOTHING;
+

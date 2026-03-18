@@ -153,7 +153,7 @@ cursor.execute(
         id SERIAL PRIMARY KEY,
         customer_id INTEGER REFERENCES pronto_customers(id) ON DELETE SET NULL,
         session_id INTEGER REFERENCES pronto_dining_sessions(id) ON DELETE SET NULL,
-        workflow_status VARCHAR(32) DEFAULT 'requested',
+        workflow_status VARCHAR(32) DEFAULT 'new',
         payment_status VARCHAR(32) DEFAULT 'unpaid',
         subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
         tax_amount NUMERIC(10,2) NOT NULL DEFAULT 0,

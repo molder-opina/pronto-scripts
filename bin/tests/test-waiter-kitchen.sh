@@ -121,7 +121,8 @@ try:
             print(order['id'])
             break
 except:
-    pass
+    import traceback
+    traceback.print_exc(file=sys.stderr)
 " 2>/dev/null)
 
 if [ -z "$ORDER_ID" ]; then
@@ -140,7 +141,8 @@ try:
     if orders:
         print(orders[0]['id'])
 except:
-    pass
+    import traceback
+    traceback.print_exc(file=sys.stderr)
 " 2>/dev/null)
 
     if [ -z "$ORDER_ID" ]; then

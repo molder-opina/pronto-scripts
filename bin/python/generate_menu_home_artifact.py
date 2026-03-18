@@ -16,8 +16,12 @@ def _bootstrap_pronto_shared() -> None:
     try:
         import pronto_shared  # noqa: F401
         return
-    except ImportError:
-        pass
+    except ImportError as initial_import_error:
+        if os.getenv("PRONTO_DEBUG_BOOTSTRAP") == "1":
+            print(
+                f"[generate_menu_home_artifact] first import failed: {initial_import_error}",
+                file=sys.stderr,
+            )
 
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parents[3]

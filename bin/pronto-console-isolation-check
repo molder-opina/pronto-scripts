@@ -1,0 +1,105 @@
+#!/bin/bash
+# pronto-console-isolation-check
+# Valida aislamiento de consolas - Regla de Oro
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo "🔍 Validando aislamiento de consolas..."
+echo "Regla de Oro: Cada consola es una app dentro de tu app"
+echo ""
+
+VIOLATIONS=0
+
+# 1. Verificar imports cruzados entre consolas operativas (excluyendo router)
+echo "1. Verificando imports cruzados..."
+
+# Router puede importar dashboards - es válido
+WAITER_IMPORTS=$(rg -n "from '@waiter/" pronto-static/src/vue/employees/{chef,cashier,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" | wc -l || echo "0")
+CHEF_IMPORTS=$(rg -n "from '@chef/" pronto-static/src/vue/employees/{waiter,cashier,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" | wc -l || echo "0")
+CASHIER_IMPORTS=$(rg -n "from '@cashier/" pronto-static/src/vue/employees/{waiter,chef,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" | wc -l || echo "0")
+ADMIN_IMPORTS=$(rg -n "from '@admin/" pronto-static/src/vue/employees/{waiter,chef,cashier}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" | wc -l || echo "0")
+
+if [ "$WAITER_IMPORTS" -gt 0 ]; then
+  echo -e "${RED}❌ Waiter imports encontrados en otras consolas${NC}"
+  rg -n "from '@waiter/" pronto-static/src/vue/employees/{chef,cashier,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" || true
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+if [ "$CHEF_IMPORTS" -gt 0 ]; then
+  echo -e "${RED}❌ Chef imports encontrados en otras consolas${NC}"
+  rg -n "from '@chef/" pronto-static/src/vue/employees/{waiter,cashier,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" || true
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+if [ "$CASHIER_IMPORTS" -gt 0 ]; then
+  echo -e "${RED}❌ Cashier imports encontrados en otras consolas${NC}"
+  rg -n "from '@cashier/" pronto-static/src/vue/employees/{waiter,chef,admin}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" || true
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+if [ "$ADMIN_IMPORTS" -gt 0 ]; then
+  echo -e "${RED}❌ Admin imports encontrados en otras consolas${NC}"
+  rg -n "from '@admin/" pronto-static/src/vue/employees/{waiter,chef,cashier}/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" || true
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# 2. Verificar shared no importa de consolas (excluyendo router)
+echo "2. Verificando shared isolation..."
+
+# Router puede importar dashboards - es válido
+SHARED_IMPORTS=$(rg -n "from '@(waiter|chef|cashier|admin)/" pronto-static/src/vue/employees/shared/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" | wc -l || echo "0")
+
+if [ "$SHARED_IMPORTS" -gt 0 ]; then
+  echo -e "${RED}❌ Shared importa de consolas${NC}"
+  rg -n "from '@(waiter|chef|cashier|admin)/" pronto-static/src/vue/employees/shared/ --type vue --type ts 2>/dev/null | grep -v "router/index.ts" || true
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# 3. Verificar dashboards propios
+echo "3. Verificando dashboards por consola..."
+
+for console in waiter chef cashier admin system; do
+  DASHBOARD_COUNT=$(find "pronto-static/src/vue/employees/$console/dashboard" \
+    -name "*.vue" 2>/dev/null | wc -l)
+  if [ "$DASHBOARD_COUNT" -eq 0 ]; then
+    echo -e "${RED}❌ $console no tiene dashboard propio${NC}"
+    VIOLATIONS=$((VIOLATIONS + 1))
+  fi
+done
+
+# 4. Verificar estructura de system
+echo "4. Verificando estructura de system..."
+
+if [ ! -d "pronto-static/src/vue/employees/system/dashboard/" ]; then
+  echo -e "${RED}❌ system/dashboard/ no existe${NC}"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+if [ ! -d "pronto-static/src/vue/employees/system/components/" ]; then
+  echo -e "${RED}❌ system/components/ no existe${NC}"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+if [ ! -d "pronto-static/src/vue/employees/system/modules/" ]; then
+  echo -e "${RED}❌ system/modules/ no existe${NC}"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# Resultado
+echo ""
+if [ "$VIOLATIONS" -gt 0 ]; then
+  echo -e "${RED}❌ VALIDACIÓN FALLIDA: $VIOLATIONS violaciones${NC}"
+  echo ""
+  echo "Regla de Oro violada: Cada consola debe ser una app dentro de tu app"
+  exit 1
+else
+  echo -e "${GREEN}✅ VALIDACIÓN EXITOSA: Aislamiento correcto${NC}"
+  echo ""
+  echo "Nota: El router puede importar dashboards - es una excepción válida"
+  exit 0
+fi

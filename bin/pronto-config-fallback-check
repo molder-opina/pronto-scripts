@@ -1,0 +1,282 @@
+#!/usr/bin/env python3
+"""
+Scanner de fallbacks peligrosos en configuración
+
+Detecta patrones .get(key, default) en código y clasifica:
+- CRITICAL: keys en CRITICAL_CONFIG_KEYS con fallback → EXIT 1
+- WARNING: keys no críticas con fallback → log
+- INFO: ignorado (tests, mocks, etc.)
+
+Usage:
+    ./pronto-config-fallback-check [--staged] [--fix]
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+from typing import List, Tuple
+
+# Add pronto-libs to path
+SCRIPT_DIR = Path(__file__).parent
+ROOT_DIR = SCRIPT_DIR.parent.parent
+LIBS_DIR = ROOT_DIR / "pronto-libs" / "src"
+sys.path.insert(0, str(LIBS_DIR))
+
+from pronto_shared.constants import CRITICAL_CONFIG_KEYS
+
+# Patrones a excluir
+EXCLUDE_DIRS = {
+    "tests", "__tests__", "test", "mock", "__pycache__",
+    "node_modules", ".venv", "venv", "build", "dist",
+    "archived", "archive", "vendor"
+}
+
+# Patrón para detectar .get(key, default)
+FALLBACK_PATTERN = re.compile(
+    r'\.get\(\s*["\']([^"\']+)["\']\s*,\s*([^)]+)\)',
+    re.MULTILINE
+)
+
+
+def is_excluded_path(path: Path) -> bool:
+    """Verificar si el path debe excluirse"""
+    parts = path.parts
+
+    # Excluir directorios
+    for part in parts:
+        if part in EXCLUDE_DIRS:
+            return True
+
+    # Excluir archivos por patrón
+    if path.name.endswith("_test.py") or path.name.startswith("mock_"):
+        return True
+
+    # Excluir tests en pronto-libs/tests/
+    if "tests" in parts and "pronto-libs" in parts:
+        return True
+
+    return False
+
+
+def is_critical_key(key: str) -> bool:
+    """Verificar si la key es crítica (match exacto)"""
+    return key in CRITICAL_CONFIG_KEYS
+
+
+def extract_default_value(default_str: str) -> str:
+    """Extraer valor del default para clasificación"""
+    default_str = default_str.strip()
+
+    # Numérico
+    if re.match(r'^-?\d+$', default_str):
+        return "int"
+    if re.match(r'^-?\d+\.\d+$', default_str):
+        return "float"
+
+    # Booleano
+    if default_str.lower() in {"true", "false"}:
+        return "bool"
+
+    # String
+    if default_str.startswith('"') or default_str.startswith("'"):
+        return "str"
+
+    return "other"
+
+
+def scan_file(file_path: Path) -> List[Tuple[int, str, str, str]]:
+    """
+    Escanear archivo en busca de fallbacks
+
+    Returns:
+        Lista de tuplas: (línea, key, default, línea_completa)
+    """
+    findings = []
+
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except Exception:
+        return findings
+
+    lines = content.split('\n')
+
+    for line_num, line in enumerate(lines, 1):
+        # Saltar comentarios
+        if line.strip().startswith('#'):
+            continue
+
+        # Saltar imports
+        if 'import' in line and line.strip().startswith(('from', 'import')):
+            continue
+
+        matches = FALLBACK_PATTERN.findall(line)
+        for key, default in matches:
+            findings.append((line_num, key, default.strip(), line.strip()))
+
+    return findings
+
+
+def scan_directory(root_path: Path) -> Tuple[List, List, List]:
+    """
+    Escanear directorio completo
+
+    Returns:
+        (criticals, warnings, infos)
+    """
+    criticals = []
+    warnings = []
+    infos = []
+
+    for py_file in root_path.rglob("*.py"):
+        if is_excluded_path(py_file):
+            continue
+
+        findings = scan_file(py_file)
+
+        for line_num, key, default, line_content in findings:
+            # Relative path desde root
+            rel_path = py_file.relative_to(root_path)
+
+            finding = {
+                "file": str(rel_path),
+                "line": line_num,
+                "key": key,
+                "default": default,
+                "content": line_content[:100]  # Truncate
+            }
+
+            if is_critical_key(key):
+                criticals.append(finding)
+            else:
+                # Clasificar como warning si parece config
+                if key.startswith(("system.", "payments.", "api.", "session.")):
+                    warnings.append(finding)
+                else:
+                    infos.append(finding)
+
+    return criticals, warnings, infos
+
+
+def generate_report(
+    criticals: List,
+    warnings: List,
+    infos: List,
+    output_file: Path
+) -> None:
+    """Generar reporte Markdown"""
+    from datetime import datetime
+
+    lines = [
+        "# Config Fallbacks Report",
+        "",
+        f"**Generated:** {datetime.now().isoformat()}",
+        "",
+        f"- **Critical:** {len(criticals)}",
+        f"- **Warnings:** {len(warnings)}",
+        f"- **Info:** {len(infos)}",
+        "",
+    ]
+
+    if criticals:
+        lines.append("## 🔴 Critical Issues")
+        lines.append("")
+        lines.append("Estos fallbacks DEBEN eliminarse (config crítica):")
+        lines.append("")
+
+        for finding in criticals:
+            lines.append(f"### `{finding['key']}`")
+            lines.append(f"- **Archivo:** `{finding['file']}`")
+            lines.append(f"- **Línea:** {finding['line']}")
+            lines.append(f"- **Default:** `{finding['default']}`")
+            lines.append(f"- **Código:** `{finding['content']}`")
+            lines.append("")
+
+    if warnings:
+        lines.append("## 🟡 Warnings")
+        lines.append("")
+        lines.append("Revisar si son configs que deberían ser críticas:")
+        lines.append("")
+
+        for finding in warnings[:20]:  # Limitar
+            lines.append(f"- `{finding['key']}` en `{finding['file']}:{finding['line']}`")
+
+        if len(warnings) > 20:
+            lines.append(f"- ... y {len(warnings) - 20} más")
+
+        lines.append("")
+
+    output_file.write_text('\n'.join(lines))
+
+
+def main():
+    """Main entry point"""
+
+    # Determine root
+    root_dir = ROOT_DIR
+
+    print("🔍 Escaneando fallbacks de configuración...")
+    print(f"   Root: {root_dir}")
+    print(f"   Critical keys: {len(CRITICAL_CONFIG_KEYS)}")
+    print()
+
+    # Escanear directories críticos
+    api_dir = root_dir / "pronto-api" / "src"
+    employees_dir = root_dir / "pronto-employees" / "src"
+
+    all_criticals = []
+    all_warnings = []
+    all_infos = []
+
+    for scan_dir in [api_dir, employees_dir]:
+        if scan_dir.exists():
+            print(f"   Escaneando: {scan_dir.relative_to(root_dir)}")
+            criticals, warnings, infos = scan_directory(scan_dir)
+            all_criticals.extend(criticals)
+            all_warnings.extend(warnings)
+            all_infos.extend(infos)
+
+    print()
+
+    # Output
+    if all_criticals:
+        print("🔴 CRITICAL - Fallbacks en config crítica:")
+        print()
+
+        for finding in all_criticals:
+            print(f"  {finding['file']}:{finding['line']}")
+            print(f"     Key: {finding['key']}")
+            print(f"     Default: {finding['default']}")
+            print()
+
+    if all_warnings:
+        print(f"🟡 WARNING - {len(all_warnings)} fallbacks en config potencialmente crítica")
+        print(f"   Ver reporte para detalles")
+        print()
+
+    print(f"📊 Resumen:")
+    print(f"   🔴 Critical: {len(all_criticals)}")
+    print(f"   🟡 Warnings: {len(all_warnings)}")
+    print(f"   ⚪ Info: {len(all_infos)}")
+    print()
+
+    # Generar reporte
+    report_dir = root_dir / "pronto-docs" / "tech-debt"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_file = report_dir / "config-fallbacks.md"
+
+    generate_report(all_criticals, all_warnings, all_infos, report_file)
+    print(f"📄 Reporte generado: {report_file}")
+    print()
+
+    # Exit code
+    if all_criticals:
+        print("❌ FAIL - Se detectaron fallbacks críticos")
+        return 1
+    else:
+        print("✅ PASS - No hay fallbacks críticos")
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

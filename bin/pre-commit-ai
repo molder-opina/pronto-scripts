@@ -176,7 +176,7 @@ load_config() {
 
 is_known_check() {
   case "$1" in
-    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy|business_invariants|rg_scans)
+    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy|business_invariants|rg_scans|config_fallbacks)
       return 0
       ;;
     *)
@@ -311,6 +311,18 @@ case "$check_name" in
       set +e
       run_timed_capture "$out_file" "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-check-assets-policy" --workspace-root "$WORKSPACE_ROOT" --repo "$TARGET_REPO" --files-file "$TARGET_FILES_FILE"
       rc=$?
+      set -e
+      ;;
+    config_fallbacks)
+      # Local only - warn mode, never fail (CI enforces)
+      set +e
+      run_timed_capture "$out_file" bash -c "\
+        cd '$WORKSPACE_ROOT' && \
+        bash pronto-scripts/bin/pronto-config-fallback-check \
+          --repo '$TARGET_REPO' \
+          --mode warn \
+          2>&1 || true"
+      rc=0  # Never fail locally - CI will enforce
       set -e
       ;;
     *)

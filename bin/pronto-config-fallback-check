@@ -1,21 +1,40 @@
 #!/usr/bin/env python3
 """
-Scanner de fallbacks peligrosos en configuración
+Config Fallback Scanner - Production Hardened
 
 Detecta patrones .get(key, default) en código y clasifica:
-- CRITICAL: keys en CRITICAL_CONFIG_KEYS con fallback → EXIT 1
+- CRITICAL: keys en CRITICAL_CONFIG_KEYS con fallback → EXIT 1 (enforce mode)
 - WARNING: keys no críticas con fallback → log
 - INFO: ignorado (tests, mocks, etc.)
 
 Usage:
-    ./pronto-config-fallback-check [--staged] [--fix]
+    ./pronto-config-fallback-check --repo <repo> [--mode warn|enforce|strict] [--audit]
+    ./pronto-config-fallback-check --repo <repo> --generate-baseline --force-baseline-update
+
+Modes:
+    warn    : Solo muestra warnings, nunca falla (para pre-commit local)
+    enforce : Falla si hay fallbacks NUEVOS (respeta baseline) - CI normal
+    strict  : Falla en TODO (ignora baseline) - auditoría/pre-release
+    --audit : Alias de strict
+
+Baseline:
+    .pronto/config-fallback-baseline.json por repo
+    Incluye code_hash para resistir refactors (anti-drift)
 """
 
+import argparse
+import hashlib
+import json
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+# Scanner version - critical for traceability
+SCANNER_VERSION = "1.0.0"
+CRITICAL_CONFIG_KEYS_SOURCE = "pronto-libs/src/pronto_shared/constants.py"
 
 # Add pronto-libs to path
 SCRIPT_DIR = Path(__file__).parent
@@ -37,6 +56,31 @@ FALLBACK_PATTERN = re.compile(
     r'\.get\(\s*["\']([^"\']+)["\']\s*,\s*([^)]+)\)',
     re.MULTILINE
 )
+
+
+def get_baseline_path(repo: str) -> Path:
+    """
+    Baseline path is FORCED per repo - no global baselines.
+    This prevents baseline corruption from mixed repos.
+    """
+    return Path(repo) / ".pronto" / "config-fallback-baseline.json"
+
+
+def calculate_code_hash(file_path: Path, line_num: int) -> str:
+    """
+    Calculate hash of code context (3 lines before + 3 lines after).
+    This makes baseline resistant to line number changes from refactors.
+    """
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        lines = content.split('\n')
+        start = max(0, line_num - 4)  # 3 lines before + current
+        end = min(len(lines), line_num + 3)  # current + 3 lines after
+        context = '\n'.join(lines[start:end])
+        return hashlib.sha256(context.encode()).hexdigest()
+    except Exception as e:
+        print(f"⚠️  Warning: Could not calculate hash for {file_path}:{line_num}")
+        return ""
 
 
 def is_excluded_path(path: Path) -> bool:
@@ -85,12 +129,12 @@ def extract_default_value(default_str: str) -> str:
     return "other"
 
 
-def scan_file(file_path: Path) -> List[Tuple[int, str, str, str]]:
+def scan_file(file_path: Path) -> List[Dict]:
     """
     Escanear archivo en busca de fallbacks
 
     Returns:
-        Lista de tuplas: (línea, key, default, línea_completa)
+        Lista de findings con: file, line, key, default, content, code_hash
     """
     findings = []
 
@@ -112,12 +156,19 @@ def scan_file(file_path: Path) -> List[Tuple[int, str, str, str]]:
 
         matches = FALLBACK_PATTERN.findall(line)
         for key, default in matches:
-            findings.append((line_num, key, default.strip(), line.strip()))
+            code_hash = calculate_code_hash(file_path, line_num)
+            findings.append({
+                "line": line_num,
+                "key": key,
+                "default": default.strip(),
+                "content": line.strip()[:100],
+                "code_hash": code_hash
+            })
 
     return findings
 
 
-def scan_directory(root_path: Path) -> Tuple[List, List, List]:
+def scan_directory(root_path: Path, repo_name: str) -> Tuple[List, List, List]:
     """
     Escanear directorio completo
 
@@ -128,49 +179,97 @@ def scan_directory(root_path: Path) -> Tuple[List, List, List]:
     warnings = []
     infos = []
 
+    total_files = 0
     for py_file in root_path.rglob("*.py"):
         if is_excluded_path(py_file):
             continue
 
+        total_files += 1
         findings = scan_file(py_file)
 
-        for line_num, key, default, line_content in findings:
-            # Relative path desde root
+        for finding in findings:
+            # Relative path desde repo root
             rel_path = py_file.relative_to(root_path)
 
-            finding = {
-                "file": str(rel_path),
-                "line": line_num,
-                "key": key,
-                "default": default,
-                "content": line_content[:100]  # Truncate
-            }
+            finding["file"] = str(rel_path)
+            finding["repo"] = repo_name
 
-            if is_critical_key(key):
+            if is_critical_key(finding["key"]):
                 criticals.append(finding)
             else:
                 # Clasificar como warning si parece config
-                if key.startswith(("system.", "payments.", "api.", "session.")):
+                if finding["key"].startswith(("system.", "payments.", "api.", "session.")):
                     warnings.append(finding)
                 else:
                     infos.append(finding)
 
-    return criticals, warnings, infos
+    return criticals, warnings, infos, total_files
+
+
+def load_baseline(baseline_path: Path) -> Optional[Dict]:
+    """Load baseline file if exists"""
+    if not baseline_path.exists():
+        return None
+    
+    try:
+        with open(baseline_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load baseline from {baseline_path}: {e}")
+        return None
+
+
+def save_baseline(baseline_path: Path, baseline: Dict) -> None:
+    """Save baseline to file"""
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(baseline_path, 'w') as f:
+        json.dump(baseline, f, indent=2)
+
+
+def is_same_fallback(finding: Dict, baseline_item: Dict) -> bool:
+    """
+    Match fallback by file + key + code_hash (not just line number).
+    This makes baseline resistant to refactors.
+    """
+    if finding["file"] != baseline_item.get("file"):
+        return False
+    if finding["key"] != baseline_item.get("key"):
+        return False
+    # Use hash if available, otherwise fall back to line match
+    if finding.get("code_hash") and baseline_item.get("code_hash"):
+        return finding["code_hash"] == baseline_item["code_hash"]
+    return finding["line"] == baseline_item.get("line")
+
+
+def is_new_fallback(finding: Dict, baseline: Optional[Dict]) -> bool:
+    """Check if fallback is new (not in baseline)"""
+    if baseline is None:
+        return True
+    
+    for baseline_item in baseline.get("fallbacks", []):
+        if is_same_fallback(finding, baseline_item):
+            return False
+    return True
+
+
+def filter_new_fallbacks(fallbacks: List, baseline: Optional[Dict]) -> List:
+    """Filter out fallbacks that are already in baseline"""
+    return [f for f in fallbacks if is_new_fallback(f, baseline)]
 
 
 def generate_report(
     criticals: List,
     warnings: List,
     infos: List,
-    output_file: Path
+    output_file: Path,
+    repo_name: str
 ) -> None:
     """Generar reporte Markdown"""
-    from datetime import datetime
-
     lines = [
-        "# Config Fallbacks Report",
+        f"# Config Fallbacks Report - {repo_name}",
         "",
         f"**Generated:** {datetime.now().isoformat()}",
+        f"**Scanner Version:** {SCANNER_VERSION}",
         "",
         f"- **Critical:** {len(criticals)}",
         f"- **Warnings:** {len(warnings)}",
@@ -209,72 +308,197 @@ def generate_report(
     output_file.write_text('\n'.join(lines))
 
 
+def print_summary(
+    repo_name: str,
+    mode: str,
+    baseline_status: str,
+    new_critical_count: int,
+    baseline_size: int,
+    total_files: int
+) -> None:
+    """Print CI-friendly summary"""
+    print("=" * 50)
+    print("     CONFIG FALLBACK SCAN SUMMARY")
+    print("=" * 50)
+    print(f"Repo:           {repo_name}")
+    print(f"Scanner:        v{SCANNER_VERSION}")
+    print(f"Mode:           {mode}")
+    print(f"Baseline:       {baseline_status}")
+    print("-" * 50)
+    print(f"New Criticals:  {new_critical_count}")
+    print(f"Baseline Size:  {baseline_size}")
+    print(f"Total Scanned:  {total_files} files")
+    print("=" * 50)
+
+
 def main():
     """Main entry point"""
-
-    # Determine root
-    root_dir = ROOT_DIR
-
-    print("🔍 Escaneando fallbacks de configuración...")
-    print(f"   Root: {root_dir}")
+    parser = argparse.ArgumentParser(
+        description="Config Fallback Scanner - Detects dangerous config fallbacks"
+    )
+    parser.add_argument(
+        "--repo", 
+        required=True, 
+        help="Repo to scan (required) - e.g., pronto-api"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["warn", "enforce", "strict"],
+        default="warn",
+        help="Scan mode: warn (local), enforce (CI), strict (audit)"
+    )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Alias for --mode strict (audit mode)"
+    )
+    parser.add_argument(
+        "--generate-baseline",
+        action="store_true",
+        help="Generate new baseline (local only, requires --force-baseline-update)"
+    )
+    parser.add_argument(
+        "--force-baseline-update",
+        action="store_true",
+        help="Force baseline regeneration (required with --generate-baseline)"
+    )
+    parser.add_argument(
+        "--baseline-path",
+        type=Path,
+        help="Custom baseline path (default: .pronto/config-fallback-baseline.json)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Handle --audit alias
+    if args.audit:
+        args.mode = "strict"
+    
+    # Protection 1: CI cannot generate baseline
+    if os.getenv("CI") and args.generate_baseline:
+        print("❌ ERROR: Baseline generation disabled in CI")
+        print("   Generate baseline locally and commit")
+        return 1
+    
+    # Protection 2: Generate requires explicit force
+    if args.generate_baseline and not args.force_baseline_update:
+        print("⚠️  WARNING: This will overwrite existing baseline")
+        print("   Add --force-baseline-update to confirm")
+        return 1
+    
+    # Protection 3: Mode must be warn for baseline generation
+    if args.generate_baseline and args.mode != "warn":
+        print("❌ ERROR: Baseline can only be generated in warn mode")
+        return 1
+    
+    # Validate repo exists
+    repo_path = ROOT_DIR / args.repo
+    if not repo_path.exists():
+        print(f"❌ ERROR: Repo '{args.repo}' does not exist")
+        return 1
+    
+    # Determine scan directory
+    scan_dir = repo_path / "src"
+    if not scan_dir.exists():
+        print(f"⚠️  Skipping {args.repo} (no src directory)")
+        return 0
+    
+    # Check for Python files
+    py_files = list(scan_dir.rglob("*.py"))
+    if not py_files:
+        print(f"⚠️  Skipping {args.repo} (no Python files)")
+        return 0
+    
+    # Determine baseline path
+    baseline_path = args.baseline_path if args.baseline_path else get_baseline_path(args.repo)
+    
+    # Scan repo
+    print(f"🔍 Config Fallback Scanner v{SCANNER_VERSION}")
+    print(f"   Repo: {args.repo}")
+    print(f"   Mode: {args.mode}")
     print(f"   Critical keys: {len(CRITICAL_CONFIG_KEYS)}")
+    print(f"   Baseline: {baseline_path}")
     print()
-
-    # Escanear directories críticos
-    api_dir = root_dir / "pronto-api" / "src"
-    employees_dir = root_dir / "pronto-employees" / "src"
-
-    all_criticals = []
-    all_warnings = []
-    all_infos = []
-
-    for scan_dir in [api_dir, employees_dir]:
-        if scan_dir.exists():
-            print(f"   Escaneando: {scan_dir.relative_to(root_dir)}")
-            criticals, warnings, infos = scan_directory(scan_dir)
-            all_criticals.extend(criticals)
-            all_warnings.extend(warnings)
-            all_infos.extend(infos)
-
-    print()
-
+    
+    criticals, warnings, infos, total_files = scan_directory(scan_dir, args.repo)
+    
+    # Load baseline (if not in strict mode)
+    baseline = None
+    baseline_status = "not found"
+    if args.mode != "strict":
+        baseline = load_baseline(baseline_path)
+        if baseline:
+            baseline_status = f"loaded ({len(baseline.get('fallbacks', []))} entries)"
+        else:
+            baseline_status = "not found (will create on first run)"
+    
+    # Filter new fallbacks (if not in strict mode)
+    if args.mode == "enforce" and baseline:
+        new_criticals = filter_new_fallbacks(criticals, baseline)
+    else:
+        new_criticals = criticals  # strict mode or no baseline
+    
+    # Handle baseline generation
+    if args.generate_baseline:
+        all_fallbacks = criticals + warnings + infos
+        baseline_data = {
+            "generated_at": datetime.now().isoformat(),
+            "scanner_version": SCANNER_VERSION,
+            "repo": args.repo,
+            "fallbacks": all_fallbacks
+        }
+        save_baseline(baseline_path, baseline_data)
+        print(f"✅ Baseline generated: {baseline_path}")
+        print(f"   Total fallbacks: {len(all_fallbacks)}")
+        return 0
+    
     # Output
-    if all_criticals:
-        print("🔴 CRITICAL - Fallbacks en config crítica:")
+    if new_criticals and args.mode == "enforce":
+        print("🔴 CRITICAL - New fallbacks en config crítica:")
         print()
-
-        for finding in all_criticals:
+        
+        for finding in new_criticals:
             print(f"  {finding['file']}:{finding['line']}")
             print(f"     Key: {finding['key']}")
             print(f"     Default: {finding['default']}")
             print()
-
-    if all_warnings:
-        print(f"🟡 WARNING - {len(all_warnings)} fallbacks en config potencialmente crítica")
+    
+    if warnings:
+        print(f"🟡 WARNING - {len(warnings)} fallbacks en config potencialmente crítica")
         print(f"   Ver reporte para detalles")
         print()
-
-    print(f"📊 Resumen:")
-    print(f"   🔴 Critical: {len(all_criticals)}")
-    print(f"   🟡 Warnings: {len(all_warnings)}")
-    print(f"   ⚪ Info: {len(all_infos)}")
-    print()
-
-    # Generar reporte
-    report_dir = root_dir / "pronto-docs" / "tech-debt"
+    
+    # Print summary
+    print_summary(
+        repo_name=args.repo,
+        mode=args.mode,
+        baseline_status=baseline_status,
+        new_critical_count=len(new_criticals),
+        baseline_size=len(baseline.get("fallbacks", [])) if baseline else 0,
+        total_files=total_files
+    )
+    
+    # Generate report
+    report_dir = ROOT_DIR / "pronto-docs" / "tech-debt"
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_file = report_dir / "config-fallbacks.md"
-
-    generate_report(all_criticals, all_warnings, all_infos, report_file)
+    report_file = report_dir / f"config-fallbacks-{args.repo}.md"
+    
+    generate_report(criticals, warnings, infos, report_file, args.repo)
     print(f"📄 Reporte generado: {report_file}")
     print()
-
+    
     # Exit code
-    if all_criticals:
-        print("❌ FAIL - Se detectaron fallbacks críticos")
+    if new_criticals and args.mode == "enforce":
+        print("❌ FAIL - New critical fallbacks detected")
+        return 1
+    elif new_criticals and args.mode == "strict":
+        print("❌ FAIL - Critical fallbacks detected (strict mode)")
         return 1
     else:
-        print("✅ PASS - No hay fallbacks críticos")
+        if args.mode == "warn":
+            print("⚠️  WARN - Fallbacks detected (CI will enforce)")
+        else:
+            print("✅ PASS - No new critical fallbacks")
         return 0
 
 

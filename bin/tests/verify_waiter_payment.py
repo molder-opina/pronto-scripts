@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../../pronto-employe
 
 from pronto_shared.config import load_config
 from pronto_shared.db import init_engine, get_session
-from pronto_shared.models import SystemSetting, DiningSession, Order, Employee
+from pronto_shared.models import SystemSetting, DiningSession, Order, Employee, Table
 from pronto_shared.services.business_config_service import invalidate_config_cache
 from pronto_shared.services.payment_permission_service import (
     invalidate_payment_permissions_cache,
@@ -82,7 +82,10 @@ def run_verification():
         # Create a dummy session with explicit ID to avoid auto-increment issues
         import uuid
         sid = uuid.uuid4()
-        ds = DiningSession(id=sid, table_number="T-Verify", status="open", total_amount=100.00)
+        table = session.execute(select(Table).where(Table.is_active.is_(True))).scalars().first()
+        if not table:
+            raise RuntimeError("No active table found for verification flow")
+        ds = DiningSession(id=sid, table_id=table.id, status="open", total_amount=100.00)
         session.add(ds)
         session.commit()
         session_id = ds.id

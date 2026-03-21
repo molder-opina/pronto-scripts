@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""
+PRONTO Layering Check - AST-based Architectural Validation
+
+Enforces:
+- No cross-layer imports
+- Console isolation (waiter/chef/cashier/admin/system)
+- Forbidden imports (flask.session, legacy_mysql, etc.)
+
+Usage:
+    pronto-layering-check [--staged|--changed|--files CSV]
+    pronto-layering-check --full    # Check entire project
+    pronto-layering-check --self-test
+
+Rule: AST-based, not regex (for accuracy)
+"""
+
+import argparse
+import sys
+from pathlib import Path
+from typing import List
+
+# Add lib to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+from validation.layering import LayeringChecker, PRONTO_LAYERS
+from validation.core import ValidationStatus
+
+
+def discover_workspace_root() -> Path:
+    """Discover workspace root from script location"""
+    script_dir = Path(__file__).parent
+    
+    if script_dir.name == "bin" and (script_dir.parent / "lib").exists():
+        return script_dir.parent.parent
+    
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=script_dir,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    
+    return script_dir.parent
+
+
+def get_staged_files(workspace_root: Path) -> List[Path]:
+    """Get list of staged files from git"""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def get_changed_files(workspace_root: Path) -> List[Path]:
+    """Get list of changed files from git"""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=ACMRT", "origin/main...HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode != 0 or not result.stdout.strip():
+            result = subprocess.run(
+                ["git", "diff", "--name-only", "--diff-filter=ACMRT", "HEAD~1...HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=workspace_root,
+            )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PRONTO AST-based Layering Check",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pronto-layering-check --staged           # Check staged files
+  pronto-layering-check --changed          # Check changed files
+  pronto-layering-check --files a.py,b.py  # Check specific files
+  pronto-layering-check --full             # Check entire project
+  pronto-layering-check --self-test        # Run self-test
+
+Exit codes:
+  0 = No violations
+  1 = Violations found
+        """,
+    )
+    
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Check staged files (default if no source specified)",
+    )
+    
+    parser.add_argument(
+        "--changed",
+        action="store_true",
+        help="Check changed files vs origin/main",
+    )
+    
+    parser.add_argument(
+        "--files",
+        type=str,
+        help="Comma-separated list of files to check",
+    )
+    
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Check entire project (all layers)",
+    )
+    
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run self-test",
+    )
+    
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON",
+    )
+    
+    args = parser.parse_args()
+    
+    # Self-test mode
+    if args.self_test:
+        print("\n" + "=" * 80)
+        print("PRONTO LAYERING CHECK - SELF TEST")
+        print("=" * 80)
+        
+        workspace_root = discover_workspace_root()
+        print(f"✓ Workspace root: {workspace_root}")
+        
+        print(f"\n✓ Configured layers:")
+        for name, config in PRONTO_LAYERS.items():
+            print(f"  - {name}: {config.path_pattern}")
+            print(f"    Allowed imports: {', '.join(config.allowed_imports)}")
+        
+        print("\n" + "=" * 80)
+        print("SELF TEST PASSED")
+        print("=" * 80)
+        return 0
+    
+    # Discover workspace root
+    workspace_root = discover_workspace_root()
+    
+    # Create checker
+    checker = LayeringChecker(workspace_root)
+    
+    # Determine files to check
+    file_paths: List[Path] = []
+    
+    if args.full:
+        print(f"\nRunning full project layering check...")
+        result = checker.check_project()
+    else:
+        if args.files:
+            file_paths = [Path(f.strip()) for f in args.files.split(",")]
+        elif args.changed:
+            file_paths = get_changed_files(workspace_root)
+        elif args.staged or True:  # Default to staged
+            file_paths = get_staged_files(workspace_root)
+        
+        if not file_paths:
+            print("No files to check")
+            return 0
+        
+        print(f"\nChecking {len(file_paths)} files for layering violations...")
+        result = checker.check_files(file_paths)
+    
+    # Print report
+    checker.engine.print_report()
+    
+    # Print violations summary
+    if checker.violations:
+        summary = checker.get_violations_summary()
+        print("\nVIOLATIONS SUMMARY:")
+        print(f"  Total: {summary['total']}")
+        
+        if summary['by_type']:
+            print(f"  By type:")
+            for vtype, count in summary['by_type'].items():
+                print(f"    - {vtype}: {count}")
+        
+        if summary['by_layer']:
+            print(f"  By layer:")
+            for layer, count in summary['by_layer'].items():
+                print(f"    - {layer}: {count}")
+        
+        print(f"\nDetailed violations:")
+        for v in summary['violations'][:10]:
+            print(f"  {v['file']}:{v['line']} [{v['type']}] {v['message']}")
+        if len(summary['violations']) > 10:
+            print(f"  ... and {len(summary['violations']) - 10} more")
+    
+    # JSON output
+    if args.json:
+        import json
+        output = {
+            "status": result.status.value,
+            "message": result.message,
+            "violations": checker.get_violations_summary(),
+            "evidence": result.evidence.to_dict(),
+        }
+        print("\n" + json.dumps(output, indent=2))
+    
+    # Return exit code
+    return 1 if result.status == ValidationStatus.FAILED else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

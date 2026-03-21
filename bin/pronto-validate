@@ -1,0 +1,412 @@
+#!/usr/bin/env python3
+"""
+PRONTO Validate - Master Validation Orchestrator
+
+Enforces:
+- Raw evidence requirement (stdout, stderr, counts)
+- Negative validation (prove why something is NOT broken)
+- Complexity limits
+- Architectural drift detection
+
+Usage:
+    pronto-validate [--checks CHECK1,CHECK2,...] [--staged|--changed|--files CSV]
+    pronto-validate --save-baseline
+    pronto-validate --list-checks
+    pronto-validate --self-test
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import List, Optional
+
+# Add lib to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+from validation.core import ValidationEngine, ValidationStatus
+from validation.layering import LayeringChecker
+from validation.invariants import InvariantChecker
+from validation.drift import DriftDetector
+from validation.complexity import ComplexityChecker
+
+
+def discover_workspace_root() -> Path:
+    """Discover workspace root from script location"""
+    script_dir = Path(__file__).parent
+    
+    # Check if we're in pronto-scripts/bin
+    if script_dir.name == "bin" and (script_dir.parent / "lib").exists():
+        return script_dir.parent.parent
+    
+    # Fallback to git root
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=script_dir,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    
+    return script_dir.parent
+
+
+def get_staged_files(workspace_root: Path) -> List[Path]:
+    """Get list of staged files from git"""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def get_changed_files(workspace_root: Path) -> List[Path]:
+    """Get list of changed files from git"""
+    import subprocess
+    
+    try:
+        # Try origin/main...HEAD first
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=ACMRT", "origin/main...HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode != 0 or not result.stdout.strip():
+            # Fallback to HEAD~1...HEAD
+            result = subprocess.run(
+                ["git", "diff", "--name-only", "--diff-filter=ACMRT", "HEAD~1...HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=workspace_root,
+            )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def run_all_checks(
+    workspace_root: Path,
+    file_paths: List[Path],
+    save_baseline: bool = False,
+) -> int:
+    """
+    Run all validation checks
+    
+    Returns:
+        Exit code (0 = PASSED, 1 = FAILED, 2 = WARNINGS)
+    """
+    all_passed = True
+    has_warnings = False
+    
+    print("=" * 80)
+    print("PRONTO VALIDATION SUITE")
+    print("=" * 80)
+    print(f"Workspace: {workspace_root}")
+    print(f"Files to validate: {len(file_paths)}")
+    print("=" * 80)
+    
+    # 1. Layering Check (AST-based)
+    print("\n[1/5] Running AST-based layering check...")
+    layering_checker = LayeringChecker(workspace_root)
+    layering_result = layering_checker.check_files(file_paths)
+    layering_result.print_report()
+    
+    if layering_result.status == ValidationStatus.FAILED:
+        all_passed = False
+    elif layering_result.status == ValidationStatus.WARNING:
+        has_warnings = True
+    
+    # 2. Complexity Check
+    print("\n[2/5] Running complexity check...")
+    complexity_checker = ComplexityChecker(workspace_root)
+    complexity_result = complexity_checker.check_complexity(file_paths)
+    complexity_result.print_report()
+    
+    if complexity_result.status == ValidationStatus.FAILED:
+        all_passed = False
+    elif complexity_result.status == ValidationStatus.WARNING:
+        has_warnings = True
+    
+    # 3. Drift Check
+    print("\n[3/5] Running import drift check...")
+    drift_detector = DriftDetector(workspace_root)
+    drift_result = drift_detector.check_drift(file_paths)
+    drift_result.print_report()
+    
+    if drift_result.status == ValidationStatus.FAILED:
+        all_passed = False
+    elif drift_result.status == ValidationStatus.WARNING:
+        has_warnings = True
+    
+    # 4. New Layer Check
+    print("\n[4/5] Running architectural layer check...")
+    layer_result = complexity_checker.check_new_layers(file_paths)
+    layer_result.print_report()
+    
+    if layer_result.status == ValidationStatus.FAILED:
+        all_passed = False
+    elif layer_result.status == ValidationStatus.WARNING:
+        has_warnings = True
+    
+    # 5. Database Invariants (if DB available)
+    print("\n[5/5] Running database invariant checks...")
+    if os.getenv("POSTGRES_HOST"):
+        try:
+            invariant_checker = InvariantChecker(workspace_root)
+            invariant_results = invariant_checker.check_all_invariants()
+            
+            for result in invariant_results:
+                result.print_report()
+                if result.status == ValidationStatus.FAILED:
+                    all_passed = False
+                elif result.status == ValidationStatus.WARNING:
+                    has_warnings = True
+        except Exception as e:
+            print(f"⚠ Database check skipped: {e}")
+    else:
+        print("⚠ Database check skipped (POSTGRES_HOST not set)")
+    
+    # Save baseline if requested
+    if save_baseline:
+        print("\n" + "=" * 80)
+        print("SAVING BASELINES...")
+        print("=" * 80)
+        
+        # Save drift baseline
+        drift_detector.save_current_baseline()
+        print(f"✓ Drift baseline saved")
+        
+        # Save complexity baseline
+        complexity_metrics = {}
+        for f in file_paths:
+            if f.suffix == ".py":
+                metrics = complexity_checker.analyze_file(f)
+                if metrics:
+                    complexity_metrics[metrics.file_path] = metrics
+        complexity_checker.save_baseline(complexity_metrics)
+        print(f"✓ Complexity baseline saved")
+    
+    # Final summary
+    print("\n" + "=" * 80)
+    print("VALIDATION SUMMARY")
+    print("=" * 80)
+    
+    if all_passed and not has_warnings:
+        print("✓ ALL CHECKS PASSED")
+        return 0
+    elif all_passed and has_warnings:
+        print("⚠ ALL CHECKS PASSED (with warnings)")
+        return 2
+    else:
+        print("✗ VALIDATION FAILED")
+        return 1
+
+
+def list_checks() -> None:
+    """List all available validation checks"""
+    checks = [
+        {
+            "name": "layering-check",
+            "description": "AST-based architectural layering validation",
+            "enforces": "No cross-layer imports, console isolation",
+        },
+        {
+            "name": "complexity-check",
+            "description": "File complexity and growth limits",
+            "enforces": "Max +30% lines per file",
+        },
+        {
+            "name": "drift-check",
+            "description": "Import/dependency drift detection",
+            "enforces": "No unexpected new dependencies",
+        },
+        {
+            "name": "layer-check",
+            "description": "New architectural layer detection",
+            "enforces": "No new top-level directories without justification",
+        },
+        {
+            "name": "invariant-check",
+            "description": "Database invariant validation",
+            "enforces": "Idempotency uniqueness, payment consistency",
+        },
+    ]
+    
+    print("\n" + "=" * 80)
+    print("AVAILABLE VALIDATION CHECKS")
+    print("=" * 80)
+    
+    for check in checks:
+        print(f"\n{check['name']}")
+        print(f"  Description: {check['description']}")
+        print(f"  Enforces: {check['enforces']}")
+    
+    print("\n" + "=" * 80)
+
+
+def self_test() -> int:
+    """Run self-test to validate check configuration"""
+    print("\n" + "=" * 80)
+    print("PRONTO VALIDATE - SELF TEST")
+    print("=" * 80)
+    
+    workspace_root = discover_workspace_root()
+    print(f"✓ Workspace root: {workspace_root}")
+    
+    # Check that lib is importable
+    try:
+        from validation.core import ValidationEngine
+        print("✓ Validation library importable")
+    except ImportError as e:
+        print(f"✗ Validation library import failed: {e}")
+        return 1
+    
+    # Check baseline directory
+    baseline_dir = workspace_root / "pronto-scripts" / ".validation-baseline"
+    baseline_dir.mkdir(parents=True, exist_ok=True)
+    print(f"✓ Baseline directory: {baseline_dir}")
+    
+    # Check database config (optional)
+    if os.getenv("POSTGRES_HOST"):
+        print(f"✓ Database connection configured: {os.getenv('POSTGRES_HOST')}")
+    else:
+        print("⚠ Database connection not configured (POSTGRES_HOST not set)")
+    
+    print("\n" + "=" * 80)
+    print("SELF TEST PASSED")
+    print("=" * 80)
+    
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PRONTO Validation Suite",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pronto-validate --staged                     # Validate staged files
+  pronto-validate --changed                    # Validate changed files
+  pronto-validate --files file1.py,file2.py    # Validate specific files
+  pronto-validate --save-baseline              # Save current state as baseline
+  pronto-validate --list-checks                # List all available checks
+  pronto-validate --self-test                  # Run self-test
+
+Exit codes:
+  0 = All checks passed
+  1 = Validation failed
+  2 = Warnings (checks passed with warnings)
+        """,
+    )
+    
+    parser.add_argument(
+        "--checks",
+        type=str,
+        default="all",
+        help="Comma-separated list of checks to run (default: all)",
+    )
+    
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Validate staged files (default if no source specified)",
+    )
+    
+    parser.add_argument(
+        "--changed",
+        action="store_true",
+        help="Validate changed files vs origin/main",
+    )
+    
+    parser.add_argument(
+        "--files",
+        type=str,
+        help="Comma-separated list of files to validate",
+    )
+    
+    parser.add_argument(
+        "--save-baseline",
+        action="store_true",
+        help="Save current state as baseline for future comparisons",
+    )
+    
+    parser.add_argument(
+        "--list-checks",
+        action="store_true",
+        help="List all available validation checks",
+    )
+    
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run self-test to validate configuration",
+    )
+    
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON",
+    )
+    
+    args = parser.parse_args()
+    
+    # Handle special modes
+    if args.list_checks:
+        list_checks()
+        return 0
+    
+    if args.self_test:
+        return self_test()
+    
+    # Discover workspace root
+    workspace_root = discover_workspace_root()
+    
+    # Determine files to validate
+    file_paths: List[Path] = []
+    
+    if args.files:
+        file_paths = [Path(f.strip()) for f in args.files.split(",")]
+    elif args.changed:
+        file_paths = get_changed_files(workspace_root)
+    elif args.staged or True:  # Default to staged
+        file_paths = get_staged_files(workspace_root)
+    
+    if not file_paths:
+        print("No files to validate")
+        return 0
+    
+    # Run validation
+    return run_all_checks(
+        workspace_root=workspace_root,
+        file_paths=file_paths,
+        save_baseline=args.save_baseline,
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main())

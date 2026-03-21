@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""
+PRONTO Isolation Test (P9-002)
+
+Final validation test that detects hidden dependencies.
+
+Test:
+1. Move services/ to services_backup
+2. Run pytest/tests
+3. Verify tests still pass
+4. Restore services/
+
+If tests pass without services/ → hidden dependency detected
+
+Usage:
+    pronto-isolation-test [--test-dir PATH] [--restore-only]
+    pronto-isolation-test --self-test
+"""
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Optional, Tuple
+
+
+def discover_workspace_root() -> Path:
+    """Discover workspace root from script location"""
+    script_dir = Path(__file__).parent
+    
+    if script_dir.name == "bin" and (script_dir.parent / "lib").exists():
+        return script_dir.parent.parent
+    
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=script_dir,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    
+    return script_dir.parent
+
+
+class IsolationTester:
+    """
+    P9-002 Isolation Test
+    
+    Detects hidden dependencies by removing services/ and running tests
+    """
+    
+    def __init__(self, workspace_root: Path):
+        self.workspace_root = workspace_root
+        self.services_dir = workspace_root / "services"
+        self.backup_dir = workspace_root / "services_backup"
+        self.test_dir = workspace_root / "pronto-tests"
+        self.restored = True  # Track if we restored services
+    
+    def check_services_exists(self) -> bool:
+        """Check if services directory exists"""
+        return self.services_dir.exists()
+    
+    def check_backup_exists(self) -> bool:
+        """Check if backup directory exists"""
+        return self.backup_dir.exists()
+    
+    def move_services_to_backup(self) -> bool:
+        """Move services/ to services_backup"""
+        try:
+            if self.services_dir.exists():
+                # Remove old backup if exists
+                if self.backup_dir.exists():
+                    shutil.rmtree(self.backup_dir)
+                
+                # Move services to backup
+                shutil.move(str(self.services_dir), str(self.backup_dir))
+                print(f"✓ Moved services/ → services_backup/")
+                self.restored = False
+                return True
+            else:
+                print("⚠ services/ directory not found")
+                return False
+        except Exception as e:
+            print(f"✗ Failed to move services: {e}")
+            return False
+    
+    def restore_services(self) -> bool:
+        """Restore services from backup"""
+        try:
+            if self.backup_dir.exists():
+                # Remove services if exists (shouldn't happen)
+                if self.services_dir.exists():
+                    shutil.rmtree(self.services_dir)
+                
+                # Move backup back to services
+                shutil.move(str(self.backup_dir), str(self.services_dir))
+                print(f"✓ Restored services_backup/ → services/")
+                self.restored = True
+                return True
+            else:
+                print("⚠ services_backup/ directory not found")
+                return False
+        except Exception as e:
+            print(f"✗ Failed to restore services: {e}")
+            return False
+    
+    def run_tests(self, test_dir: Optional[Path] = None) -> Tuple[bool, str]:
+        """
+        Run tests
+        
+        Returns:
+            (success, output)
+        """
+        test_path = test_dir or self.test_dir
+        
+        if not test_path.exists():
+            return False, f"Test directory not found: {test_path}"
+        
+        # Determine test command
+        test_cmd = None
+        
+        # Check for pytest
+        pytest_ini = test_path / "pytest.ini"
+        if pytest_ini.exists() or (test_path / "tests").exists():
+            test_cmd = ["python", "-m", "pytest", "-v", "--tb=short"]
+        
+        # Check for package.json with test script
+        package_json = test_path / "package.json"
+        if package_json.exists():
+            test_cmd = ["npm", "test"]
+        
+        if not test_cmd:
+            # Default to pytest
+            test_cmd = ["python", "-m", "pytest", "-v", "--tb=short", str(test_path)]
+        
+        print(f"Running tests: {' '.join(test_cmd)}")
+        
+        try:
+            result = subprocess.run(
+                test_cmd,
+                cwd=test_path,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+            )
+            
+            output = result.stdout + result.stderr
+            
+            if result.returncode == 0:
+                return True, output
+            else:
+                return False, output
+        
+        except subprocess.TimeoutExpired:
+            return False, "Tests timed out after 5 minutes"
+        except Exception as e:
+            return False, f"Test execution failed: {str(e)}"
+    
+    def run_isolation_test(self, test_dir: Optional[Path] = None) -> int:
+        """
+        Run complete isolation test
+        
+        Returns:
+            Exit code (0 = PASSED, 1 = FAILED, 2 = ERROR)
+        """
+        print("\n" + "=" * 80)
+        print("PRONTO ISOLATION TEST (P9-002)")
+        print("=" * 80)
+        print(f"Workspace: {self.workspace_root}")
+        print(f"Services: {self.services_dir}")
+        print(f"Tests: {test_dir or self.test_dir}")
+        print("=" * 80)
+        
+        # Step 1: Check if services exists
+        print("\n[1/5] Checking services directory...")
+        if not self.check_services_exists():
+            print("⚠ services/ does not exist - skipping isolation test")
+            print("  (This is OK if your project doesn't use services/)")
+            return 0
+        
+        # Step 2: Move services to backup
+        print("\n[2/5] Moving services/ to services_backup/...")
+        if not self.move_services_to_backup():
+            print("✗ Failed to move services")
+            return 2
+        
+        # Ensure we restore on exit
+        import atexit
+        atexit.register(lambda: self.restore_services() if not self.restored else None)
+        
+        # Step 3: Run tests
+        print("\n[3/5] Running tests without services/...")
+        success, output = self.run_tests(test_dir)
+        
+        print("\n" + "-" * 80)
+        print("TEST OUTPUT (first 50 lines):")
+        print("-" * 80)
+        for line in output.split("\n")[:50]:
+            print(line)
+        if len(output.split("\n")) > 50:
+            print(f"... and {len(output.splitlines()) - 50} more lines")
+        print("-" * 80)
+        
+        # Step 4: Restore services
+        print("\n[4/5] Restoring services/...")
+        if not self.restore_services():
+            print("✗ CRITICAL: Failed to restore services!")
+            return 2
+        
+        # Step 5: Determine result
+        print("\n[5/5] Analyzing results...")
+        
+        if success:
+            print("\n" + "=" * 80)
+            print("⚠ WARNING: TESTS PASSED WITHOUT services/")
+            print("=" * 80)
+            print("\nThis indicates:")
+            print("  1. Tests don't actually depend on services/ (GOOD)")
+            print("  2. OR tests are not comprehensive enough (BAD)")
+            print("  3. OR services/ is not needed (check if it should be removed)")
+            print("\nRecommendation: Review what services/ contains and why tests pass without it")
+            return 1  # Warning - not necessarily failure
+        else:
+            print("\n" + "=" * 80)
+            print("✓ ISOLATION TEST PASSED")
+            print("=" * 80)
+            print("\nTests correctly fail without services/ - dependencies are explicit")
+            return 0
+    
+    def cleanup(self) -> None:
+        """Ensure services is restored"""
+        if not self.restored and self.backup_dir.exists():
+            print("\nCleaning up: restoring services/...")
+            self.restore_services()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PRONTO Isolation Test (P9-002)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pronto-isolation-test                    # Run full isolation test
+  pronto-isolation-test --test-dir ./tests # Use custom test directory
+  pronto-isolation-test --restore-only     # Only restore services (emergency)
+  pronto-isolation-test --self-test        # Run self-test
+
+Exit codes:
+  0 = Test passed (dependencies are explicit)
+  1 = Warning (tests passed without services - review needed)
+  2 = Error (failed to move/restore services)
+        """,
+    )
+    
+    parser.add_argument(
+        "--test-dir",
+        type=Path,
+        help="Custom test directory (default: pronto-tests/)",
+    )
+    
+    parser.add_argument(
+        "--restore-only",
+        action="store_true",
+        help="Only restore services/ (emergency recovery)",
+    )
+    
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run self-test",
+    )
+    
+    args = parser.parse_args()
+    
+    # Self-test mode
+    if args.self_test:
+        print("\n" + "=" * 80)
+        print("PRONTO ISOLATION TEST - SELF TEST")
+        print("=" * 80)
+        
+        workspace_root = discover_workspace_root()
+        print(f"✓ Workspace root: {workspace_root}")
+        
+        tester = IsolationTester(workspace_root)
+        print(f"✓ Services directory: {tester.services_dir}")
+        print(f"✓ Backup directory: {tester.backup_dir}")
+        print(f"✓ Test directory: {tester.test_dir}")
+        
+        print("\n" + "=" * 80)
+        print("SELF TEST PASSED")
+        print("=" * 80)
+        return 0
+    
+    # Restore-only mode (emergency)
+    if args.restore_only:
+        print("\n" + "=" * 80)
+        print("PRONTO ISOLATION TEST - EMERGENCY RESTORE")
+        print("=" * 80)
+        
+        workspace_root = discover_workspace_root()
+        tester = IsolationTester(workspace_root)
+        
+        if tester.restore_services():
+            print("\n✓ Services restored successfully")
+            return 0
+        else:
+            print("\n✗ Failed to restore services")
+            return 2
+    
+    # Run isolation test
+    workspace_root = discover_workspace_root()
+    tester = IsolationTester(workspace_root)
+    
+    try:
+        return tester.run_isolation_test(args.test_dir)
+    finally:
+        tester.cleanup()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

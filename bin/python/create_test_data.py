@@ -381,13 +381,13 @@ print("👥 Creando empleados de prueba...")
 
 employees = [
     {
-        "email": "system@pronto.test",
+        "email": "admin@cafeteria.test",
         "role": "system",
         "name": "System Administrator",
         "employee_code": "SYS001",
         "phone": "",
         "is_active": True,
-        "email_encrypted": "system@pronto.test",
+        "email_encrypted": "admin@cafeteria.test",
         "name_encrypted": "System Administrator",
         "phone_encrypted": "",
         "allow_scopes": '["system"]',

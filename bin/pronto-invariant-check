@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""
+PRONTO Invariant Check - Database Consistency Validation
+
+Enforces critical payment infrastructure invariants:
+1. 1 idempotency_key → maximum 1 payment
+2. Paid session → no new payments accepted
+3. Payment status consistency
+4. Order workflow validity
+5. Session status validity
+
+Usage:
+    pronto-invariant-check [--check NAME] [--json]
+    pronto-invariant-check --list
+    pronto-invariant-check --self-test
+
+Rule: SQL validation with raw evidence (row counts, query output)
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+# Add lib to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+from validation.invariants import InvariantChecker, PAYMENT_INVARIANTS
+from validation.core import ValidationStatus
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PRONTO Database Invariant Check",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pronto-invariant-check                    # Check all invariants
+  pronto-invariant-check --check idempotency_uniqueness
+  pronto-invariant-check --list             # List all invariants
+  pronto-invariant-check --self-test        # Run self-test
+
+Exit codes:
+  0 = All invariants OK
+  1 = Invariant violations found
+  2 = Database connection error
+        """,
+    )
+    
+    parser.add_argument(
+        "--check",
+        type=str,
+        help="Check specific invariant by name",
+    )
+    
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all available invariant checks",
+    )
+    
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run self-test",
+    )
+    
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON",
+    )
+    
+    parser.add_argument(
+        "--skip-critical",
+        action="store_true",
+        help="Skip critical checks (for non-production use)",
+    )
+    
+    args = parser.parse_args()
+    
+    # Self-test mode
+    if args.self_test:
+        print("\n" + "=" * 80)
+        print("PRONTO INVARIANT CHECK - SELF TEST")
+        print("=" * 80)
+        
+        print(f"\n✓ Database configuration:")
+        print(f"  POSTGRES_HOST: {os.getenv('POSTGRES_HOST', 'NOT SET')}")
+        print(f"  POSTGRES_PORT: {os.getenv('POSTGRES_PORT', '5432')}")
+        print(f"  POSTGRES_DB: {os.getenv('POSTGRES_DB', 'pronto')}")
+        print(f"  POSTGRES_USER: {os.getenv('POSTGRES_USER', 'pronto')}")
+        
+        print(f"\n✓ Configured invariants ({len(PAYMENT_INVARIANTS)}):")
+        for inv in PAYMENT_INVARIANTS:
+            severity_icon = "🔴" if inv.severity == "critical" else "🟡" if inv.severity == "high" else "🟢"
+            print(f"  {severity_icon} {inv.name}: {inv.description}")
+        
+        print("\n" + "=" * 80)
+        
+        if not os.getenv("POSTGRES_HOST"):
+            print("WARNING: POSTGRES_HOST not set - database checks will be skipped")
+            print("=" * 80)
+        else:
+            print("SELF TEST PASSED")
+            print("=" * 80)
+        
+        return 0
+    
+    # List mode
+    if args.list:
+        print("\n" + "=" * 80)
+        print("PRONTO INVARIANT CHECKS")
+        print("=" * 80)
+        
+        for inv in PAYMENT_INVARIANTS:
+            severity_icon = "🔴" if inv.severity == "critical" else "🟡" if inv.severity == "high" else "🟢"
+            print(f"\n{severity_icon} {inv.name}")
+            print(f"  Description: {inv.description}")
+            print(f"  Severity: {inv.severity}")
+            print(f"  Expected rows: {inv.expected_rows}")
+            print(f"  Fix suggestion: {inv.fix_suggestion}")
+        
+        print("\n" + "=" * 80)
+        return 0
+    
+    # Check database connection
+    if not os.getenv("POSTGRES_HOST"):
+        print("\n" + "=" * 80)
+        print("ERROR: POSTGRES_HOST not set")
+        print("=" * 80)
+        print("\nSet database connection environment variables:")
+        print("  export POSTGRES_HOST=localhost")
+        print("  export POSTGRES_PORT=5432")
+        print("  export POSTGRES_DB=pronto")
+        print("  export POSTGRES_USER=pronto")
+        print("  export POSTGRES_PASSWORD=***")
+        print("=" * 80)
+        return 2
+    
+    # Create checker
+    workspace_root = Path(__file__).parent.parent.parent
+    checker = InvariantChecker(workspace_root)
+    
+    # Run checks
+    print("\n" + "=" * 80)
+    print("PRONTO DATABASE INVARIANT CHECK")
+    print("=" * 80)
+    
+    if args.check:
+        # Check specific invariant
+        invariant = next(
+            (i for i in PAYMENT_INVARIANTS if i.name == args.check),
+            None
+        )
+        
+        if not invariant:
+            print(f"\nERROR: Unknown invariant '{args.check}'")
+            print(f"\nAvailable invariants:")
+            for i in PAYMENT_INVARIANTS:
+                print(f"  - {i.name}")
+            return 1
+        
+        print(f"\nChecking: {invariant.name}")
+        print(f"Description: {invariant.description}")
+        print("-" * 80)
+        
+        result = checker.check_invariant(invariant)
+        result.print_report()
+        
+        exit_code = 1 if result.status == ValidationStatus.FAILED else 0
+    else:
+        # Check all invariants
+        print(f"\nRunning {len(PAYMENT_INVARIANTS)} invariant checks...")
+        print("-" * 80)
+        
+        results = checker.check_all_invariants()
+        
+        for result in results:
+            if args.skip_critical and result.severity == "critical":
+                continue
+            result.print_report()
+        
+        # Summary
+        failed = sum(1 for r in results if r.status == ValidationStatus.FAILED)
+        passed = sum(1 for r in results if r.status == ValidationStatus.PASSED)
+        
+        print("\n" + "=" * 80)
+        print(f"SUMMARY: {passed} passed, {failed} failed")
+        print("=" * 80)
+        
+        if checker.violations:
+            summary = checker.get_violations_summary()
+            print(f"\nTotal violations: {summary['total_violations']}")
+            print(f"Critical: {summary['critical_count']}")
+            
+            if summary['by_check']:
+                print(f"\nViolations by check:")
+                for check_name, violations in summary['by_check'].items():
+                    print(f"  - {check_name}: {len(violations)} violations")
+        
+        exit_code = 1 if failed > 0 else 0
+    
+    # JSON output
+    if args.json:
+        output = {
+            "status": "FAILED" if exit_code > 0 else "PASSED",
+            "violations": checker.get_violations_summary(),
+            "results": [r.to_dict() for r in checker.engine.results],
+        }
+        print("\n" + json.dumps(output, indent=2))
+    
+    print("\n" + "=" * 80)
+    if exit_code == 0:
+        print("✓ ALL INVARIANTS OK")
+    else:
+        print("✗ INVARIANT VIOLATIONS DETECTED")
+    print("=" * 80)
+    
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

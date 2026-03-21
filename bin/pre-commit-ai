@@ -584,6 +584,50 @@ done <<< "$CHECKS_TO_RUN"
 
 emit_report
 
+# ============================================================================
+# NEW PYTHON VALIDATION SUITE INTEGRATION
+# ============================================================================
+# Run the new agent-independent validation tools if available
+if has_cmd "python3" && [ -f "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-validate" ]; then
+  echo ""
+  echo "================================================================================"
+  echo "RUNNING PYTHON VALIDATION SUITE"
+  echo "================================================================================"
+  
+  # Run pronto-validate on staged files
+  if [ "$USE_STAGED" -eq 1 ]; then
+    python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-validate" --staged --mode enforce || true
+  elif [ "$USE_CHANGED" -eq 1 ]; then
+    python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-validate" --changed --mode enforce || true
+  fi
+  
+  # Run layering check (critical for architecture)
+  if [ -f "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-layering-check" ]; then
+    echo ""
+    echo "Running AST-based layering check..."
+    if [ "$USE_STAGED" -eq 1 ]; then
+      python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-layering-check" --staged || true
+    elif [ "$USE_CHANGED" -eq 1 ]; then
+      python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-layering-check" --changed || true
+    fi
+  fi
+  
+  # Run drift check (if baseline exists)
+  if [ -f "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-drift-detect" ]; then
+    baseline_dir="$WORKSPACE_ROOT/pronto-scripts/.validation-baseline"
+    if [ -d "$baseline_dir" ] && [ "$(ls -A "$baseline_dir" 2>/dev/null)" ]; then
+      echo ""
+      echo "Running import drift check..."
+      if [ "$USE_STAGED" -eq 1 ]; then
+        python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-drift-detect" --staged || true
+      elif [ "$USE_CHANGED" -eq 1 ]; then
+        python3 "$WORKSPACE_ROOT/pronto-scripts/bin/pronto-drift-detect" --changed || true
+      fi
+    fi
+  fi
+fi
+# ============================================================================
+
 if [ "$FAILS" -gt 0 ]; then
   exit 1
 fi

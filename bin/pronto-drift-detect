@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""
+PRONTO Drift Detect - Import/Dependency Drift Detection
+
+Tracks and detects unexpected changes in imports/dependencies.
+
+Features:
+- Baseline import tracking
+- Before/after comparison
+- New dependency detection
+- Drift reporting
+
+Usage:
+    pronto-drift-detect [--staged|--changed|--files CSV]
+    pronto-drift-detect --save-baseline
+    pronto-drift-detect --show-baseline
+    pronto-drift-detect --self-test
+
+Rule: Compare imports before/after, flag unexpected additions
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import List
+
+# Add lib to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+from validation.drift import DriftDetector
+from validation.core import ValidationStatus
+
+
+def discover_workspace_root() -> Path:
+    """Discover workspace root from script location"""
+    script_dir = Path(__file__).parent
+    
+    if script_dir.name == "bin" and (script_dir.parent / "lib").exists():
+        return script_dir.parent.parent
+    
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=script_dir,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    
+    return script_dir.parent
+
+
+def get_staged_files(workspace_root: Path) -> List[Path]:
+    """Get list of staged files from git"""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def get_changed_files(workspace_root: Path) -> List[Path]:
+    """Get list of changed files from git"""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=ACMRT", "origin/main...HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=workspace_root,
+        )
+        
+        if result.returncode != 0 or not result.stdout.strip():
+            result = subprocess.run(
+                ["git", "diff", "--name-only", "--diff-filter=ACMRT", "HEAD~1...HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=workspace_root,
+            )
+        
+        if result.returncode == 0:
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            return [workspace_root / f for f in files]
+    except Exception:
+        pass
+    
+    return []
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PRONTO Import/Dependency Drift Detection",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pronto-drift-detect --staged              # Check staged files
+  pronto-drift-detect --changed             # Check changed files
+  pronto-drift-detect --files a.py,b.py     # Check specific files
+  pronto-drift-detect --save-baseline       # Save current state as baseline
+  pronto-drift-detect --show-baseline       # Show current baseline
+  pronto-drift-detect --self-test           # Run self-test
+
+Exit codes:
+  0 = No drift or approved drift
+  1 = Unapproved drift detected
+  2 = Warning (drift detected but approved)
+        """,
+    )
+    
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Check staged files (default if no source specified)",
+    )
+    
+    parser.add_argument(
+        "--changed",
+        action="store_true",
+        help="Check changed files vs origin/main",
+    )
+    
+    parser.add_argument(
+        "--files",
+        type=str,
+        help="Comma-separated list of files to check",
+    )
+    
+    parser.add_argument(
+        "--save-baseline",
+        action="store_true",
+        help="Save current state as baseline",
+    )
+    
+    parser.add_argument(
+        "--force-baseline-update",
+        action="store_true",
+        help="Force baseline update (bypass CI protection)",
+    )
+    
+    parser.add_argument(
+        "--show-baseline",
+        action="store_true",
+        help="Show current baseline",
+    )
+    
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run self-test",
+    )
+    
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON",
+    )
+    
+    parser.add_argument(
+        "--allow-new-deps",
+        type=str,
+        help="Comma-separated list of allowed new dependencies",
+    )
+    
+    args = parser.parse_args()
+    
+    # Self-test mode
+    if args.self_test:
+        print("\n" + "=" * 80)
+        print("PRONTO DRIFT DETECT - SELF TEST")
+        print("=" * 80)
+        
+        workspace_root = discover_workspace_root()
+        print(f"✓ Workspace root: {workspace_root}")
+        
+        baseline_dir = workspace_root / "pronto-scripts" / ".validation-baseline"
+        print(f"✓ Baseline directory: {baseline_dir}")
+        
+        if baseline_dir.exists():
+            baseline_files = list(baseline_dir.glob("*.json"))
+            print(f"✓ Baseline files: {len(baseline_files)}")
+            for bf in baseline_files[:5]:
+                print(f"  - {bf.name}")
+        
+        print("\n" + "=" * 80)
+        print("SELF TEST PASSED")
+        print("=" * 80)
+        return 0
+    
+    # Show baseline mode
+    if args.show_baseline:
+        workspace_root = discover_workspace_root()
+        detector = DriftDetector(workspace_root)
+        baseline_path = detector.get_baseline_path()
+        
+        print("\n" + "=" * 80)
+        print("PRONTO DRIFT DETECT - BASELINE")
+        print("=" * 80)
+        
+        if baseline_path.exists():
+            with open(baseline_path, "r") as f:
+                baseline = json.load(f)
+            
+            print(f"\nBaseline file: {baseline_path}")
+            print(f"Total imports: {baseline.get('import_count', 'N/A')}")
+            print(f"Total dependencies: {len(baseline.get('dependencies', []))}")
+            print(f"Files covered: {baseline.get('file_count', 'N/A')}")
+            
+            print(f"\nDependencies ({len(baseline.get('dependencies', []))}):")
+            for dep in sorted(baseline.get('dependencies', []))[:20]:
+                print(f"  - {dep}")
+            if len(baseline.get('dependencies', [])) > 20:
+                print(f"  ... and {len(baseline.get('dependencies', [])) - 20} more")
+        else:
+            print("\nNo baseline exists. Run with --save-baseline to create one.")
+        
+        print("\n" + "=" * 80)
+        return 0
+    
+    # Discover workspace root
+    workspace_root = discover_workspace_root()
+    
+    # Create detector
+    detector = DriftDetector(workspace_root)
+    
+    # Save baseline mode
+    if args.save_baseline:
+        # CI protection: prevent baseline regeneration in automated environments
+        if os.getenv("CI") and not args.force_baseline_update:
+            print("\n" + "=" * 80)
+            print("❌ ERROR: Baseline modification prohibited in CI")
+            print("=" * 80)
+            print("\nBaseline cannot be modified in CI environments.")
+            print("To update baseline:")
+            print("  1. Run locally: pronto-drift-detect --save-baseline")
+            print("  2. Commit the updated baseline file")
+            print("  3. Push changes")
+            print("\nOr use --force-baseline-update to bypass (NOT RECOMMENDED)")
+            print("=" * 80)
+            return 1
+        
+        print("\n" + "=" * 80)
+        print("PRONTO DRIFT DETECT - SAVING BASELINE")
+        print("=" * 80)
+        
+        baseline_path = detector.save_current_baseline()
+        
+        print(f"\n✓ Baseline saved: {baseline_path}")
+        
+        with open(baseline_path, "r") as f:
+            baseline = json.load(f)
+        
+        print(f"  Total imports: {baseline.get('import_count', 'N/A')}")
+        print(f"  Total dependencies: {len(baseline.get('dependencies', []))}")
+        print(f"  Files covered: {baseline.get('file_count', 'N/A')}")
+        
+        print("\n" + "=" * 80)
+        return 0
+    
+    # Determine files to check
+    file_paths: List[Path] = []
+    
+    if args.files:
+        file_paths = [Path(f.strip()) for f in args.files.split(",")]
+    elif args.changed:
+        file_paths = get_changed_files(workspace_root)
+    elif args.staged or True:  # Default to staged
+        file_paths = get_staged_files(workspace_root)
+    
+    if not file_paths:
+        print("No files to check")
+        return 0
+    
+    # Parse allowed new deps
+    allowed_new_deps = None
+    if args.allow_new_deps:
+        allowed_new_deps = [d.strip() for d in args.allow_new_deps.split(",")]
+    
+    # Run drift check
+    print("\n" + "=" * 80)
+    print("PRONTO DRIFT DETECT")
+    print("=" * 80)
+    print(f"Files to check: {len(file_paths)}")
+    print("-" * 80)
+    
+    result = detector.check_drift(file_paths, allowed_new_deps=allowed_new_deps)
+    detector.engine.print_report()
+    
+    # Show detailed drift report
+    if detector.violations:
+        print("\nDRIFT DETAILS:")
+        
+        if detector.violations.new_imports:
+            print(f"\nNew imports ({len(detector.violations.new_imports)}):")
+            for imp in detector.violations.new_imports[:20]:
+                print(f"  + {imp.module} ({imp.file_path}:{imp.line_number})")
+            if len(detector.violations.new_imports) > 20:
+                print(f"  ... and {len(detector.violations.new_imports) - 20} more")
+        
+        if detector.violations.removed_imports:
+            print(f"\nRemoved imports ({len(detector.violations.removed_imports)}):")
+            for imp in detector.violations.removed_imports[:20]:
+                print(f"  - {imp.module} ({imp.file_path}:{imp.line_number})")
+            if len(detector.violations.removed_imports) > 20:
+                print(f"  ... and {len(detector.violations.removed_imports) - 20} more")
+        
+        if detector.violations.new_dependencies:
+            print(f"\nNew dependencies: {', '.join(detector.violations.new_dependencies)}")
+        
+        if detector.violations.removed_dependencies:
+            print(f"Removed dependencies: {', '.join(detector.violations.removed_dependencies)}")
+    
+    # JSON output
+    if args.json:
+        output = {
+            "status": result.status.value,
+            "message": result.message,
+            "drift": {
+                "new_imports": len(detector.violations.new_imports),
+                "removed_imports": len(detector.violations.removed_imports),
+                "new_dependencies": list(detector.violations.new_dependencies),
+                "removed_dependencies": list(detector.violations.removed_dependencies),
+                "files_with_changes": list(detector.violations.files_with_changes),
+            },
+            "evidence": result.evidence.to_dict(),
+        }
+        print("\n" + json.dumps(output, indent=2))
+    
+    # Return exit code
+    if result.status == ValidationStatus.FAILED:
+        return 1
+    elif result.status == ValidationStatus.WARNING:
+        return 2
+    else:
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

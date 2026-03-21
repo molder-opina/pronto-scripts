@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+#
+# pronto-setup-test-auth - Bootstrap canonical test authentication accounts
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../" && pwd)"
+PYTHON_VENV="$PROJECT_ROOT/pronto-libs/.venv/bin/python3"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+error() { echo -e "${RED}❌ ERROR:${NC} $1" >&2; }
+success() { echo -e "${GREEN}✅${NC} $1"; }
+warning() { echo -e "${YELLOW}⚠️${NC} $1"; }
+info() { echo -e "${BLUE}ℹ️${NC} $1"; }
+
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    set -a
+    # Source .env disabled - use environment variables instead
+    set +a
+fi
+
+check_env() {
+    local missing=()
+    for var in POSTGRES_HOST POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB PASSWORD_HASH_SALT HANDOFF_PEPPER; do
+        [[ -z "${!var:-}" ]] && missing+=("$var")
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        error "Missing: ${missing[*]}"
+        exit 1
+    fi
+}
+
+run_check() {
+    export PROJECT_ROOT
+    "$PYTHON_VENV" - "$PROJECT_ROOT" << 'PYEOF'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "pronto-libs/src"))
+from pronto_shared.security import hash_identifier
+import psycopg2
+
+CANONICAL = [
+    ("admin.roles@cafeteria.test", "admin"),
+    ("admin@cafeteria.test", "system"),
+    ("juan.mesero@cafeteria.test", "waiter"),
+    ("carlos.chef@cafeteria.test", "chef"),
+    ("laura.cajera@cafeteria.test", "cashier"),
+]
+
+conn = psycopg2.connect(
+    host=os.getenv("POSTGRES_HOST", "localhost"),
+    port=os.getenv("POSTGRES_PORT", "5432"),
+    user=os.getenv("POSTGRES_USER", "pronto"),
+    password=os.getenv("POSTGRES_PASSWORD", "pronto123"),
+    database=os.getenv("POSTGRES_DB", "pronto"),
+)
+cursor = conn.cursor()
+print("Checking canonical test accounts...\n")
+all_ok = True
+
+for email, role in CANONICAL:
+    email_hash = hash_identifier(email)
+    cursor.execute("SELECT id, role, email_encrypted, auth_hash IS NOT NULL, is_active FROM pronto_employees WHERE email_hash = %s", (email_hash,))
+    row = cursor.fetchone()
+    if not row:
+        print(f"❌ {email:40s} - NOT FOUND")
+        all_ok = False
+    else:
+        issues = []
+        if row[1] != role: issues.append(f"role={row[1]}")
+        if row[2] != email: issues.append(f"email='{row[2]}'")
+        if not row[3]: issues.append("no auth_hash")
+        if not row[4]: issues.append("inactive")
+        if issues:
+            print(f"⚠️  {email:40s} - {', '.join(issues)}")
+            all_ok = False
+        else:
+            print(f"✅ {email:40s} - OK")
+
+cursor.close()
+conn.close()
+sys.exit(0 if all_ok else 1)
+PYEOF
+}
+
+run_fix() {
+    export PROJECT_ROOT
+    "$PYTHON_VENV" - "$PROJECT_ROOT" << 'PYEOF'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "pronto-libs/src"))
+from pronto_shared.security import hash_identifier, hash_credentials
+import psycopg2
+
+CANONICAL = [
+    ("admin.roles@cafeteria.test", "admin", "Admin", "Roles", "ADMIN001", ["admin", "waiter", "chef", "cashier"]),
+    ("admin@cafeteria.test", "system", "Administrador", "Sistema", "SYSTEM001", ["system", "admin", "waiter", "chef", "cashier"]),
+    ("juan.mesero@cafeteria.test", "waiter", "Juan", "Mesero", "WAITER001", ["waiter"]),
+    ("carlos.chef@cafeteria.test", "chef", "Carlos", "Chef", "CHEF001", ["chef"]),
+    ("laura.cajera@cafeteria.test", "cashier", "Laura", "Cajera", "CASHIER001", ["cashier"]),
+]
+
+conn = psycopg2.connect(
+    host=os.getenv("POSTGRES_HOST", "localhost"),
+    port=os.getenv("POSTGRES_PORT", "5432"),
+    user=os.getenv("POSTGRES_USER", "pronto"),
+    password=os.getenv("POSTGRES_PASSWORD", "pronto123"),
+    database=os.getenv("POSTGRES_DB", "pronto"),
+)
+conn.autocommit = True
+cursor = conn.cursor()
+print("Creating/updating canonical test accounts...\n")
+created = updated = 0
+
+for email, role, first, last, code, scopes in CANONICAL:
+    email_hash = hash_identifier(email)
+    auth_hash = hash_credentials(email, "ChangeMe!123")
+    cursor.execute("SELECT id FROM pronto_employees WHERE email_hash = %s", (email_hash,))
+    if cursor.fetchone():
+        cursor.execute("UPDATE pronto_employees SET auth_hash=%s, is_active=true, employee_code=%s, role=%s, first_name=%s, last_name=%s, name_encrypted=%s, email_encrypted=%s, allow_scopes=%s WHERE email_hash=%s",
+            (auth_hash, code, role, first, last, f"{first} {last}", email, json.dumps(scopes), email_hash))
+        print(f"   ✓ Updated: {email} ({role})")
+        updated += 1
+    else:
+        cursor.execute("INSERT INTO pronto_employees (email_hash, auth_hash, role, is_active, first_name, last_name, name_encrypted, email_encrypted, employee_code, allow_scopes) VALUES (%s, %s, %s, true, %s, %s, %s, %s, %s, %s)",
+            (email_hash, auth_hash, role, first, last, f"{first} {last}", email, code, json.dumps(scopes)))
+        print(f"   + Created: {email} ({role})")
+        created += 1
+
+cursor.close()
+conn.close()
+print(f"\n✅ Done: {created} created, {updated} updated")
+PYEOF
+}
+
+show_help() {
+    cat << 'HELP'
+Bootstrap canonical test authentication accounts for PRONTO tests.
+
+USAGE:
+    pronto-setup-test-auth [OPTION]
+
+OPTIONS:
+    --check     Validate accounts exist with correct hashes
+    --fix       Create/update accounts with canonical credentials
+    --verify    Check and auto-fix any issues found
+    --help      Show this help message
+
+ENVIRONMENT:
+    POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+    PASSWORD_HASH_SALT, HANDOFF_PEPPER
+
+CANONICAL ACCOUNTS (Password: ChangeMe!123):
+    admin.roles@cafeteria.test  (admin)
+    admin@cafeteria.test        (system)
+    juan.mesero@cafeteria.test  (waiter)
+    carlos.chef@cafeteria.test  (chef)
+    laura.cajera@cafeteria.test (cashier)
+HELP
+}
+
+check_env
+
+case "${1:-}" in
+    --check) run_check ;;
+    --fix) run_fix ;;
+    --verify) run_check || { run_fix && run_check; } ;;
+    --help|-h) show_help ;;
+    "") run_check || { warning "Run with --fix to create/update"; exit 1; } ;;
+    *) error "Unknown option: $1"; show_help; exit 1 ;;
+esac

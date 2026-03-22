@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""
+Architecture Validation Report Generator
+
+Generates professional reports for architecture gate violations and passes.
+
+Usage:
+    python3 pronto-scripts/bin/pronto-arch-report --mode [local|ci] --output [path]
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import json
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def run_command(cmd: list[str]) -> tuple[int, str, str]:
+    """Run a command and return exit code, stdout, stderr."""
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result.returncode, result.stdout, result.stderr
+
+
+def generate_header() -> str:
+    """Generate report header."""
+    return f"""
+================================================================================
+PRONTO ARCHITECTURE VALIDATION REPORT
+================================================================================
+
+Generated: {datetime.now(timezone.utc).isoformat()}
+Environment: {os.getenv('CI', 'false').lower()} (CI mode)
+Branch: {os.getenv('GITHUB_REF', 'local')}
+Commit: {os.getenv('GITHUB_SHA', 'local')}
+
+--------------------------------------------------------------------------------
+"""
+
+
+def generate_summary(passed: bool, checks: list[dict]) -> str:
+    """Generate summary section."""
+    total = len(checks)
+    passed_count = sum(1 for c in checks if c['status'] == 'PASS')
+    failed_count = total - passed_count
+    
+    status = "✅ APPROVED" if passed else "❌ REJECTED"
+    
+    return f"""
+SUMMARY
+--------------------------------------------------------------------------------
+Status: {status}
+Total Checks: {total}
+Passed: {passed_count}
+Failed: {failed_count}
+
+"""
+
+
+def generate_check_details(checks: list[dict]) -> str:
+    """Generate detailed check results."""
+    lines = ["CHECK DETAILS", "-" * 80]
+    
+    for check in checks:
+        status_icon = "✅" if check['status'] == 'PASS' else "❌"
+        lines.append(f"{status_icon} {check['name']}")
+        lines.append(f"  Status: {check['status']}")
+        if check.get('duration'):
+            lines.append(f"  Duration: {check['duration']}ms")
+        if check.get('output'):
+            lines.append(f"  Output: {check['output'][:200]}...")
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
+def generate_violations(violations: list[dict]) -> str:
+    """Generate violations section."""
+    if not violations:
+        return "\nVIOLATIONS\n--------------------------------------------------------------------------------\n✅ No violations detected\n"
+    
+    lines = ["\nVIOLATIONS", "-" * 80]
+    
+    for v in violations:
+        lines.append(f"❌ {v['file']}")
+        lines.append(f"  Pattern: {v['pattern']}")
+        if v.get('line'):
+            lines.append(f"  Line: {v['line']}")
+        if v.get('context'):
+            lines.append(f"  Context: {v['context'][:100]}...")
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
+def generate_recommendations(violations: list[dict]) -> str:
+    """Generate recommendations based on violations."""
+    if not violations:
+        return "\nRECOMMENDATIONS\n--------------------------------------------------------------------------------\n✅ All architecture rules are being followed. Keep it up!\n"
+    
+    lines = ["\nRECOMMENDATIONS", "-" * 80]
+    
+    has_db_access = any('DB' in v.get('pattern', '') or 'session' in v.get('pattern', '').lower() 
+                       for v in violations)
+    
+    if has_db_access:
+        lines.append("❌ CRITICAL: Direct database access detected")
+        lines.append("   Action: Move all DB logic to pronto-api or pronto-libs")
+        lines.append("   Reference: AGENTS.md section 12.4.2 (BFF prohibido)")
+        lines.append("")
+    
+    lines.append("General Recommendations:")
+    lines.append("  1. Run: ./pronto-scripts/validate_architecture.sh")
+    lines.append("  2. Run: python3 pronto-tests/architecture/test_no_db_access.py")
+    lines.append("  3. Check: pronto-docs/errors/ for related bugs")
+    lines.append("")
+    
+    return "\n".join(lines)
+
+
+def generate_report(mode: str = "local") -> str:
+    """Generate complete architecture validation report."""
+    checks = []
+    violations = []
+    
+    # Run architecture gate test
+    start_time = datetime.now(timezone.utc)
+    rc, stdout, stderr = run_command([
+        sys.executable, 
+        "pronto-tests/architecture/test_no_db_access.py"
+    ])
+    end_time = datetime.now(timezone.utc)
+    
+    duration_ms = int((end_time - start_time).total_seconds() * 1000)
+    
+    checks.append({
+        'name': 'Architecture Gate (No DB Access)',
+        'status': 'PASS' if rc == 0 else 'FAIL',
+        'duration': duration_ms,
+        'output': stdout if rc == 0 else stderr
+    })
+    
+    if rc != 0:
+        # Parse violations from output
+        for line in (stdout + stderr).split('\n'):
+            if '→' in line:
+                parts = line.split('→')
+                if len(parts) == 2:
+                    violations.append({
+                        'file': parts[0].strip(),
+                        'pattern': parts[1].strip()
+                    })
+    
+    # Run validation script
+    start_time = datetime.now(timezone.utc)
+    rc2, stdout2, stderr2 = run_command(["bash", "pronto-scripts/validate_architecture.sh"])
+    end_time = datetime.now(timezone.utc)
+    
+    duration_ms2 = int((end_time - start_time).total_seconds() * 1000)
+    
+    checks.append({
+        'name': 'Architecture Validation Script',
+        'status': 'PASS' if rc2 == 0 else 'FAIL',
+        'duration': duration_ms2,
+        'output': stdout2 if rc2 == 0 else stderr2
+    })
+    
+    # Determine overall status
+    passed = all(c['status'] == 'PASS' for c in checks)
+    
+    # Generate report sections
+    report = [
+        generate_header(),
+        generate_summary(passed, checks),
+        generate_check_details(checks),
+        generate_violations(violations),
+        generate_recommendations(violations),
+        "\n================================================================================\n",
+        f"Report ID: ARCH-REPORT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}\n",
+        "================================================================================\n"
+    ]
+    
+    return "".join(report)
+
+
+def save_report(report: str, output_path: str = None) -> str:
+    """Save report to file or return as string."""
+    if output_path:
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w') as f:
+            f.write(report)
+        return output_path
+    return report
+
+
+def main():
+    """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate architecture validation report')
+    parser.add_argument('--mode', choices=['local', 'ci'], default='local',
+                       help='Run mode (local or CI)')
+    parser.add_argument('--output', '-o', help='Output file path')
+    parser.add_argument('--json', action='store_true', help='Output as JSON')
+    
+    args = parser.parse_args()
+    
+    report = generate_report(mode=args.mode)
+    
+    if args.json:
+        # Convert to JSON structure
+        print(json.dumps({
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'mode': args.mode,
+            'report': report
+        }, indent=2))
+    else:
+        print(report)
+    
+    if args.output:
+        save_report(report, args.output)
+        print(f"\nReport saved to: {args.output}")
+    
+    # Exit with appropriate code
+    sys.exit(1 if "❌ REJECTED" in report else 0)
+
+
+if __name__ == "__main__":
+    main()

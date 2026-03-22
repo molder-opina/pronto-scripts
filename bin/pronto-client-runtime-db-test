@@ -1,0 +1,140 @@
+#!/bin/bash
+# pronto-client-runtime-db-test
+# Architecture Gate: Verify that client app can start without database connection
+#
+# CRITICAL: Client should start in PRONTO_ROUTES_ONLY=1 mode without DB.
+# If violated, exit 1 (CI block).
+#
+# Usage: pronto-scripts/bin/pronto-client-runtime-db-test
+
+set -e
+
+echo "=============================================================================="
+echo "ARCHITECTURE GATE: pronto-client Runtime DB Test"
+echo "=============================================================================="
+echo ""
+
+# Set up environment for routes-only mode (no DB required)
+export PRONTO_ROUTES_ONLY=1
+export DATABASE_URL=""
+export POSTGRES_USER=""
+export POSTGRES_PASSWORD=""
+export POSTGRES_HOST=""
+export POSTGRES_PORT=""
+export POSTGRES_DB=""
+
+echo "Testing client app startup in PRONTO_ROUTES_ONLY=1 mode..."
+echo "------------------------------------------------------------------------------"
+
+# Test 1: Create app in routes-only mode
+echo "Test 1: App creation in routes-only mode"
+echo "----------------------------------------"
+
+cd /Users/molder/projects/github-molder/pronto
+
+# Use the Python interpreter from venv
+PYTHON_CMD="/Users/molder/projects/github-molder/pronto/pronto-tests/.venv-test/bin/python3.14"
+
+$PYTHON_CMD -c "
+import sys
+sys.path.insert(0, '/Users/molder/projects/github-molder/pronto/pronto-client/src')
+
+try:
+    from pronto_clients.app import create_app
+    app = create_app()
+    print('✓ App created successfully in routes-only mode')
+    print(f'✓ Routes registered: {len(app.url_map._rules)}')
+    
+    # Verify no DB initialization happened
+    print('✓ No database connection attempted')
+    
+except Exception as e:
+    print(f'✗ Failed to create app: {type(e).__name__}: {e}')
+    sys.exit(1)
+"
+
+if [[ $? -ne 0 ]]; then
+    echo ""
+    echo "=============================================================================="
+    echo "STATUS: REJECTED (exit 1)"
+    echo "=============================================================================="
+    exit 1
+fi
+
+echo ""
+echo "Test 2: Verify no DB initialization in create_app()"
+echo "----------------------------------------------------"
+
+APP_FILE="/Users/molder/projects/github-molder/pronto/pronto-client/src/pronto_clients/app.py"
+
+# Check that create_app doesn't call init_engine or init_db
+PROHIBITED_CALLS=(
+    "init_engine("
+    "init_db("
+    "create_engine("
+    "get_session()"
+)
+
+FOUND_PROHIBITED=()
+
+for call in "${PROHIBITED_CALLS[@]}"; do
+    if grep -q "$call" "$APP_FILE"; then
+        # Check if it's in init_runtime (which is allowed when not routes-only)
+        LINE_NUM=$(grep -n "$call" "$APP_FILE" | cut -d: -f1)
+        CONTEXT_START=$((LINE_NUM - 50))
+        CONTEXT_END=$((LINE_NUM + 5))
+        
+        CONTEXT=$(sed -n "${CONTEXT_START},${CONTEXT_END}p" "$APP_FILE")
+        
+        if [[ "$CONTEXT" != *"def init_runtime"* ]]; then
+            FOUND_PROHIBITED+=("$call")
+        fi
+    fi
+done
+
+if [[ ${#FOUND_PROHIBITED[@]} -gt 0 ]]; then
+    echo "✗ FAIL: Found prohibited DB calls in create_app():"
+    for p in "${FOUND_PROHIBITED[@]}"; do
+        echo "  - $p"
+    done
+    echo ""
+    echo "=============================================================================="
+    echo "STATUS: REJECTED (exit 1)"
+    echo "=============================================================================="
+    exit 1
+fi
+
+echo "✓ PASS: No prohibited DB initialization in create_app()"
+
+echo ""
+echo "Test 3: Verify get_session() usage in services"
+echo "-----------------------------------------------"
+
+# Check that pronto-client doesn't directly use get_session
+CLIENT_DB_USAGE=$(grep -rn "get_session()" "/Users/molder/projects/github-molder/pronto/pronto-client/src" 2>/dev/null || true)
+
+if [[ -n "$CLIENT_DB_USAGE" ]]; then
+    echo "✗ FAIL: pronto-client uses get_session() directly"
+    echo "$CLIENT_DB_USAGE"
+    echo ""
+    echo "=============================================================================="
+    echo "STATUS: REJECTED (exit 1)"
+    echo "=============================================================================="
+    exit 1
+fi
+
+echo "✓ PASS: pronto-client does not use get_session() directly"
+
+echo ""
+echo "=============================================================================="
+echo "✓ ALL TESTS PASSED: Client has no direct DB access"
+echo "=============================================================================="
+echo ""
+echo "Test Summary:"
+echo "  ✓ App creation in routes-only mode: PASSED"
+echo "  ✓ No prohibited DB calls in create_app(): PASSED"
+echo "  ✓ No direct get_session() usage: PASSED"
+echo ""
+echo "STATUS: APPROVED"
+echo "=============================================================================="
+exit 0

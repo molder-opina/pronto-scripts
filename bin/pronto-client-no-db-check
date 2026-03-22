@@ -1,0 +1,128 @@
+#!/bin/bash
+# pronto-client-no-db-check
+# Architecture Gate: Validate that pronto-client has NO direct database access
+#
+# CRITICAL: Cliente es API consumer puro. NO debe acceder a DB directa ni indirectamente.
+# If violated, exit 1 (CI block).
+#
+# Usage: pronto-scripts/bin/pronto-client-no-db-check
+
+set -e
+
+CLIENT_DIR="/Users/molder/projects/github-molder/pronto/pronto-client/src"
+
+echo "=============================================================================="
+echo "ARCHITECTURE GATE: pronto-client NO DB ACCESS CHECK"
+echo "=============================================================================="
+echo ""
+
+# Patterns that indicate direct DB access (prohibited in pronto-client)
+DB_PATTERNS=(
+    "Session"
+    "engine"
+    "Base"
+    "get_db"
+    "get_session"
+    "init_engine"
+    "create_engine"
+    "sessionmaker"
+    "scoped_session"
+)
+
+VIOLATIONS=()
+
+echo "Scanning for DB access patterns in pronto-client..."
+echo "------------------------------------------------------------------------------"
+
+for pattern in "${DB_PATTERNS[@]}"; do
+    # Search for pattern, excluding false positives and pycache
+    result=$(grep -rn "$pattern" "$CLIENT_DIR" 2>/dev/null | \
+        grep -v "__pycache__" | \
+        grep -v "Session ID" | \
+        grep -v "Session Status" | \
+        grep -v "api/sessions" | \
+        grep -v "def get_session" | \
+        grep -v "def set_session" | \
+        grep -v "dining_session" | \
+        grep -v "dining_session_id" | \
+        grep -v "dining_session_store" | \
+        grep -v "dining_session_service" | \
+        grep -v "API Base URL" | \
+        grep -v "base_url" | \
+        grep -v "API_BASE_URL" | \
+        grep -v "Session Flask" | \
+        grep -v "Sessions endpoints" || true)
+    
+    if [[ -n "$result" ]]; then
+        VIOLATIONS+=("$pattern")
+        echo "FOUND: $pattern"
+        echo "$result" | head -20
+        echo ""
+    fi
+done
+
+# Check for pronto_shared.db imports (CRITICAL)
+echo "Checking for pronto_shared.db imports..."
+echo "------------------------------------------------------------------------------"
+db_imports=$(grep -rn "from pronto_shared.db" "$CLIENT_DIR" 2>/dev/null || true)
+
+if [[ -n "$db_imports" ]]; then
+    VIOLATIONS+=("pronto_shared.db imports")
+    echo "FOUND: pronto_shared.db imports (CRITICAL)"
+    echo "$db_imports"
+    echo ""
+fi
+
+# Check for SQLAlchemy imports
+echo "Checking for SQLAlchemy imports..."
+echo "------------------------------------------------------------------------------"
+sqlalchemy_imports=$(grep -rn "from sqlalchemy" "$CLIENT_DIR" 2>/dev/null | \
+    grep -v "sqlalchemy.orm" | \
+    grep -v "sqlalchemy.ext" | \
+    grep -v "sqlalchemy.types" || true)
+
+if [[ -n "$sqlalchemy_imports" ]]; then
+    VIOLATIONS+=("SQLAlchemy imports")
+    echo "FOUND: SQLAlchemy imports"
+    echo "$sqlalchemy_imports"
+    echo ""
+fi
+
+# Report results
+echo "=============================================================================="
+echo "RESULTS"
+echo "=============================================================================="
+
+if [[ ${#VIOLATIONS[@]} -gt 0 ]]; then
+    echo ""
+    echo "CRITICAL: Architecture violations detected!"
+    echo ""
+    echo "Violations found:"
+    for v in "${VIOLATIONS[@]}"; do
+        echo "  - $v"
+    done
+    echo ""
+    echo "RULE: Cliente es API consumer puro. NO debe acceder a DB directa ni indirectamente."
+    echo "SOURCE: AGENTS.md section 12.4.2 (BFF prohibido para negocio/API)"
+    echo "SOURCE: AGENTS.md section 0.9.1 (CERO DEUDA TÉCNICA NUEVA)"
+    echo ""
+    echo "REQUIRED FIX:"
+    echo "  1. Mover toda lógica de DB a pronto-api o pronto-libs"
+    echo "  2. Cliente solo debe consumir endpoints /api/*"
+    echo "  3. Si hay servicios reutilizables, mover a pronto-libs/src/pronto_shared/services/"
+    echo ""
+    echo "=============================================================================="
+    echo "STATUS: REJECTED (exit 1)"
+    echo "=============================================================================="
+    exit 1
+fi
+
+echo ""
+echo "✓ PASS: No direct DB access patterns found in pronto-client"
+echo "✓ PASS: pronto-client follows API consumer pattern correctly"
+echo "✓ PASS: Architecture gate passed"
+echo ""
+echo "=============================================================================="
+echo "STATUS: APPROVED"
+echo "=============================================================================="
+exit 0

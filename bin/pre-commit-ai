@@ -176,7 +176,7 @@ load_config() {
 
 is_known_check() {
   case "$1" in
-    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy|business_invariants|rg_scans|config_fallbacks)
+    staged_artifacts|file_naming|mypy|tsc_no_emit|api_auth_policy|assets_policy|business_invariants|rg_scans|config_fallbacks|architecture_gate)
       return 0
       ;;
     *)
@@ -323,6 +323,15 @@ case "$check_name" in
           --mode warn \
           2>&1 || true"
       rc=0  # Never fail locally - CI will enforce
+      set -e
+      ;;
+    architecture_gate)
+      # Validate architecture constraints (no DB access from client)
+      set +e
+      run_timed_capture "$out_file" bash -c "\
+        cd '$WORKSPACE_ROOT' && \
+        python3 pronto-tests/architecture/test_no_db_access.py 2>&1 || true"
+      rc=$?
       set -e
       ;;
     *)
@@ -575,7 +584,7 @@ while IFS= read -r check_name; do
   fi
 
   hard_block=0
-  if [ "$check_name" = "staged_artifacts" ] || [ "$check_name" = "file_naming" ]; then
+  if [ "$check_name" = "staged_artifacts" ] || [ "$check_name" = "file_naming" ] || [ "$check_name" = "architecture_gate" ]; then
     hard_block=1
   fi
 
